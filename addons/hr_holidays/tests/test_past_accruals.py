@@ -59,7 +59,7 @@ class TestAccrualAllocations(TestHrHolidaysCommon):
 
     def _test_past_accrual(self):
         with freeze_time("2023-12-01"):
-            allocation = self.env['hr.leave.allocation'].create({
+            allocation = self.env['hr.leave.allocation'].with_context(tracking_disable=True).create({
                 'employee_id': self.employee_emp_id,
                 'allocation_type': 'accrual',
                 'accrual_plan_id': self.accrual_plan.id,
@@ -68,6 +68,7 @@ class TestAccrualAllocations(TestHrHolidaysCommon):
                 'number_of_days': 0,
             })
 
-            allocation._process_accrual_plans()
+            allocations_data = allocation._process_accrual_plans()
+            allocation._update_accrual_from_data(allocations_data, log=False)
 
             self.assertEqual(allocation.number_of_days, 0)
