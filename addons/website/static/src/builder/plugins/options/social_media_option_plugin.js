@@ -141,6 +141,7 @@ export class SocialMediaOptionPlugin extends Plugin {
             AddSocialMediaLinkAction,
         },
         normalize_processors: this.normalize.bind(this),
+        has_unsaved_data_predicates: () => this.changedRecordedSocialMedia().size || undefined,
         on_ready_to_save_document_handlers: this.saveRecordedSocialMedia.bind(this),
         content_not_editable_selectors: [".s_share"],
         content_editable_selectors: [
