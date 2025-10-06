@@ -38,6 +38,7 @@ const TRANSLATED_ATTRS = [
     "value",
     "data-oe-translate-src",
     "data-oe-translate-srcset",
+    "data-oe-translate-data-oe-expression",
 ];
 const TRANSLATION_ATTRIBUTES_SELECTOR = TRANSLATED_ATTRS.map(
     (att) => `[${att}*="data-oe-translation-source-sha="]`
@@ -226,7 +227,7 @@ export class TranslationPlugin extends Plugin {
         const translationRegex =
             /<span [^>]*data-oe-translation-source-sha="([^"]+)"[^>]*>(.*)<\/span>/;
         const isEmpty = (el) => !el.hasChildNodes() || el.innerHTML.trim() === "";
-        const matchTag = (el) => el.matches("input, select, textarea, img");
+        const matchTag = (el) => el.matches("input, select, textarea, img, div");
         for (const translatedAttr of TRANSLATED_ATTRS) {
             const filteredEditableEls = editableEls.filter(
                 (editableEl) =>

@@ -34,11 +34,12 @@ registry.category("translation-plugins").add(MediaTranslationPlugin.id, MediaTra
 
 export class TranslateMediaSrcAction extends BuilderAction {
     static id = "translateMediaSrc";
-    static dependencies = ["media"];
+    static dependencies = ["history", "media", "translation"];
 
     setup() {
         this.savingMap = {
             images: this.saveImage.bind(this),
+            videos: this.saveVideo.bind(this),
         };
     }
 
@@ -96,5 +97,17 @@ export class TranslateMediaSrcAction extends BuilderAction {
         }
         editingElement.classList.add("oe_translated");
         this.trigger("on_media_replaced_handlers", { newMediaEl: editingElement });
+    }
+
+    saveVideo(editingElement, newVideoEl) {
+        const originalSrc =
+            this.dependencies.translation.getTranslationInfo(editingElement)["data-oe-expression"]
+                .translation;
+        const newSrc = newVideoEl.querySelector("iframe").getAttribute("src");
+        editingElement.setAttribute("data-oe-expression", newSrc);
+        editingElement.querySelector("iframe").setAttribute("src", newSrc);
+        editingElement.classList.add("oe_translated");
+
+        this.handleTranslationMapHistory(editingElement, newSrc, originalSrc, "data-oe-expression");
     }
 }
