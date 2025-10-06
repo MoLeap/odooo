@@ -3,12 +3,19 @@ import { Component, onWillStart, onWillDestroy } from "@odoo/owl";
 import { browser } from "@web/core/browser/browser";
 import { range } from "@web/core/utils/numbers";
 
+import { AttendanceVideoStream } from "@hr_attendance/components/attendance_video_stream/attendance_video_stream";
+
 export class KioskPinCode extends Component {
     static template = "hr_attendance.KioskPinConfirm";
     static props = {
         employeeData: { type: Object },
         onClickBack: { type: Function },
         onPinConfirm: { type: Function },
+        captureCheckInImage: { type: Boolean },
+        exposeCamera: { type: Function, optional: true },
+    };
+    static components = {
+        AttendanceVideoStream,
     };
 
     setup() {
