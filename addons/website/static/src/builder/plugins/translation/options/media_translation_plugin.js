@@ -40,6 +40,7 @@ export class TranslateMediaSrcAction extends BuilderAction {
         this.savingMap = {
             images: this.saveImage.bind(this),
             videos: this.saveVideo.bind(this),
+            documents: this.saveDocument.bind(this),
         };
     }
 
@@ -109,5 +110,11 @@ export class TranslateMediaSrcAction extends BuilderAction {
         editingElement.classList.add("oe_translated");
 
         this.handleTranslationMapHistory(editingElement, newSrc, originalSrc, "data-oe-expression");
+    }
+
+    saveDocument(editingElement, newFileEl) {
+        editingElement.replaceChildren(...newFileEl.children);
+        editingElement.dataset.attachmentId = newFileEl.dataset.attachmentId;
+        editingElement.querySelector("a.o_link_readonly").classList.add("o_translate_inline");
     }
 }
