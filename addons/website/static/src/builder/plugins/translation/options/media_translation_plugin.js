@@ -2,13 +2,29 @@ import { BuilderAction } from "@html_builder/core/builder_action";
 import { Plugin } from "@html_editor/plugin";
 import { registry } from "@web/core/registry";
 
+/**
+ * @typedef { Object } MediaTranslationShared
+ * @property { MediaTranslationPlugin['translateMedia'] } translateMedia
+ */
+
+const translateImageOptionSelector = "img.o_savable_attribute";
+const translateVideoOptionSelector = ".media_iframe_video.o_savable_attribute";
+const translateDocumentOptionSelector = ".o_file_box";
+
 export class MediaTranslationPlugin extends Plugin {
     static id = "mediaTranslation";
-    static dependencies = ["imagePostProcess", "translation"];
+    static dependencies = ["history", "imagePostProcess", "media", "media_website", "translation"];
+    static shared = ["translateMedia"];
+
     /** @type {import("plugins").WebsiteResources} */
     resources = {
         builder_actions: {
             TranslateMediaSrcAction,
+        },
+        builder_options_render_context: {
+            translateImageOptionSelector,
+            translateVideoOptionSelector,
+            translateDocumentOptionSelector,
         },
         on_will_save_media_image_overrides: async (editingElement, newImgEl) => {
             // Replicate all attributes from the new image to the current
@@ -28,13 +44,6 @@ export class MediaTranslationPlugin extends Plugin {
             return true;
         },
     };
-}
-
-registry.category("translation-plugins").add(MediaTranslationPlugin.id, MediaTranslationPlugin);
-
-export class TranslateMediaSrcAction extends BuilderAction {
-    static id = "translateMediaSrc";
-    static dependencies = ["history", "media", "translation"];
 
     setup() {
         this.savingMap = {
@@ -42,15 +51,71 @@ export class TranslateMediaSrcAction extends BuilderAction {
             videos: this.saveVideo.bind(this),
             documents: this.saveDocument.bind(this),
         };
+        const translatableMediaSelector = [
+            translateDocumentOptionSelector,
+            translateImageOptionSelector,
+            translateVideoOptionSelector,
+        ].join(", ");
+
+        this.addDomListener(this.editable, "dblclick", async (ev) => {
+            const targetEl = ev.target.closest(translatableMediaSelector);
+            if (!targetEl) {
+                return;
+            }
+            if (this.isReplaceableMedia(targetEl)) {
+                const mediaType = this.getMediaType(targetEl);
+                this.dependencies.media_website.onDblClickEditableMedia(targetEl, async () => {
+                    await this.translateMedia(targetEl, mediaType);
+                });
+            }
+        });
+        this.addDomListener(this.editable, "click", (ev) => {
+            const targetEl = ev.target.closest(translatableMediaSelector);
+            if (!targetEl) {
+                return;
+            }
+            if (this.isReplaceableMedia(targetEl)) {
+                this.dependencies.media_website.openImageTooltip(targetEl);
+            }
+        });
     }
 
-    async apply({ editingElement, params: { mainParam: mediaType } }) {
+    getMediaType(el) {
+        if (el.matches(translateImageOptionSelector)) {
+            return "images";
+        }
+        if (el.matches(translateVideoOptionSelector)) {
+            return "videos";
+        }
+        if (el.matches(translateDocumentOptionSelector)) {
+            return "documents";
+        }
+    }
+    /**
+     * @param {HTMLElement} mediaEl
+     * @returns {Boolean}
+     */
+    isReplaceableMedia(mediaEl) {
+        if (this.getMediaType(mediaEl) === "documents") {
+            return true;
+        }
+        // An element marked `.o_translatable_attribute` means that it went
+        // through `findOEditable` and `buildTranslationInfoMap` in the
+        // TranslationPlugin. We can rely on that information.
+        return mediaEl.classList.contains("o_translatable_attribute");
+    }
+    /**
+     * Opens the media dialog to translate the source of the media.
+     * @param {HTMLElement} element - element that should be "translated"
+     * @param {"images" | "videos" | "documents"} mediaType
+     */
+    async translateMedia(element, mediaType) {
         await new Promise((resolve) => {
             const onClose = this.dependencies.media.openMediaDialog({
                 onlyImages: mediaType === "images",
                 noImages: mediaType !== "images",
                 visibleTabs: [mediaType.toUpperCase()],
-                node: editingElement,
+                node: element,
                 // TODO @image-translate: this is a one-to-one "translation" of
                 // the image. We bring back from the original image all the
                 // manipulations that have been done: shape, resizing, filters..
@@ -60,7 +125,8 @@ export class TranslateMediaSrcAction extends BuilderAction {
                 copiedDataAttributes:
                     mediaType === "images" ? ["oeTranslationState", "resizeWidth", "glFilter"] : [],
                 save: async (newMediaEl) => {
-                    await this.savingMap[mediaType](editingElement, newMediaEl);
+                    await this.savingMap[mediaType](element, newMediaEl);
+                    this.dependencies.history.addStep(); // Needed for the dblclick
                 },
             });
             onClose.then(resolve);
@@ -116,5 +182,16 @@ export class TranslateMediaSrcAction extends BuilderAction {
         editingElement.replaceChildren(...newFileEl.children);
         editingElement.dataset.attachmentId = newFileEl.dataset.attachmentId;
         editingElement.querySelector("a.o_link_readonly").classList.add("o_translate_inline");
+    }
+}
+
+registry.category("translation-plugins").add(MediaTranslationPlugin.id, MediaTranslationPlugin);
+
+export class TranslateMediaSrcAction extends BuilderAction {
+    static id = "translateMediaSrc";
+    static dependencies = ["mediaTranslation"];
+
+    async apply({ editingElement, params: { mainParam: mediaType } }) {
+        await this.dependencies.mediaTranslation.translateMedia(editingElement, mediaType);
     }
 }

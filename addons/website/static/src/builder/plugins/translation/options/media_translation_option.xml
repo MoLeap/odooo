@@ -38,15 +38,15 @@
     <xpath expr="//t[@id='translation_options']" position="before">
         <img_translation_option
             template="website.ImgTranslationOption"
-            selector="img.o_savable_attribute"
+            t-att-selector="translateImageOptionSelector"
             editableOnly="false"/>
         <video_translation_option
             template="website.VideoTranslationOption"
-            selector=".media_iframe_video.o_savable_attribute"
+            t-att-selector="translateVideoOptionSelector"
             editableOnly="false"/>
         <document_translation_option
             template="website.DocumentTranslationOption"
-            selector=".o_file_box"
+            t-att-selector="translateDocumentOptionSelector"
             editableOnly="false"/>
     </xpath>
 </t>
