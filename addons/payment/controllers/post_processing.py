@@ -2,12 +2,12 @@
 
 import logging
 
-import psycopg2
-
 from odoo import http
 from odoo.exceptions import UserError
 from odoo.http import request
 from odoo.tools.translate import LazyTranslate
+
+from odoo.addons.payment import utils as payment_utils
 
 _lt = LazyTranslate(__name__)
 _logger = logging.getLogger(__name__)
@@ -42,17 +42,21 @@ class PaymentPostProcessing(http.Controller):
         """
         monitored_tx = self._get_monitored_transaction()
         # The session might have expired, or the transaction never existed.
-        values = {"tx": monitored_tx} if monitored_tx else {"payment_not_found": True}
+        if monitored_tx:
+            notification_channel = payment_utils.generate_notification_channel(monitored_tx)
+            values = {"tx": monitored_tx, "notification_channel": notification_channel}
+        else:
+            values = {"payment_not_found": True}
         return request.render("payment.payment_status", values)
 
-    @http.route("/payment/status/poll", type="jsonrpc", auth="public")
-    def poll_status(self, **_kwargs):
-        """Fetch the transaction and trigger its post-processing.
+    @http.route("/payment/post_process", type="jsonrpc", auth="public")
+    def payment_post_process(self, **_kwargs):
+        """ Fetch the transaction and trigger its post-processing.
 
         :return: The post-processing values of the transaction.
         :rtype: dict
         """
-        # We only poll the payment status if a payment was found, so the transaction should exist.
+        # We only call the payment post processing on existing transactions.
         monitored_tx = self._get_monitored_transaction()
 
         # Post-process the transaction before redirecting the user to the landing route and its
@@ -60,22 +64,16 @@ class PaymentPostProcessing(http.Controller):
         if not monitored_tx.is_post_processed:
             try:
                 monitored_tx._post_process()
-            except (psycopg2.OperationalError, psycopg2.IntegrityError):  # Concurrent update error.
-                request.env.cr.rollback()  # Rollback and try later.
-                msg = "retry"
-                raise UserError(msg) from None
-            except Exception:
-                request.env.cr.rollback()
-                _logger.error(
-                    "Encountered an error while post-processing transaction with id %s.",
-                    monitored_tx.id,
+            except Exception as e:
+                _logger.exception(
+                    "Encountered an error while post-processing transaction with id %s:\n%s",
+                    monitored_tx.id, e
                 )
                 raise
-
         return {
-            "provider_code": monitored_tx.provider_code,
             "state": monitored_tx.state,
             "landing_route": monitored_tx.landing_route,
+            "state_message": monitored_tx.state_message,
         }
 
     @classmethod
