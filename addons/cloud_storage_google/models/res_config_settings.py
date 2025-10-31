@@ -1,6 +1,5 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import base64
 import json
 import requests
 from datetime import datetime, timezone
@@ -9,6 +8,7 @@ from google.auth.transport.requests import Request
 
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError, UserError
+from odoo.tools.binary import BinaryBytes
 
 from .ir_attachment import get_cloud_storage_google_credential
 
@@ -43,14 +43,14 @@ class ResConfigSettings(models.TransientModel):
     def get_values(self):
         res = super().get_values()
         if account_info := self.env['ir.config_parameter'].get_str('cloud_storage_google_account_info'):
-            res['cloud_storage_google_service_account_key'] = base64.b64encode(account_info.encode())
+            res['cloud_storage_google_service_account_key'] = BinaryBytes(account_info.encode('utf-8'))
         return res
 
     @api.onchange('cloud_storage_google_service_account_key')
     def _compute_cloud_storage_google_account_info(self):
         for setting in self:
             key = setting.cloud_storage_google_service_account_key
-            setting.cloud_storage_google_account_info = base64.b64decode(key) if key else False
+            setting.cloud_storage_google_account_info = key.decode('utf-8') if key else False
 
     def _setup_cloud_storage_provider(self):
         ICP = self.env['ir.config_parameter']
