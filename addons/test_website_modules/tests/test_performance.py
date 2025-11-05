@@ -295,7 +295,7 @@ class TestWebsiteAllPerformance(TestWebsitePerformanceCommon, TestWebsitePriceLi
         self.assertIn(f'<img src="/web/image/product.template/{self.productA.product_tmpl_id.id}/', html)
         self.assertIn(f'<img src="/web/image/product.image/{self.product_images.ids[1]}/', html)
 
-        query_count = 49  # To increase this number you must ask the permission to al
+        query_count = 50  # To increase this number you must ask the permission to al
         queries = {
             'orm_signaling_registry': 1,
             'website': 1,
@@ -322,6 +322,7 @@ class TestWebsiteAllPerformance(TestWebsitePerformanceCommon, TestWebsitePriceLi
             'ir_ui_view': 2,
             'website_menu': 1,
             'website_page': 1,
+            'uom_uom': 1,
         }
 
         addons = tuple(self.env.registry._init_modules) + (self.env.context.get('install_module'),)
@@ -375,9 +376,10 @@ class TestWebsiteAllPerformanceShop(TestWebsiteAllPerformance):
         # To increase the query count you must ask the permission to al
         query_count, queries = self._get_queries_shop()
 
-        query_count += 2
+        query_count += 3
         queries['account_tax'] += 1
         queries['account_account_tag'] += 1
+        queries['uom_uom'] += 1
 
         if self._has_demo_data():
             query_count += 2
