@@ -146,6 +146,9 @@ class TestChannelRTC(MailCommon, HttpCase):
                 ),
                 "Rtc": {
                     "iceServers": False,
+                    "canRecordTranscription": False,
+                    "canRecordVideo": False,
+                    "canRecordAudio": False,
                     "localSession": last_rtc_session_id + 1,
                     "serverInfo": None,
                 },
