@@ -3,6 +3,7 @@ from odoo.addons.account_edi_ubl_cii.models.account_edi_xml_ubl_bis3 import CHOR
 
 
 class TestUblCiiCommonChorusPro(TestUblCiiCommon):
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -23,3 +24,8 @@ class TestUblCiiCommonChorusPro(TestUblCiiCommon):
             'country_id': cls.env.ref('base.fr').id,
             **kwargs,
         })
+
+    @classmethod
+    def subfolders(cls):
+        subfolder_format, subfolder_document, _subfolder_country = super().subfolders()
+        return subfolder_format, subfolder_document, 'fr'
