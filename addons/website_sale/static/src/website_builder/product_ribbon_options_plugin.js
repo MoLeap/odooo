@@ -82,11 +82,15 @@ export class ProductsRibbonOptionPlugin extends Plugin {
     async _setRibbon(editingElement, ribbon, save = true) {
         const ribbonId = ribbon.id;
         const editableBody = editingElement.ownerDocument.body;
-        editingElement.dataset.ribbonId = ribbonId;
+        if (editingElement.dataset.ribbonId === editingElement.dataset.templateRibbonId) {
+            editingElement.dataset.ribbonId = ribbonId;
+        }
+
+        editingElement.dataset.templateRibbonId = ribbonId;
 
         // Update all ribbons with this ID
         const ribbons = editableBody.ownerDocument.querySelectorAll(
-            `[data-ribbon-id="${ribbonId}"]`,
+            `[data-template-ribbon-id="${ribbonId}"]`,
         );
 
         for (const ribbonElement of ribbons) {
@@ -287,7 +291,7 @@ export class SetRibbonAction extends BuilderAction {
     }
     isApplied({ editingElement, value }) {
         const ribbonId = parseInt(
-            editingElement.querySelector('.o_ribbons')?.dataset.ribbonId,
+            editingElement.querySelector('.o_ribbons')?.dataset.templateRibbonId,
         );
         const match = !ribbonId || !this.ribbonOptions.getRibbonsObject().hasOwnProperty(ribbonId)
             ? ''

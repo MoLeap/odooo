@@ -209,7 +209,12 @@
                                 options="{'no_quick_create': True}"
                             />
                             <!-- From hidden "Extra Info" group -->
-                            <field name="product_tag_ids" widget="many2many_tags" context="{'product_template_id': id}"/>
+                            <field
+                                name="product_tag_ids"
+                                widget="many2many_tags"
+                                options="{'on_tag_click': 'open_form'}"
+                                context="{'product_template_id': id}"
+                            />
                         </group>
                     </group>
                     <group>
