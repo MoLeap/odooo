@@ -69,6 +69,7 @@ export class HtmlComposerMessageField extends HtmlMailField {
             model: this.props.record.data.model,
             id: JSON.parse(this.props.record.data.res_ids || "[]")[0],
         });
+        config.isLogNote = this.props.record.data.subtype_is_log;
         return config;
     }
 

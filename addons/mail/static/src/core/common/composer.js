@@ -14,6 +14,7 @@ import { NavigableList } from "@mail/core/common/navigable_list";
 import { MAIL_PLUGINS, MAIL_SMALL_UI_PLUGINS } from "@mail/core/common/plugin/plugin_sets";
 import { useSuggestion } from "@mail/core/common/suggestion_hook";
 import { useSelection } from "@mail/utils/common/hooks";
+import { getInnerHtml } from "@mail/utils/common/html";
 import { isDragSourceExternalFile } from "@mail/utils/common/misc";
 import { Wysiwyg } from "@html_editor/wysiwyg";
 
@@ -27,6 +28,7 @@ import { Component, markup, onMounted, onWillUnmount, toRaw, EventBus } from "@o
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import {
+    createDocumentFragmentFromContent,
     htmlFormatList,
     htmlJoin,
     isHtmlEmpty,
@@ -259,6 +261,14 @@ export class Composer extends Component {
                 this.props.composer.forceCursorMove = false;
             },
             () => [this.props.composer.forceCursorMove]
+        );
+        useLayoutEffect(
+            () => {
+                if (this.env.inChatter && this.props.composer.mentionedPartners.length) {
+                    this.formatMentionsForComposer();
+                }
+            },
+            () => [this.props.type, this.props.composer.mentionedPartners.length]
         );
         useLayoutEffect(
             (isFullComposerOpen, restoredFromFullComposer, fullComposerButtonEl) => {
@@ -957,6 +967,36 @@ export class Composer extends Component {
         if (!this.ui.isSmall || !this.env.inChatter) {
             composer.autofocus++;
         }
+    }
+
+    formatMentionsForComposer() {
+        // Preserve trailing space added by editor after mention insertion
+        const lastCharBeforeFormatting = this.props.composer.composerText.at(-1);
+        const fragment = createDocumentFragmentFromContent(this.props.composer.composerHtml);
+        const elements = fragment.querySelectorAll(`[data-oe-model="res.partner"]`);
+        for (const el of elements) {
+            const partnerId = Number(el.dataset.oeId);
+            const partner = this.props.composer.mentionedPartners.find((p) => p.id === partnerId);
+            if (partner.partner_share && this.props.type === "note" && el.tagName === "A") {
+                const span = document.createElement("span");
+                span.textContent = el.textContent;
+                span.dataset.oeId = partner.id;
+                span.dataset.oeModel = "res.partner";
+                el.replaceWith(span);
+            } else if (el.tagName !== "A") {
+                const link = document.createElement("a");
+                link.textContent = el.textContent;
+                link.classList.add("o_mail_redirect");
+                link.setAttribute("href", `/odoo/res.partner/${partner.id}`);
+                link.dataset.oeId = partner.id;
+                link.dataset.oeModel = "res.partner";
+                el.replaceWith(link);
+            }
+        }
+        if (lastCharBeforeFormatting === " ") {
+            fragment.body.appendChild(document.createTextNode("\u00A0"));
+        }
+        this.props.composer.composerHtml = getInnerHtml(fragment);
     }
 
     onChangeWysiwygContent() {

@@ -12,6 +12,7 @@ export class MentionList extends Component {
     static props = {
         onSelect: { type: Function },
         close: { type: Function, optional: true },
+        isLogNote: { type: Boolean, optional: true },
         thread: { optional: true },
         type: { type: String },
     };
@@ -43,14 +44,14 @@ export class MentionList extends Component {
                     try {
                         await this.suggestionService.fetchSuggestions(
                             { delimiter, term },
-                            { thread }
+                            { thread, isLogNote: this.props.isLogNote }
                         );
                     } finally {
                         this.state.isFetching = false;
                     }
                     const { suggestions } = this.suggestionService.searchSuggestions(
                         { delimiter, term },
-                        { thread }
+                        { thread, isLogNote: this.props.isLogNote }
                     );
                     this.state.options = suggestions;
                 });

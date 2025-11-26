@@ -44,6 +44,7 @@ export class MailFullComposerSuggestionPlugin extends Plugin {
             this.historySavePointRestore = this.dependencies.history.makeSavePoint();
             this.mentionList.open({
                 props: {
+                    isLogNote: this.config.isLogNote,
                     onSelect: this.onSelect.bind(this),
                     thread: this.config.thread,
                     type: ev.data === "@" ? "partner" : "channel",

@@ -31,6 +31,8 @@ export class ResPartner extends ImStatusMixin {
     name;
     /** @type {string} */
     display_name;
+    /** @type {boolean | undefined} */
+    partner_share;
     /** @type {string} */
     phone;
     user_ids = fields.Many("res.users", { inverse: "partner_id" });
