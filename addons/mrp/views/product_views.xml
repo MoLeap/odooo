@@ -41,6 +41,17 @@
             </field>
         </record>
 
+        <record id="product_search_form_view" model="ir.ui.view">
+            <field name="name">product.product.view.search.inherit.mrp</field>
+            <field name="model">product.product</field>
+            <field name="inherit_id" ref="product.product_search_form_view"/>
+            <field name="arch" type="xml">
+                <field name="all_product_tag_ids" position="after">
+                    <field name="used_in"/>
+                </field>
+            </field>
+        </record>
+
         <record id="product_template_action" model="ir.actions.act_window">
             <field name="name">Products</field>
             <field name="res_model">product.template</field>
