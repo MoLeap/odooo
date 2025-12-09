@@ -1,6 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import models, fields
+from odoo import api, fields, models
 
 
 class HrAttendanceOvertimeRuleset(models.Model):
@@ -34,6 +34,13 @@ class HrAttendanceOvertimeRuleset(models.Model):
     active = fields.Boolean(default=True, readonly=False)
     version_ids = fields.One2many('hr.version', 'ruleset_id')
     versions_count = fields.Integer(compute="_compute_versions_count")
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get("name", False):
+                vals['name'] = self.env._("Unnamed Ruleset")
+        return super().create(vals_list)
 
     def _get_current_versions_domain(self):
         today = fields.Date.today()
@@ -76,10 +83,25 @@ class HrAttendanceOvertimeRuleset(models.Model):
     def action_show_versions(self):
         self.ensure_one()
         action = self.env['ir.actions.act_window']._for_xml_id('hr_attendance.hr_version_list_view')
-        action['domain'] = self._get_current_versions_domain()
-        action['context'] = {'default_ruleset_id': self.id}
+        domain = self._get_current_versions_domain()
+        action['domain'] = [d for d in domain if d != ('ruleset_id', 'in', self.ids)]
+        action['context'] = {
+            'search_default_ruleset_id': self.id,
+            'default_ruleset_id': self.id,
+        }
         return action
 
     def copy_data(self, default=None):
         vals_list = super().copy_data(default=default)
         return [dict(vals, name=self.env._("%s (copy)", ruleset.name)) for ruleset, vals in zip(self, vals_list)]
+
+    def action_create_overtime_rule(self):
+        return {
+            'name': self.env._('Create Rule'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.attendance.overtime.rule',
+            'view_mode': 'form',
+            'views': [[False, 'form']],
+            'view_id': self.env.ref('hr_attendance.hr_attendance_overtime_rule_view_form').id,
+            'target': 'new',
+        }
