@@ -4,6 +4,17 @@ import { ImageSelector as HtmlImageSelector } from "@html_editor/main/media/medi
 patch(HtmlImageSelector.prototype, {
     get attachmentsDomain() {
         const domain = super.attachmentsDomain;
+        if (this.env.services.website.currentWebsite) {
+            // Add website logos to media manager
+            domain.unshift(
+                "|",
+                "&",
+                "&",
+                ["res_model", "=", "website"],
+                ["res_id", "=", this.env.services.website.currentWebsiteId],
+                ["res_field", "=", "logo"]
+            );
+        }
         domain.push("|", ["url", "=", false], "!", ["url", "=like", "/web/image/website.%"]);
         domain.push(["key", "=", false]);
         return domain;
