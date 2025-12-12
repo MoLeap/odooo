@@ -25,6 +25,7 @@ import { TranslationButton } from "@web/views/fields/translation_button";
 import { HtmlViewer } from "./html_viewer";
 import { withSequence } from "@html_editor/utils/resource";
 import { fixInvalidHTML, instanceofMarkup } from "@html_editor/utils/sanitize";
+import { ATTACHMENT_PENDING_RECORD_ID } from "@html_editor/main/media/media_plugin";
 
 const HTML_FIELD_METADATA_ATTRIBUTES = ["data-last-history-steps"];
 
@@ -161,23 +162,50 @@ export class HtmlField extends Component {
         this.props.record.model.bus.trigger("FIELD_IS_DIRTY", this.isDirty);
     }
 
+    /**
+     * Attachments that were linked to res_id 0 we update them
+     * when the record have a valid res_id
+     */
+    async remapAttachmentsToRecord(content, resId, resModel) {
+        if (!resId || !content) {
+            return;
+        }
+        const unmappedAttachments = [
+            ...content.querySelectorAll(`.${ATTACHMENT_PENDING_RECORD_ID}`),
+        ];
+        const attachmentIds = unmappedAttachments
+            .map((attachment) => attachment.dataset?.attachmentId)
+            .filter(Boolean)
+            .map((id) => parseInt(id));
+        if (attachmentIds.length) {
+            await this.ormService.write("ir.attachment", attachmentIds, {
+                res_id: resId,
+                res_model: resModel,
+            });
+            unmappedAttachments.forEach((attachment) =>
+                attachment.classList.remove(ATTACHMENT_PENDING_RECORD_ID)
+            );
+        }
+        return;
+    }
+
     async getEditorContent() {
         const content = this.editor.getElContent();
         const oldSrcToNewSrcMap = await this.editor.shared.media?.savePendingImages(content);
         // Update the actual editable if still in the DOM.
         if (this.editor.editable && oldSrcToNewSrcMap) {
             this.editor.editable
-                .querySelectorAll('.o_b64_image_to_save, .o_modified_image_to_save')
-              .forEach((unsavedImage) => {
-                const oldSrc = unsavedImage.getAttribute('src');
-                if (oldSrcToNewSrcMap.has(oldSrc)) {
-                  unsavedImage.setAttribute(
-                    'src',
-                    oldSrcToNewSrcMap.get(oldSrc)
-                  );
-                }
-                unsavedImage.classList.remove("o_b64_image_to_save", "o_modified_image_to_save");
-              });
+                .querySelectorAll(".o_b64_image_to_save, .o_modified_image_to_save")
+                .forEach((unsavedImage) => {
+                    const oldSrc = unsavedImage.getAttribute("src");
+                    if (oldSrcToNewSrcMap.has(oldSrc)) {
+                        unsavedImage.setAttribute("src", oldSrcToNewSrcMap.get(oldSrc));
+                    }
+                    unsavedImage.classList.remove(
+                        "o_b64_image_to_save",
+                        "o_modified_image_to_save"
+                    );
+                });
         }
         return content;
     }
@@ -270,6 +298,12 @@ export class HtmlField extends Component {
                 return { resModel, resId };
             },
             resources: {},
+            onEditorReady: (editable) => {
+                const { resId, resModel } = this.props.record;
+                if (resId) {
+                    this.remapAttachmentsToRecord(editable, resId, resModel);
+                }
+            },
             ...this.props.editorConfig,
         };
 

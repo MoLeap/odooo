@@ -115,7 +115,7 @@ export class Editor {
             editable.style.height = this.config.height;
         }
         this.startPlugins();
-        this.config.onEditorReady?.();
+        this.config.onEditorReady?.(this.editable);
     }
 
     preparePlugins() {
