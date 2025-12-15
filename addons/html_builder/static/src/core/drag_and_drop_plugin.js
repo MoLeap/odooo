@@ -80,7 +80,7 @@ import { selectElements } from "@html_editor/utils/dom_traversal";
 
 export class DragAndDropPlugin extends Plugin {
     static id = "dragAndDrop";
-    static dependencies = ["dropzone", "history", "operation", "builderOptions"];
+    static dependencies = ["dropzone", "domMutation", "operation", "builderOptions"];
     /** @type {import("plugins").BuilderResources} */
     resources = {
         has_overlay_options: { hasOption: (el) => this.isDraggable(el) },
@@ -221,7 +221,7 @@ export class DragAndDropPlugin extends Plugin {
                     withLoadingEffect: false,
                     canTimeout: false,
                 });
-                const restoreDragSavePoint = this.dependencies.history.makeSavePoint();
+                const restoreDragSavePoint = this.dependencies.domMutation.makeSavePoint();
                 this.cancelDragAndDrop = () => {
                     this.dependencies.dropzone.removeDropzones();
                     // Undo the changes needed to ease the drag and drop.
@@ -430,7 +430,7 @@ export class DragAndDropPlugin extends Plugin {
                     dragState: this.dragState,
                 });
 
-                // Add a history step only if the element was not dropped where
+                // Add a history commit only if the element was not dropped where
                 // it was before, otherwise cancel everything.
                 let hasSamePositionAsStart;
                 if ("hasSamePositionAsStart" in this.dragState) {
@@ -445,7 +445,7 @@ export class DragAndDropPlugin extends Plugin {
                         startParentEl === parentEl;
                 }
                 if (!hasSamePositionAsStart) {
-                    this.dependencies.history.addStep();
+                    this.dependencies.domMutation.commit();
                 } else {
                     this.cancelDragAndDrop();
                     return;

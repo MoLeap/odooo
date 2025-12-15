@@ -16,7 +16,7 @@ export class SyntaxHighlightingPlugin extends Plugin {
     static dependencies = [
         "baseContainer",
         "overlay",
-        "history",
+        "domMutation",
         "selection",
         "protectedNode",
         "embeddedComponents",
@@ -105,7 +105,7 @@ export class SyntaxHighlightingPlugin extends Plugin {
                         const textarea = codeBlock.querySelector("textarea");
                         if (textarea !== codeBlock.ownerDocument.activeElement) {
                             textarea.focus();
-                            this.dependencies.history.stageFocus();
+                            this.dependencies.domMutation.stageFocus();
                         }
                     }
                 }
@@ -124,9 +124,9 @@ export class SyntaxHighlightingPlugin extends Plugin {
     setupNewCodeBlock({ name, props }) {
         if (name === "syntaxHighlighting") {
             Object.assign(props, {
-                onTextareaFocus: () => this.dependencies.history.stageFocus(),
+                onTextareaFocus: () => this.dependencies.domMutation.stageFocus(),
                 convertToParagraph: ({ target }) => {
-                    this.dependencies.history.stageSelection();
+                    this.dependencies.domMutation.stageSelection();
                     const component = target.closest(`[data-embedded='${name}']`);
                     const embeddedProps = getEmbeddedProps(component);
                     const baseContainer = this.dependencies.baseContainer.createBaseContainer();
@@ -134,7 +134,7 @@ export class SyntaxHighlightingPlugin extends Plugin {
                     component.replaceWith(baseContainer);
                     newlinesToLineBreaks(baseContainer);
                     this.dependencies.selection.setCursorStart(baseContainer);
-                    this.dependencies.history.addStep();
+                    this.dependencies.domMutation.commit();
                 },
             });
             props.host.removeAttribute("data-syntax-highlighting-autofocus");

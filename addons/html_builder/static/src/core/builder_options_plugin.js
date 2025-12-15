@@ -128,7 +128,7 @@ import { omit } from "@web/core/utils/objects";
 
 export class BuilderOptionsPlugin extends Plugin {
     static id = "builderOptions";
-    static dependencies = ["operation", "history"];
+    static dependencies = ["operation", "domMutation"];
     static shared = [
         "checkElement",
         "closestWithOption",
@@ -147,10 +147,10 @@ export class BuilderOptionsPlugin extends Plugin {
     ];
     /** @type {import("plugins").BuilderResources} */
     resources = {
-        on_will_add_step_handlers: this.onWillAddStep.bind(this),
-        on_step_added_handlers: this.onStepAdded.bind(this),
-        on_undone_handlers: (revertedStep) => this.restoreContainers(revertedStep, "undo"),
-        on_redone_handlers: (revertedStep) => this.restoreContainers(revertedStep, "redo"),
+        on_will_commit_handlers: this.onWillCommit.bind(this),
+        on_committed_handlers: this.onCommitted.bind(this),
+        on_undone_handlers: (revertedCommit) => this.restoreContainers(revertedCommit, "undo"),
+        on_redone_handlers: (revertedCommit) => this.restoreContainers(revertedCommit, "redo"),
         clean_for_save_processors: this.cleanForSave.bind(this),
         reload_context_processors: (context, el) => {
             if (el) {
@@ -278,12 +278,12 @@ export class BuilderOptionsPlugin extends Plugin {
     }
 
     updateContainers(target, { forceUpdate = false } = {}) {
-        if (this.dependencies.history.getIsCurrentStepModified()) {
+        if (this.dependencies.domMutation.hasStagedMutations()) {
             console.warn(
-                "Should not have any mutations in the current step when you update the container selection"
+                "Should not have any mutations in the current commit when you update the container selection"
             );
         }
-        if (this.dependencies.history.getIsPreviewing()) {
+        if (this.dependencies.domMutation.getIsPreviewing()) {
             return;
         }
         if (target) {
@@ -476,7 +476,7 @@ export class BuilderOptionsPlugin extends Plugin {
                 button.handler = (...args) => {
                     this.dependencies.operation.next(async () => {
                         await handler(...args);
-                        this.dependencies.history.addStep();
+                        this.dependencies.domMutation.commit();
                     });
                 };
             }
@@ -498,28 +498,30 @@ export class BuilderOptionsPlugin extends Plugin {
 
     /**
      * Activates the containers of the given element or deactivate them if false
-     * is given. They will be (de)activated once the current step is added (see
-     * `onStepAdded`).
+     * is given. They will be (de)activated once the current commit is added (see
+     * `onCommitted`).
      *
      * @param {HTMLElement|Boolean} targetEl the element to activate or `false`
      */
     setNextTarget(targetEl) {
-        if (this.dependencies.history.getIsPreviewing()) {
+        if (this.dependencies.domMutation.getIsPreviewing()) {
             return;
         }
-        // Store the next target to activate in the current step.
-        this.dependencies.history.setStepExtra("nextTarget", targetEl);
+        // Store the next target to activate in the current commit.
+        this.dependencies.domMutation.updateExternal("nextTarget", targetEl);
     }
 
-    onWillAddStep() {
-        // Store the current target in the current step.
-        this.dependencies.history.setStepExtra("currentTarget", this.target);
+    onWillCommit(type) {
+        if (!["undo", "redo"].includes(type)) {
+            // Store the current target in the current commit.
+            this.dependencies.domMutation.updateExternal("currentTarget", this.target);
+        }
     }
 
-    onStepAdded({ step }) {
+    onCommitted(commit) {
         // If a target is specified, activate its containers, otherwise simply
         // update them.
-        const nextTargetEl = step.extraStepInfos.nextTarget;
+        const nextTargetEl = commit.data.external.nextTarget;
         if (nextTargetEl) {
             this.updateContainers(nextTargetEl, { forceUpdate: true });
         } else if (nextTargetEl === false) {
@@ -530,17 +532,17 @@ export class BuilderOptionsPlugin extends Plugin {
     }
 
     /**
-     * Restores the containers of the target stored in the reverted step.
+     * Restores the containers of the target stored in the reverted commit.
      *
-     * @param {Object} revertedStep the step
+     * @param {Object} revertedCommit the commit
      * @param {String} mode "undo" or "redo"
      */
-    restoreContainers(revertedStep, mode) {
-        if (revertedStep && revertedStep.extraStepInfos.currentTarget) {
-            let targetEl = revertedStep.extraStepInfos.currentTarget;
-            // If the step was supposed to activate another target, activate
+    restoreContainers(revertedCommit, mode) {
+        if (revertedCommit && revertedCommit.data.external.currentTarget) {
+            let targetEl = revertedCommit.data.external.currentTarget;
+            // If the commit was supposed to activate another target, activate
             // this one instead.
-            const nextTarget = revertedStep.extraStepInfos.nextTarget;
+            const nextTarget = revertedCommit.data.external.nextTarget;
             if (mode === "redo" && (nextTarget || nextTarget === false)) {
                 targetEl = nextTarget;
             }

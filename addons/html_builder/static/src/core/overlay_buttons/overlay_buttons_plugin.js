@@ -22,7 +22,7 @@ import { withSequence } from "@html_editor/utils/resource";
 
 export class OverlayButtonsPlugin extends Plugin {
     static id = "overlayButtons";
-    static dependencies = ["builderOptions", "overlay", "history", "operation", "toolbar"];
+    static dependencies = ["builderOptions", "overlay", "domMutation", "operation", "toolbar"];
     static shared = [
         "hideOverlayButtons",
         "showOverlayButtons",
@@ -33,7 +33,7 @@ export class OverlayButtonsPlugin extends Plugin {
     resources = {
         on_selectionchange_handlers: this.shouldShowToolbar.bind(this),
         on_selection_leave_handlers: this.showOverlayButtonsUi.bind(this),
-        on_step_added_handlers: this.refreshButtons.bind(this),
+        on_committed_handlers: this.refreshButtons.bind(this),
         on_current_options_containers_changed_handlers: this.addOverlayButtons.bind(this),
         on_mobile_preview_clicked_handlers: withSequence(20, this.refreshButtons.bind(this)),
     };
@@ -132,7 +132,7 @@ export class OverlayButtonsPlugin extends Plugin {
             button.handler = (...args) => {
                 this.dependencies.operation.next(async () => {
                     await handler(...args);
-                    this.dependencies.history.addStep();
+                    this.dependencies.domMutation.commit();
                 });
             };
         }

@@ -1,4 +1,4 @@
-import { nodeToTree } from "@html_editor/core/history_plugin";
+import { nodeToTree } from "@html_editor/utils/dom_info";
 import { Plugin } from "@html_editor/plugin";
 import { withSequence } from "@html_editor/utils/resource";
 import { selectElements } from "@html_editor/utils/dom_traversal";
@@ -21,7 +21,7 @@ import { renderToElement } from "@web/core/utils/render";
  */
 export class EmbeddedComponentPlugin extends Plugin {
     static id = "embeddedComponents";
-    static dependencies = ["history", "protectedNode", "selection"];
+    static dependencies = ["history", "domMutation", "protectedNode", "selection"];
     static shared = ["renderBlueprintToElement"];
     /** @type {import("plugins").EditorResources} */
     resources = {
@@ -29,10 +29,16 @@ export class EmbeddedComponentPlugin extends Plugin {
         on_attribute_changed_handlers: this.onChangeAttribute.bind(this),
         on_savepoint_restored_handlers: () => this.handleComponents(this.editable),
         on_history_reset_handlers: () => this.handleComponents(this.editable),
-        on_history_reset_from_steps_handlers: () => this.handleComponents(this.editable),
-        on_step_added_handlers: ({ stepCommonAncestor }) =>
-            this.handleComponents(stepCommonAncestor),
-        on_external_step_added_handlers: () => this.handleComponents(this.editable),
+        on_history_reset_from_commits_handlers: () => this.handleComponents(this.editable),
+        on_committed_handlers: (commit) => {
+            let root;
+            this.getResource("commit_root_providers").find((p) => {
+                root = p(commit);
+                return root;
+            });
+            this.handleComponents(root);
+        },
+        on_external_commit_added_handlers: () => this.handleComponents(this.editable),
 
         /** Processors */
         clean_for_save_processors: (root) => this.cleanForSave(root),
@@ -83,7 +89,7 @@ export class EmbeddedComponentPlugin extends Plugin {
     }
 
     /**
-     * @typedef {import("@html_editor/core/history_plugin").Tree} Tree
+     * @typedef {import("@html_editor/core/dom_mutation_plugin").Tree} Tree
      *
      * @param {Tree[]} serializableDescendants
      * @param {Node} elem
@@ -130,18 +136,18 @@ export class EmbeddedComponentPlugin extends Plugin {
 
     /**
      * Apply an embedded state change received from `data-embedded-state`
-     * attribute. In some cases (undo/redo/revertStepsUntil history operations),
+     * attribute. In some cases (undo/redo/revertCommitsUntil history operations),
      * the attribute has to be set to a new value, computed by the
      * stateChangeManager.
      *
      * @param {Object} attributeChange @see HistoryPlugin
      * @param { Object } options
-     * @param { boolean } options.forNewStep whether the mutation is being used
-     *        to create a new step
+     * @param { boolean } options.ensureNewMutations whether the mutation is being used
+     *        to create a new commit
      * @returns {string} new attribute value to set on the node, which might be
      *        unchanged
      */
-    onChangeAttribute(attributeChange, { forNewStep = false } = {}) {
+    onChangeAttribute(attributeChange, { ensureNewMutations = false } = {}) {
         const attributeValue = attributeChange.value;
         let newAttributeValue;
         if (attributeChange.attributeName === "data-embedded-state") {
@@ -154,7 +160,7 @@ export class EmbeddedComponentPlugin extends Plugin {
                 // the attribute value
                 newAttributeValue = stateChangeManager.onStateChanged(attrState, {
                     reverse: attributeChange.reverse,
-                    forNewStep,
+                    ensureNewMutations,
                 });
             }
         }
@@ -170,7 +176,7 @@ export class EmbeddedComponentPlugin extends Plugin {
         if (!this.hostToStateChangeManagerMap.has(host)) {
             const config = {
                 host,
-                commitStateChanges: () => this.dependencies.history.addStep(),
+                commitStateChanges: () => this.dependencies.domMutation.commit(),
             };
             const stateChangeManager = embedding.getStateChangeManager(config);
             stateChangeManager.setup();
@@ -229,7 +235,7 @@ export class EmbeddedComponentPlugin extends Plugin {
     destroyRemovedComponents(infos) {
         // Avoid registering mutations if removed hosts are handled in
         // the same microtask as when they were removed.
-        this.dependencies.history.ignoreDOMMutations(() => {
+        this.dependencies.domMutation.ignoreDOMMutations(() => {
             for (const info of infos) {
                 if (!this.editable.contains(info.host)) {
                     const host = info.host;

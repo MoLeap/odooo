@@ -229,7 +229,7 @@ export function useSelectableComponent(id, { onItemChange } = {}) {
     });
 
     function refreshCurrentItem() {
-        if (env.editor.isDestroyed || env.editor.shared.history.getIsPreviewing()) {
+        if (env.editor.isDestroyed || env.editor.shared.domMutation.getIsPreviewing()) {
             return;
         }
         let currentItem;
@@ -612,7 +612,8 @@ export function useClickableBuilderComponent() {
     const onReady = usePrepareAction(getAllActions);
     const { reload } = useReloadAction(getAllActions);
 
-    const applyOperation = comp.env.editor.shared.history.makePreviewableAsyncOperation(callApply);
+    const applyOperation =
+        comp.env.editor.shared.domMutation.makePreviewableAsyncOperation(callApply);
     const inheritedActionIds =
         comp.props.inheritedActions || comp.env.weContext.inheritedActions || [];
 
@@ -771,7 +772,7 @@ export function useOperationWithReload(callApply, reload) {
         try {
             const applyResults = await callApply(...args);
             if (!applyResults.includes(BuilderAction.cancelReload)) {
-                env.editor.shared.history.addStep();
+                env.editor.shared.domMutation.commit();
                 await env.editor.shared.savePlugin.save();
                 const url = reload.getReloadUrl?.();
                 await env.editor.config.reloadEditor({ url, editingElement });
@@ -950,7 +951,8 @@ export function useInputBuilderComponent({
         return await Promise.all(proms);
     }
 
-    const applyOperation = comp.env.editor.shared.history.makePreviewableAsyncOperation(callApply);
+    const applyOperation =
+        comp.env.editor.shared.domMutation.makePreviewableAsyncOperation(callApply);
     const operationWithReload = useOperationWithReload(callApply, reload);
     function getState(editingElement) {
         if (!isConnectedElement(editingElement)) {
@@ -1086,7 +1088,7 @@ export function useInputDebouncedCommit(ref) {
     }, 550);
     // ↑ 500 is the delay when holding keydown between the 1st and 2nd event
     // fired. Some additional delay by the browser may add another ~5-10ms.
-    // We debounce above that threshold to keep a single history step when
+    // We debounce above that threshold to keep a single history commit when
     // holding up/down on a number or range input.
 }
 
