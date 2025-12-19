@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="l10n_fr_pdp_view_move_form" model="ir.ui.view">
+        <field name="name">l10n.fr.pdp.view.move.form</field>
+        <field name="model">account.move</field>
+        <field name="priority">30</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <header position="inside">
+                <button name="action_pdp_open_response_wizard"
+                        type="object"
+                        class="btn btn-secondary"
+                        string="Send Response"
+                        invisible="not pdp_can_send_response"/>
+            </header>
+            <xpath expr="//div[@name='peppol_div']" position="after">
+                <field name="ppf_move_state" invisible="not peppol_message_uuid"/>
+                <field name="ppf_lifecycle_state" invisible="not peppol_message_uuid"/>
+                <!-- TODO: remove after testing -->
+                <field name="peppol_message_uuid" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
