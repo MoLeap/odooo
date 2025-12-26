@@ -1642,8 +1642,8 @@ class TestSaleProject(TestSaleProjectCommon):
             - Create a project and link it to the sale order.
             - Create a task and link it to the project.
             - Verify that the project is linked to the sale order.
-            - Verify that the tasks is linked to the sale order.
-            - Verify that the project & task smart button is visible.
+            - Verify that the task without SO item is not linked to the sale order.
+            - Verify that the project & task smart button is hidden.
             - Confirm the sale order.
             - Verify the visibility of the project & task smart button.
         """
