@@ -724,22 +724,30 @@ class PurchaseOrder(models.Model):
             'price': price,
             'currency_id': currency.id,
             'discount': line.discount,
-            'delay': 0,
+            'delay': (line.date_planned.date() - fields.Datetime.now().date()).days,
+            'product_id': line.product_id.id if line.product_id.product_variant_count > 1 else False,
         }
 
     def _add_supplier_to_product(self):
         # Add the partner in the supplier list of the product if the supplier is not registered for
         # this product. We limit to 10 the number of suppliers for a product to avoid the mess that
         # could be caused for some generic products ("Miscellaneous").
+        suppliers_by_template = {}
+        # Do not add a contact as a supplier
+        partner = self.partner_id if not self.partner_id.parent_id else self.partner_id.parent_id
+        allowed_partners = partner | self.partner_id
         for line in self.order_line:
-            # Do not add a contact as a supplier
-            partner = self.partner_id if not self.partner_id.parent_id else self.partner_id.parent_id
-            already_seller = (partner | self.partner_id) & line.product_id.seller_ids.mapped('partner_id')
-            if line.product_id and not already_seller and len(line.product_id.seller_ids) <= 10:
+            product = line.product_id
+            is_variant = product.product_variant_count > 1
+            already_seller = product.seller_ids.filtered(
+                lambda s: s.partner_id in allowed_partners and
+                (not is_variant or s.product_id == product)
+            )
+            if product and not already_seller and len(product.seller_ids) <= 10:
                 price = line.price_unit
                 # Compute the price for the template's UoM, because the supplier's UoM is related to that UoM.
-                if line.product_id.product_tmpl_id.uom_id != line.uom_id:
-                    default_uom = line.product_id.product_tmpl_id.uom_id
+                if product.product_tmpl_id.uom_id != line.uom_id:
+                    default_uom = product.product_tmpl_id.uom_id
                     price = line.uom_id._compute_price(price, default_uom)
 
                 supplierinfo = self._prepare_supplier_info(partner, line, price, line.currency_id)
@@ -748,12 +756,39 @@ class PurchaseOrder(models.Model):
                 if line.selected_seller_id:
                     supplierinfo['product_name'] = line.selected_seller_id.product_name
                     supplierinfo['product_code'] = line.selected_seller_id.product_code
-                    supplierinfo['uom_id'] = line.uom_id.id
-                vals = {
-                    'seller_ids': [(0, 0, supplierinfo)],
-                }
-                # supplier info should be added regardless of the user access rights
-                line.product_id.product_tmpl_id.sudo().write(vals)
+
+                # Group supplier values per template to batch-create supplierinfo records
+                suppliers_to_create = suppliers_by_template.setdefault(product.product_tmpl_id, [])
+
+                if not suppliers_to_create:
+                    suppliers_to_create.append(supplierinfo)
+                else:
+                    product_id = supplierinfo.get('product_id')
+                    products = {s.get('product_id') for s in suppliers_to_create}
+                    if product_id not in products:
+                        suppliers_to_create.append(supplierinfo)
+
+        for template, suppliers_to_create in suppliers_by_template.items():
+            # If all variant suppliers have the same price and delay,
+            # create a single template-level supplier instead of multiple variant records.
+            reference_supplier = suppliers_to_create[0]
+            if len(suppliers_to_create) > 1 and all(
+                s.get('price') == reference_supplier.get('price') and s.get('delay') == reference_supplier.get('delay') for s in suppliers_to_create
+            ):
+                suppliers_to_create = [{**reference_supplier, 'product_id': False}]
+
+            # Skip creation if a template-level supplier already exists for this partner.
+            already_seller = template.seller_ids.filtered(lambda s: s.partner_id in allowed_partners and not s.product_id)
+            if already_seller and not suppliers_to_create[0].get('product_id'):
+                continue
+
+            # supplier info should be added regardless of the user access rights
+            template.sudo().write({
+                'seller_ids': [
+                    Command.create(seller)
+                    for seller in suppliers_to_create
+                ],
+            })
 
     def action_bill_matching(self):
         self.ensure_one()
