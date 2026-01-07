@@ -495,6 +495,7 @@ const GPSPicker = InputUserValueWidget.extend({
             return;
         }
 
+        await this.contentWindow.google.maps.importLibrary("places");
         this._gmapAutocomplete = new this.contentWindow.google.maps.places.Autocomplete(this.inputEl, {types: ['geocode']});
         this.contentWindow.google.maps.event.addListener(this._gmapAutocomplete, 'place_changed', this._onPlaceChanged.bind(this));
     },
