@@ -2854,6 +2854,12 @@ class AccountMove(models.Model):
             ):
                 raise ValidationError(_("The currency rate must be strictly positive."))
 
+    # @api.constrains('journal_id', 'statement_id', 'date')
+    # def _check_statement_journal(self):
+    #     for move in self:
+            # if not move.statement_id and move.journal_id.type == 'bank':
+            #     raise ValidationError(_("Bank statements must be linked to a journal of type Bank."))
+
     # -------------------------------------------------------------------------
     # CATALOG
     # -------------------------------------------------------------------------
@@ -6207,6 +6213,60 @@ class AccountMove(models.Model):
             self._post(soft=False)
         if autopost_bills_wizard := self._show_autopost_bills_wizard():
             return autopost_bills_wizard
+        if self in self.env.companies.mapped('account_opening_move_id'):
+            bank_journals = self.env['account.journal'].search([
+                *self.env['account.journal']._check_company_domain(self.company_id),
+                ('type', 'in', ('bank', 'cash')),
+            ])
+            for journal in bank_journals:
+                opening_bank_lines = self.line_ids.filtered(
+                    lambda line, acc=journal.default_account_id: line.account_id == acc,
+                )
+                if not opening_bank_lines:
+                    continue
+
+                bank_balance = sum(opening_bank_lines.mapped('balance'))
+                if journal.currency_id:
+                    amount = sum(opening_bank_lines.mapped('amount_currency'))
+                else:
+                    amount = bank_balance
+
+                if self.company_id.currency_id.is_zero(bank_balance):
+                    continue
+
+                existing = self.env['account.bank.statement.line'].search([
+                    ('journal_id', '=', journal.id),
+                    ('payment_ref', '=', _("Opening balance")),
+                    ('date', '=', self.date),
+                ], limit=1)
+                if existing:
+                    continue
+
+                st_line = self.env['account.bank.statement.line'].create({
+                    'date': self.date,
+                    'payment_ref': _("Opening balance"),
+                    'amount': amount,
+                    'journal_id': journal.id,
+                })
+
+                if not st_line.statement_id:
+                    self.env['account.bank.statement'].create({
+                        'name': _("Opening Balance"),
+                        'date': self.date,
+                        'journal_id': journal.id,
+                        'line_ids': [Command.link(st_line.id)],
+                    })
+
+                _liquidity, suspense, _other = st_line._seek_for_lines()
+                if suspense:
+                    suspense.with_context(
+                        skip_account_move_synchronization=True,
+                        force_delete=True,
+                        skip_readonly_check=True,
+                    ).write({'account_id': journal.default_account_id.id})
+                    (suspense + opening_bank_lines).with_context(
+                        no_exchange_difference=True,
+                    ).reconcile()
         return False
 
     def _get_moves_requiring_confirmation(self):
