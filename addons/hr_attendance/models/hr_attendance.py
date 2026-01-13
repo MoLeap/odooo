@@ -4,7 +4,7 @@ import pytz
 
 from calendar import monthrange
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from dateutil.relativedelta import relativedelta
 from operator import itemgetter
 from pytz import timezone
@@ -363,6 +363,15 @@ class HrAttendance(models.Model):
             company_threshold = emp.company_id.overtime_company_threshold / 60.0
             employee_threshold = emp.company_id.overtime_employee_threshold / 60.0
 
+            if emp.resource_calendar_id:
+                tz = timezone(emp.tz) if emp.tz else None
+                leave_intervals = emp.resource_calendar_id._leave_intervals_batch(
+                    start,
+                    stop,
+                    tz=tz,
+                    resources=emp.resource_id,
+                    domain=[('company_id', 'in', [False, emp.company_id.id])])[emp.resource_id.id]
+
             for day_data in attendance_dates:
                 attendance_date = day_data[1]
                 attendances = attendances_per_day.get(attendance_date, self.browse())
@@ -386,6 +395,11 @@ class HrAttendance(models.Model):
                     else:
                         # Count time before, during and after 'working hours'
                         pre_work_time, work_duration, post_work_time, planned_work_duration = attendances._get_pre_post_work_time(emp, working_times, attendance_date)
+                        if emp.is_flexible:
+                            min_date = working_times[attendance_date][-1][-1]
+                            max_date = datetime.combine(attendance_date, time.max, tzinfo=tz)
+                            day_interval = Intervals([(min_date, max_date, self.env['resource.calendar.attendance'])])
+                            planned_work_duration -= sum_intervals(day_interval & leave_intervals)
                         # Overtime within the planned work hours + overtime before/after work hours is > company threshold
                         total_overtime_duration = pre_work_time + work_duration + post_work_time - planned_work_duration
                         if total_overtime_duration > company_threshold and total_overtime_duration > 0:
