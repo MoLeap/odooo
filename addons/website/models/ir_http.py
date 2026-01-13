@@ -225,13 +225,14 @@ class IrHttp(models.AbstractModel):
     @classmethod
     def _pre_dispatch(cls, rule, arguments):
         super()._pre_dispatch(rule, arguments)
-
         env = request.env
         website_id = env.context.get('website_id') or env.context.get('fallback_website_id')
         if not website_id:
             website_id = env['ir.http']._get_current_website_fallback()
+        if expected_website_id := env['ir.http']._get_expected_website_id(website_id):
+            request.update_context(website_id=expected_website_id)
         if website_id and not env.context.get('website_id'):
-            if request.is_frontend:
+            if request.is_frontend and not expected_website_id:
                 request.update_context(website_id=website_id)
             else:
                 request.update_context(fallback_website_id=website_id)
@@ -247,6 +248,24 @@ class IrHttp(models.AbstractModel):
                     # 403 instead of using `sudo()` for perfs as this is
                     # low level.
                     raise werkzeug.exceptions.Forbidden()
+
+    @api.model
+    def _get_expected_website_id(self, current_id):
+        try:
+            expected_website_id = int(request.httprequest.args.get('website_id'))
+        except TypeError:
+            return False
+        if not expected_website_id:
+            return False
+        if current_id == expected_website_id:
+            return current_id
+        if expected_website_id not in self.env['website']._cached_data()['id']:
+            return False
+        user = self.env.user or self.env['res.users'].sudo().browse(request.session.uid)
+        if (user and user.has_group('website.group_multi_website')
+                    and user.has_group('website.group_website_restricted_editor')):
+            return expected_website_id
+        return False
 
     @api.model
     def _get_current_website_id(self):
@@ -334,7 +353,7 @@ class IrHttp(models.AbstractModel):
             return url1.netloc == url2.netloc
 
         Website = self.env['website'].sudo()
-        existings = Website.browse(Website._cached_data()['id']).sorted(lambda w: (w.sequence, w.id))
+        existings = Website.get_all().sorted(lambda w: (w.sequence, w.id))
 
         # Filter for the exact domain (to filter out potential subdomains) due
         # to the use of ilike.
@@ -375,29 +394,30 @@ class IrHttp(models.AbstractModel):
             with contextlib.suppress(ZoneInfoNotFoundError):
                 request.update_context(tz=ZoneInfo(tz).key)
 
-        website = request.env['website'].get_current_website()
-        user = request.env.user
+        context = cls._get_editor_context()
+
+        if website_id := request.env['ir.http']._get_current_website_id():
+            context['website_id'] = website_id
+        elif website_id := request.env['ir.http']._get_current_website_fallback():
+            context['fallback_website_id'] = website_id
 
         # This is mainly to avoid access errors in website controllers
         # where there is no context (eg: /shop), and it's not going to
         # propagate to the global context of the tab. If the company of
         # the website is not in the allowed companies of the user, set
         # the main company of the user.
+        website = request.env['website'].browse(website_id)
+        user = request.env.user
         website_company_id = website.company_id.id
         if user == website.user_id:
             # avoid a read on res_company_user_rel in case of public user
-            allowed_company_ids = [website_company_id]
+            context['allowed_company_ids'] = [website_company_id]
         elif website_company_id in user._get_company_ids():
-            allowed_company_ids = [website_company_id]
+            context['allowed_company_ids'] = [website_company_id]
         else:
-            allowed_company_ids = user.company_id.ids
+            context['allowed_company_ids'] = user.company_id.ids
 
-        request.update_context(
-            allowed_company_ids=allowed_company_ids,
-            **cls._get_editor_context(),
-        )
-
-        request.website = website.with_context(request.env.context)
+        request.update_context(**context)
 
     @classmethod
     def _post_dispatch(cls, response):
@@ -411,17 +431,15 @@ class IrHttp(models.AbstractModel):
         # matched. We have to assume we are going to match a frontend
         # route, hence the default True. Elsewhere, request.is_frontend
         # is set.
-        website_id = False
-        if getattr(request, 'is_frontend', True):
-            website_id = self.env.context.get('website_id', request.website_routing)
-        return super(IrHttp, self.with_context(website_id=website_id)).get_nearest_lang(lang_code)
+        irHttp = self
+        if website_id := (self.env['website'].sudo().get_current_website().id or request.website_routing):
+            irHttp = irHttp.with_context(website_id=website_id)
+        return super(IrHttp, irHttp).get_nearest_lang(lang_code)
 
-    @classmethod
-    def _get_default_lang(cls):
-        if getattr(request, 'is_frontend', True):
-            website = request.env['website'].sudo().get_current_website()
-            return request.env['res.lang']._get_data(id=website.default_lang_id.id)
-        return super()._get_default_lang()
+    @api.model
+    def _get_default_lang(self):
+        website = self.env['website'].sudo().get_current_website()
+        return self.env['res.lang']._get_data(id=website.default_lang_id.id)
 
     @classmethod
     def _get_translation_frontend_modules_name(cls):
@@ -444,7 +462,7 @@ class IrHttp(models.AbstractModel):
         if not page_info and req_page != "/" and req_page.endswith("/"):
             # mimick `_postprocess_args()` redirect
             path = request.httprequest.path[:-1]
-            if request.lang != cls._get_default_lang():
+            if request.lang != request.env['ir.http']._get_default_lang():
                 path = '/' + request.lang.url_code + path
             if request.httprequest.query_string:
                 path += '?' + request.httprequest.query_string.decode('utf-8')
@@ -463,7 +481,7 @@ class IrHttp(models.AbstractModel):
             Domain('redirect_type', 'in', ('301', '302'))
             # trailing / could have been removed by server_page
             & Domain('url_from', 'in', [req_page_with_qs, req_page.rstrip('/'), req_page + '/'])
-            & request.env['website'].get_current_website().website_domain()
+            & request.env["website"].get_current_website().website_domain()
         )
         return request.env['website.rewrite'].sudo().search(domain, order='url_from DESC', limit=1)
 
@@ -536,7 +554,7 @@ class IrHttp(models.AbstractModel):
 
     @api.model
     def get_frontend_session_info(self):
-        website = self.env['website'].get_current_website()
+        website = self.env["website"].get_current_website()
         session_info = super().get_frontend_session_info()
         geoip_country_code = request.geoip.country_code
         geoip_phone_code = request.env['res.country']._phone_code_for(geoip_country_code) if geoip_country_code else None
@@ -554,11 +572,11 @@ class IrHttp(models.AbstractModel):
         session_info['bundle_params']['website_id'] = website.id
         return session_info
 
-    @classmethod
-    def _is_allowed_cookie(cls, cookie_type):
+    @api.model
+    def _is_allowed_cookie(self, cookie_type):
         result = super()._is_allowed_cookie(cookie_type)
         if result and cookie_type == 'optional':
-            if not request.env['website'].get_current_website().cookies_bar:
+            if not self.env["website"].get_current_website().cookies_bar:
                 # Cookies bar is disabled on this website
                 return True
             accepted_cookie_types = json_scriptsafe.loads(request.cookies.get('website_cookies_bar', '{}'))
@@ -566,7 +584,7 @@ class IrHttp(models.AbstractModel):
             # pre-16.0 compatibility, `website_cookies_bar` was `"true"`.
             # In that case we delete that cookie and let the user choose again.
             if not isinstance(accepted_cookie_types, dict):
-                request.future_response.set_cookie('website_cookies_bar', max_age=0)
+                self.future_response.set_cookie('website_cookies_bar', max_age=0)
                 return False
 
             if 'optional' in accepted_cookie_types:

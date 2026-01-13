@@ -468,7 +468,7 @@ class ProductTemplate(models.Model):
         self.ensure_one()
 
         combination = combination or self.env["product.template.attribute.value"]
-        website = request.website.with_context(self.env.context)
+        website = self.env["website"].get_current_website()
         uom = self.env["uom.uom"].browse(uom_id) or self.uom_id
 
         if not product_id and not combination and not only_template:
@@ -643,7 +643,7 @@ class ProductTemplate(models.Model):
 
         :param int | typing.Iterable[int | str] combination_ids: The IDs of the currently selected
             `product.template.attribute.value` records.
-        :param int website_id: The ID of the current website (request.website.id). Used
+        :param int website_id: The ID of the current website. Used
             to generate correct image URLs for the specific domain context.
 
         :return: A dictionary mapping attribute value IDs to their corresponding image
@@ -961,8 +961,7 @@ class ProductTemplate(models.Model):
                 data["image_url"] = "/web/image/product.template/%s/image_128" % data["id"]
             if with_category and categ_ids:
                 data["category"] = (
-                    self
-                    .env["ir.ui.view"]
+                    current_website
                     .sudo()
                     ._render_template(
                         "website_sale.product_category_extra_link",
@@ -1042,7 +1041,7 @@ class ProductTemplate(models.Model):
             product_or_template, quantity, date, currency, pricelist, **kwargs
         )
 
-        if website := self.env['website'].get_current_website(fallback=False):
+        if website := self.env["website"].get_current_website(fallback=False):
             product_taxes = product_or_template.sudo().taxes_id._filter_taxes_by_company(
                 self.env.company
             )

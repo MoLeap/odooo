@@ -148,7 +148,7 @@ class TestGetCurrentWebsite(HttpCaseWithUserDemo):
             'groups': [],
         })
         # Ensure the cache is invalidated, it is not needed at the time but some
-        # code might one day go through get_current_website_id before reaching
+        # code might one day go through _get_current_website_id before reaching
         # this code, making this test useless
         self.env.registry.clear_cache()
         failed = False

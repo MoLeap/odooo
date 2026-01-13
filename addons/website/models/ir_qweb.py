@@ -6,9 +6,7 @@ from urllib.parse import urlsplit
 
 from odoo import models
 from odoo.http import request
-from odoo.tools import lazy
 from odoo.addons.website.tools import add_form_signature
-from odoo.exceptions import AccessError
 
 
 re_background_image = re.compile(r"(background-image\s*:\s*url\(\s*['\"]?\s*)([^)'\"]+)")
@@ -142,7 +140,7 @@ class IrQweb(models.AbstractModel):
             website.cookies_bar
             and website.block_third_party_domains
             and not self.env.context.get('cookies_allowed')
-            and not request.env.user.has_group('website.group_website_restricted_editor')
+            and not self.env.user.has_group('website.group_website_restricted_editor')
         ):
             # If the cookie banner is activated, 3rd-party embedded iframes and
             # scripts should be controlled. As such:
