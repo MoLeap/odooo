@@ -20,7 +20,6 @@ from odoo.tools.json import scriptsafe as json_scriptsafe
 from odoo.tools.safe_eval import safe_eval
 from odoo.addons.http_routing.models import ir_http
 from odoo.addons.portal.controllers.portal import _build_url_w_params
-from odoo.addons.website.tools import get_base_domain
 
 logger = logging.getLogger(__name__)
 
@@ -203,28 +202,39 @@ class IrHttp(models.AbstractModel):
 
     @classmethod
     def _match(cls, path):
-        # set website into the context
-        if website_id := request.env['ir.http']._get_current_website_id():
-            request.update_context(website_id=website_id)
-        else:
-            website_id = request.env['ir.http']._get_current_website_fallback()
-            request.update_context(fallback_website_id=website_id)
+        website_id = request.env['ir.http']._get_current_website_id()
+        fallback_website_id = website_id or request.env['ir.http']._get_current_website_fallback()
 
         if not hasattr(request, 'website_routing'):
-            request.website_routing = website_id
+            request.website_routing = website_id or fallback_website_id
 
-        return super()._match(path)
+        # set website into the context, used by match for the default lang
+        if website_id:
+            request.update_context(website_id=website_id)
+        elif fallback_website_id:
+            request.update_context(fallback_website_id=fallback_website_id)
+
+        rule, args = super()._match(path)
+
+        # remove website_id from the context if it's not a website route
+        if website_id and not rule.endpoint.routing.get('website', False):
+            request.update_context(website_id=None, fallback_website_id=fallback_website_id)
+
+        return rule, args
 
     @classmethod
     def _pre_dispatch(cls, rule, arguments):
         super()._pre_dispatch(rule, arguments)
 
-        if not request.env.context.get('website_id'):
-            if website_id := request.env['ir.http']._get_current_website_fallback():
-                if request.is_frontend:
-                    request.update_context(website_id=website_id)
-                else:
-                    request.update_context(fallback_website_id=website_id)
+        env = request.env
+        website_id = env.context.get('website_id') or env.context.get('fallback_website_id')
+        if not website_id:
+            website_id = env['ir.http']._get_current_website_fallback()
+        if website_id and not env.context.get('website_id'):
+            if request.is_frontend:
+                request.update_context(website_id=website_id)
+            else:
+                request.update_context(fallback_website_id=website_id)
 
         for record in arguments.values():
             if isinstance(record, models.BaseModel) and hasattr(record, 'can_access_from_current_website'):
@@ -247,22 +257,16 @@ class IrHttp(models.AbstractModel):
         3. ``False``
         """
         if force_website_id := request.session.get('force_website_id'):
-            website_id = self._get_current_forced_website_id(force_website_id)
-            if website_id:
-                return website_id
+            if force_website_id in self.env['website']._cached_data()['id']:
+                return force_website_id
             else:
                 # Don't crash if the session website got deleted
                 request.session.pop('force_website_id')
 
         if website_id := request.env.context.get('website_id'):
-            return self._get_current_forced_website_id(website_id)
+            if website_id in self.env['website']._cached_data()['id']:
+                return website_id
         return False
-
-    @api.model
-    @tools.ormcache('force_website_id')
-    def _get_current_forced_website_id(self, force_website_id):
-        if force_website_id and request.env['website'].browse(force_website_id).exists():
-            return force_website_id
 
     @api.model
     def _get_current_website_fallback(self):
@@ -329,24 +333,26 @@ class IrHttp(models.AbstractModel):
                 return url1.host == url2.host
             return url1.netloc == url2.netloc
 
-        # TODO: in master, store the computed field domain_punycode to avoid
-        #       the need to search on domain_name and domain_name_idna.
-        websites = self.env['website'].sudo().search([])
+        Website = self.env['website'].sudo()
+        existings = Website.browse(Website._cached_data()['id']).sorted(lambda w: (w.sequence, w.id))
 
         # Filter for the exact domain (to filter out potential subdomains) due
         # to the use of ilike.
         # ``domain_name` could be an empty string, in that case multiple website
         # without a domain will be returned
-        websites = websites.filtered(lambda w: _filter_domain(w, domain_name))
+        websites = existings.filtered(lambda w: _filter_domain(w, domain_name))
         # If there is no domain matching for the given port, ignore the port.
-        websites = websites or websites.filtered(lambda w: _filter_domain(w, domain_name, ignore_port=True))
+        websites = websites or existings.filtered(lambda w: _filter_domain(w, domain_name, ignore_port=True))
+
+        if not websites:
+            websites = existings
 
         return websites[0].id if websites else False
 
     @classmethod
     def _get_editor_context(cls):
         ctx = super()._get_editor_context()
-        if request.is_frontend_multilang and request.lang == cls._get_default_lang():
+        if request.is_frontend_multilang and request.lang == request.env['ir.http']._get_default_lang():
             ctx['edit_translations'] = False
         return ctx
 
