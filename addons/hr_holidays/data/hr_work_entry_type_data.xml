@@ -644,67 +644,77 @@
 
 
 <!-- OM : Oman -->
-    <record id="l10n_om_leave_type_sick_leave_100" model="hr.leave.type">
+    <record id="hr_work_entry.l10n_om_work_entry_type_sick_leave_100" model="hr.work.entry.type">
         <field name="name">Sick Leave (100% Paid)</field>
         <field name="requires_allocation">yes</field>
         <field name="leave_validation_type">hr</field>
         <field name="country_id" ref="base.om"/>
     </record>
-    <record id="l10n_om_leave_type_sick_leave_75" model="hr.leave.type">
+
+    <record id="hr_work_entry.l10n_om_work_entry_type_sick_leave_75" model="hr.work.entry.type">
         <field name="name">Sick Leave (75% Paid)</field>
         <field name="requires_allocation">yes</field>
         <field name="leave_validation_type">hr</field>
         <field name="country_id" ref="base.om"/>
     </record>
-    <record id="l10n_om_leave_type_sick_leave_50" model="hr.leave.type">
+
+    <record id="hr_work_entry.l10n_om_work_entry_type_sick_leave_50" model="hr.work.entry.type">
         <field name="name">Sick Leave (50% Paid)</field>
         <field name="requires_allocation">yes</field>
         <field name="leave_validation_type">hr</field>
         <field name="country_id" ref="base.om"/>
     </record>
-    <record id="l10n_om_leave_type_sick_leave_35" model="hr.leave.type">
+
+    <record id="hr_work_entry.l10n_om_work_entry_type_sick_leave_35" model="hr.work.entry.type">
         <field name="name">Sick Leave (35% Paid)</field>
         <field name="requires_allocation">yes</field>
         <field name="leave_validation_type">hr</field>
         <field name="country_id" ref="base.om"/>
     </record>
-    <record id="l10n_om_leave_type_sick_leave_0" model="hr.leave.type">
+
+    <record id="hr_work_entry.l10n_om_work_entry_type_sick_leave_0" model="hr.work.entry.type">
         <field name="name">Sick Leave (Unpaid)</field>
         <field name="requires_allocation">no</field>
         <field name="leave_validation_type">hr</field>
         <field name="country_id" ref="base.om"/>
     </record>
-    <record id="l10n_om_leave_type_maternity" model="hr.leave.type">
+
+    <record id="hr_work_entry.l10n_om_work_entry_type_maternity" model="hr.work.entry.type">
         <field name="name">Maternity Leave</field>
         <field name="requires_allocation">no</field>
         <field name="leave_validation_type">hr</field>
         <field name="country_id" ref="base.om"/>
     </record>
-    <record id="l10n_om_leave_type_paternity" model="hr.leave.type">
+
+    <record id="hr_work_entry.l10n_om_work_entry_type_paternity" model="hr.work.entry.type">
         <field name="name">Paternity Leave</field>
         <field name="requires_allocation">no</field>
         <field name="leave_validation_type">hr</field>
         <field name="country_id" ref="base.om"/>
     </record>
-    <record id="l10n_om_leave_type_hajj" model="hr.leave.type">
+
+    <record id="hr_work_entry.l10n_om_work_entry_type_hajj" model="hr.work.entry.type">
         <field name="name">Hajj Leave</field>
         <field name="requires_allocation">no</field>
         <field name="leave_validation_type">hr</field>
         <field name="country_id" ref="base.om"/>
     </record>
-    <record id="l10n_om_leave_type_iddah" model="hr.leave.type">
+
+    <record id="hr_work_entry.l10n_om_work_entry_type_iddah" model="hr.work.entry.type">
         <field name="name">Iddah Leave</field>
         <field name="requires_allocation">no</field>
         <field name="leave_validation_type">hr</field>
         <field name="country_id" ref="base.om"/>
     </record>
-    <record id="l10n_om_leave_type_fdrcl" model="hr.leave.type">
+
+    <record id="hr_work_entry.l10n_om_work_entry_type_fdrcl" model="hr.work.entry.type">
         <field name="name">First Degree Relatives Compassionate Leave</field>
         <field name="requires_allocation">no</field>
         <field name="leave_validation_type">hr</field>
         <field name="country_id" ref="base.om"/>
     </record>
-    <record id="l10n_om_leave_type_sdrcl" model="hr.leave.type">
+
+    <record id="hr_work_entry.l10n_om_work_entry_type_sdrcl" model="hr.work.entry.type">
         <field name="name">Second Degree Relatives Compassionate Leave</field>
         <field name="requires_allocation">no</field>
         <field name="leave_validation_type">hr</field>
