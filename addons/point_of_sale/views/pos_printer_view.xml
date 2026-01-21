@@ -19,6 +19,7 @@
                             <field name="printer_ip" invisible="printer_type != 'epson_epos'" placeholder="10.100.50.87" required="printer_type == 'epson_epos'"/>
                             <field name="use_lna"/>
                             <field name="product_categories_ids" invisible="use_type != 'preparation'" widget="many2many_tags" required="use_type == 'preparation'"/>
+                            <field name="iface_cashdrawer" invisible="use_type != 'receipt'"/>
                         </group>
                     </group>
                 </sheet>
