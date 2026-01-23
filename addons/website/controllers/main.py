@@ -151,7 +151,22 @@ class Website(Home):
 
         raise request.not_found()
 
-    @http.route("/website/http_error/<int:status_code>", type="http", auth="public", website=True)
+    def system_page_http_error(self):
+        """
+        Listing of error pages for System Pages.
+        """
+        route_map = []
+        for template in self['ir.ui.view'].search([('key', '=like', 'http_routing.%')]):
+            # we don't need templates like 'http_routing.http_error'
+            match = re.match(r'http_routing\.(\d{3})$', template.key)
+            if match:
+                route_map.append({
+                    'route_title': match.group(1),
+                    'route_url': f"/website/http_error/{match.group(1)}",
+                })
+        return route_map
+
+    @http.route("/website/http_error/<int:status_code>", type="http", auth="public", website=True, list_as_website_content=system_page_http_error)
     def website_http_error_page(self, status_code, **kwargs):
         """
         Generic error page renderer for 400, 403, 404, 500, etc.
