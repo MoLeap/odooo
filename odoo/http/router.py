@@ -4,7 +4,6 @@ import datetime as dt
 import functools
 import logging
 import re
-import threading
 import typing
 from contextlib import nullcontext
 from os.path import join as opj
@@ -31,13 +30,15 @@ except ImportError:
 
 import odoo.modules.db
 from odoo.api import Environment
+from odoo import netsvc
 from odoo.exceptions import AccessDenied, AccessError, UserError
 from odoo.modules.module import (
     Manifest,
     initialize_sys_path,
 )
 from odoo.modules.registry import Registry
-from odoo.tools import config, file_path, profiler, real_time
+from odoo.netsvc import ExecutionInfo
+from odoo.tools import config, file_path, profiler
 from odoo.tools.misc import submap
 
 from . import request, request_var
@@ -146,13 +147,15 @@ def dispatch_rpc(service_name: str, method: str, params: Mapping[str, typing.Any
         raise ValueError(f"Invalid service name: {service_name}")
 
     # Remove the request to simulate that the call does not come from HTTP
+    info = netsvc.ExecutionInfo.get()
+    uid, dbname = info.uid, info.db_name
     request_reset = request_var.set(None)
     try:
-        threading.current_thread().uid = None
-        threading.current_thread().dbname = None
+        info.uid = info.db_name = None
         return dispatch(method, params)
     finally:
         request_var.reset(request_reset)
+        info.uid, info.db_name = uid, dbname
 
 
 class RegistryError(RuntimeError):
@@ -257,16 +260,8 @@ class Application:
             server that this application must call in order to send the
             HTTP response status line and the response headers.
         """
-        current_thread = threading.current_thread()
-        current_thread.query_count = 0
-        current_thread.query_time = 0
-        current_thread.perf_t0 = real_time()
-        current_thread.cursor_mode = None
-        if hasattr(current_thread, 'dbname'):
-            del current_thread.dbname
-        if hasattr(current_thread, 'uid'):
-            del current_thread.uid
-        current_thread.rpc_model_method = ''
+        execution = netsvc.ExecutionInfo('http')
+        execution.__enter__()  # never exit so that werkzeug knows this context
 
         if config['proxy_mode'] and environ.get("HTTP_X_FORWARDED_HOST"):
             # The ProxyFix middleware has a side effect of updating the
@@ -282,7 +277,7 @@ class Application:
             request_reset = request_var.set(request)
             try:
                 _set_session_and_dbname(request)
-                current_thread.url = httprequest.url
+                execution.url = httprequest.url
 
                 if self.get_static_file(httprequest.path):
                     response = serve_static(request)
@@ -423,7 +418,7 @@ def serve_db(request: Request) -> Response:
         # keep on using the RO cursor when a readonly route matched,
         # and for serve fallback
         if readonly and cr.readonly:
-            threading.current_thread().cursor_mode = 'ro'
+            ExecutionInfo.get().cursor_mode = 'ro'
             try:
                 return retrying(serve_func, env=request.env)
             except ReadOnlySqlTransaction as exc:
@@ -431,11 +426,11 @@ def serve_db(request: Request) -> Response:
                 # attempted a write operation, try again using a
                 # read/write cursor
                 _logger.warning("%s, retrying with a read/write cursor", exc.args[0].rstrip(), exc_info=True)
-                threading.current_thread().cursor_mode = 'ro->rw'
+                ExecutionInfo.get().cursor_mode = 'ro->rw'
             except Exception as exc:  # noqa: BLE001
                 raise _update_served_exception(request, exc)
         else:
-            threading.current_thread().cursor_mode = 'rw'
+            ExecutionInfo.get().cursor_mode = 'rw'
 
         # we must use a RW cursor when a read/write route matched, or
         # there was a ReadOnlySqlTransaction error
