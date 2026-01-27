@@ -3,7 +3,9 @@
 from odoo import api, Command, fields, models, _
 from odoo.exceptions import ValidationError
 from odoo.osv import expression
-from odoo.tools import format_amount
+from odoo.tools import format_amount, SQL, split_every
+
+from collections import defaultdict
 
 ACCOUNT_DOMAIN = "['&', ('deprecated', '=', False), ('account_type', 'not in', ('asset_receivable','liability_payable','asset_cash','liability_credit_card','off_balance'))]"
 
@@ -335,3 +337,96 @@ class ProductProduct(models.Model):
                 if product:
                     return product
         return self.env['product.product']
+
+    def _retrieve_products_batched(self, list_of_product_vals, company=None, extra_domain=None):
+        '''Search all products and find one that matches one of the parameters.
+
+        :param company:         The company of the product.
+        :param extra_domain:    Any extra domain to add to the search.
+        :param product_vals:    Values the product should match.
+        :returns:               A product or an empty recordset if not found.
+        '''
+
+        all_products = defaultdict(lambda: self.env['product.product'])
+
+        # Batching to avoid too large queries
+        for product_vals in split_every(1000, list_of_product_vals):
+            domains = self._get_products_domain_batched(product_vals)
+
+            company = company or self.env.company
+            for company_domain in (
+                [*self.env['res.partner']._check_company_domain(company), ('company_id', '!=', False)],
+                [('company_id', '=', False)],
+            ):
+                for domain in domains:
+                    if products := self.env['product.product'].search_fetch(
+                        expression.AND([domain, company_domain, extra_domain or []]),
+                        ['id', 'barcode', 'default_code', 'name']
+                    ):
+                        lookup = {}
+                        for product in products.sorted(lambda p: p.company_id.id or 0):
+                            if product.barcode:
+                                lookup['barcode', product.barcode] = product
+                            if product.default_code:
+                                lookup['default_code', product.default_code] = product
+                            if product.name:
+                                lookup['name', product.name.lower()] = product
+
+                        for val_dict in product_vals:
+
+                            barcode = val_dict.get('barcode')
+                            code = val_dict.get('default_code')
+                            raw_name = (val_dict.get('name') or '').split('\n', 1)[0]
+
+                            if barcode and (match := lookup.get(('barcode', barcode))):
+                                all_products[barcode] = match
+                            elif code and (match := lookup.get(('default_code', code))):
+                                all_products[code] = match
+                            elif raw_name and (match := lookup.get(('name', raw_name.lower()))):
+                                all_products[raw_name] = match
+
+        return all_products
+
+    def _get_products_domain_batched(self, list_of_vals):
+        """Gives the domain for all values linked to a product.
+
+        :param list_of_vals:            The list of barcode, default_code and name for each product.
+        :returns:               The full domain based on all the values in the parameter.
+        :rtype: Domain
+        """
+
+        barcode_list = set()
+        default_code_list = set()
+        name_list = set()
+        name_ilike_list = set()
+        for vals in list_of_vals:
+            if barcode := vals.get('barcode'):
+                barcode_list.add(barcode)
+            if default_code := vals.get('default_code'):
+                default_code_list.add(default_code)
+            if name := vals.get('name'):
+                name = name.split('\n', 1)[0]  # Cut sales description from the name
+                name_list.add(name)
+                # avoid matching unrelated products whose names merely contain that short string
+                if len(name) > 4:
+                    name_ilike_list.add(f"%{name}%")
+
+        domains = []
+        if barcode_list:
+            domains.append([('barcode', 'in', list(barcode_list))])
+        if default_code_list:
+            domains.append([('default_code', 'in', list(default_code_list))])
+        if name_list:
+            domains.append([('name', 'in', list(name_list))])
+        if name_ilike_list:
+            Template = self.env['product.template']
+            subquery = Template._search([('active', '=', True)])
+            subquery.add_where(SQL(
+                "(jsonb_path_query_array(%(name)s, '$.*')::text) ILIKE ANY(%(values)s)",
+                name=SQL.identifier(Template._table, 'name'),
+                values=list(name_ilike_list)
+            ))
+
+            domains.append([('product_tmpl_id', 'in', subquery)])
+
+        return domains
