@@ -167,6 +167,9 @@ export class ViewButton extends Component {
                 classNames.push(`btn-${this.props.size}`);
             }
         }
+        if (this.dropdownControl.isInsideDropdown) {
+            classNames.push("o-navigable", "dropdown-item");
+        }
         return classNames.join(" ");
     }
 }

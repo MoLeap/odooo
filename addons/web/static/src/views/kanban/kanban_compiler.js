@@ -32,7 +32,8 @@ export class KanbanCompiler extends ViewCompiler {
         this.compilers.push(
             { selector: "t[t-call]", fn: this.compileTCall },
             { selector: "img", fn: this.compileImage },
-            { selector: "main", fn: this.compileMain }
+            { selector: "main", fn: this.compileMain },
+            { selector: "[t-name=menu] .dropdown-item", fn: this.compileDropdownItem }
         );
     }
 
@@ -77,8 +78,13 @@ export class KanbanCompiler extends ViewCompiler {
         for (const { name, value } of el.attributes) {
             compiled.setAttribute(name, value);
         }
-        if (getTag(el, true) === "a" && !compiled.hasAttribute("href")) {
-            compiled.setAttribute("href", "#");
+        if (getTag(el, true) === "a") {
+            if (!compiled.hasAttribute("href")) {
+                compiled.setAttribute("href", "#");
+            }
+            if (compiled.classList.contains("dropdown-item")) {
+                compiled.classList.add("o-navigable");
+            }
         }
         for (const child of el.childNodes) {
             append(compiled, this.compileNode(child, params));
@@ -185,6 +191,16 @@ export class KanbanCompiler extends ViewCompiler {
         if (tname in this.templates) {
             compiled.setAttribute("t-call", `{{__comp__.templates[${toStringExpression(tname)}]}}`);
         }
+        return compiled;
+    }
+
+    /**
+     * @param {Element} el
+     * @returns {Element}
+     */
+    compileDropdownItem(el) {
+        const compiled = el.cloneNode(true);
+        compiled.classList.add("o-navigable");
         return compiled;
     }
 }

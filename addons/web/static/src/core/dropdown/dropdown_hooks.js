@@ -46,6 +46,9 @@ export function useDropdownCloser() {
     const env = useEnv();
     const dropdown = env[DROPDOWN_NESTING];
     return {
+        get isInsideDropdown() {
+            return !!dropdown;
+        },
         close: () => dropdown?.close(),
         closeChildren: () => dropdown?.closeChildren(),
         closeAll: () => dropdown?.closeAllParents(),
