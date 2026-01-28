@@ -249,8 +249,16 @@
     </BuilderRow>
     <BuilderRow label.translate="Requirement"
             t-if="this.domStateCurrentFieldInput.hasDateTimePicker or this.domStateCurrentFieldInput.isTextArea or this.canHaveTextValidationCondition.includes(this.domStateCurrentFieldInput.type)">
+        <BuilderSelect id="'require_condition_email_opt'"
+                t-if="domStateCurrentFieldInput.type === 'email'"
+                preview="false"
+                dataAttributeAction="'requirementComparator'"
+                action="'setRequirementComparator'">
+            <BuilderSelectItem id="'no_requirement_opt'" dataAttributeActionValue="''">None</BuilderSelectItem>
+            <BuilderSelectItem dataAttributeActionValue="'domain'">Matches domain</BuilderSelectItem>
+        </BuilderSelect>
         <BuilderSelect id="'require_condition_text_opt'"
-                t-if="!this.domStateCurrentFieldInput.hasDateTimePicker and (this.domStateCurrentFieldInput.isTextArea || ['text', 'email', 'tel', 'url', 'search', 'password'].includes(this.domStateCurrentFieldInput.type))"
+                t-if="!this.domStateCurrentFieldInput.hasDateTimePicker and (this.domStateCurrentFieldInput.isTextArea || ['text', 'tel', 'url', 'search', 'password'].includes(this.domStateCurrentFieldInput.type))"
                 preview="false"
                 dataAttributeAction="'requirementComparator'"
                 action="'setRequirementComparator'">
@@ -326,14 +334,15 @@
     <BuilderRow t-if="this.isMultipleTextConditionForRequirementOptionVisible">
         <div class="d-flex flex-column w-100">
             <p class="hb-row-label mb-0 flex-basis-auto">
-                <t t-out="'Enter words'"/>
+                <t t-out="this.multiTextRequirementConfig.title"/>
             </p>
             <BuilderList
                 dataAttributeAction="'requirementCondition'"
                 action="'setDefaultErrorMessage'"
                 addItemTitle.translate="Add"
                 itemShape="{ requirement_text: 'text'}"
-                defaultNewValue="{ requirement_text: 'example' }"
+                defaultNewValue="{ requirement_text: this.multiTextRequirementConfig.defaultValue }"
+                sortable="false"
             />
         </div>
     </BuilderRow>
