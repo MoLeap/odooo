@@ -3122,3 +3122,45 @@ class TestStockValuation(TestStockValuationCommon):
         recs[-2:]._compute_cumulative_fields()
         self.assertEqual(recs[-1].total_quantity, 3)
         self.assertEqual(recs[-1].total_value, 30)
+
+    def test_avco_valuation_multicompany(self):
+        """
+        Test that changing values manually for an AVCO product in different companies results
+        in the correct total value when the product is viewed in a single or multi-company context.
+        """
+        # _compute_value() uses sudo(False) which doesnt work when the user is the Superuser
+        product_avco = self.product_avco
+        time = Datetime.now()
+
+        c1 = self.env.company
+        c2 = self.env['res.company'].create({
+            'name': 'Test Company',
+        })
+        c1_stock_loc = self.env['stock.warehouse'].search([('company_id', '=', c1.id)], limit=1).lot_stock_id
+        c2_stock_loc = self.env['stock.warehouse'].search([('company_id', '=', c2.id)], limit=1).lot_stock_id
+        c1_product = product_avco.with_context(allowed_company_ids=[c1.id])
+        c2_product = product_avco.with_context(allowed_company_ids=[c2.id])
+
+        # Change cost manually and create stock move for each company
+        # freeze_time is used because avco compares dates of stock moves against dates of new values
+        with freeze_time(time + timedelta(minutes=1)):
+            c1_product.standard_price = 10
+        with freeze_time(time + timedelta(minutes=2)):
+            self._make_in_move(c1_product, 2.0, company=c1, location_id=self.supplier_location.id, location_dest_id=c1_stock_loc.id)
+
+        with freeze_time(time + timedelta(minutes=3)):
+            c2_product.standard_price = 50
+        with freeze_time(time + timedelta(minutes=4)):
+            self._make_in_move(c2_product, 1.0, company=c2, location_id=self.supplier_location.id, location_dest_id=c2_stock_loc.id)
+
+        self.assertEqual(c1_product.total_value, 20)
+        self.assertEqual(c1_product.qty_available, 2)
+        self.assertEqual(c1_product.avg_cost, 10)
+        self.assertEqual(c2_product.total_value, 50)
+        self.assertEqual(c2_product.qty_available, 1)
+        self.assertEqual(c2_product.avg_cost, 50)
+        c3_product = product_avco.with_context(allowed_company_ids=[c1.id, c2.id])
+        c3_product.invalidate_recordset(fnames=['total_value'])
+        self.assertEqual(c3_product.total_value, 70)  # sum of both total_values
+        self.assertEqual(c3_product.qty_available, 3)
+        self.assertEqual(c3_product.avg_cost, 23.33)
