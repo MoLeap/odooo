@@ -88,6 +88,11 @@ class HrAttendanceOvertimeLine(models.Model):
     def action_refuse(self):
         self.write({'status': 'refused'})
 
+    def action_reset(self):
+        for overtime in self:
+            overtime.manual_duration = overtime.duration  # in case duration was changed while being refused/approved, we want to reset it to the original value
+        self.write({'status': 'to_approve'})
+
     def _linked_attendances(self):
         return self.env['hr.attendance'].search([
             ('check_in', 'in', self.mapped('time_start')),
@@ -97,6 +102,10 @@ class HrAttendanceOvertimeLine(models.Model):
     def write(self, vals):
         if any(key in vals for key in ['status', 'manual_duration']):
             attendances = self._linked_attendances()
+            self.env.add_to_compute(
+                 attendances._fields['overtime_hours'],
+                 attendances
+            )
             self.env.add_to_compute(
                  attendances._fields['overtime_status'],
                  attendances
