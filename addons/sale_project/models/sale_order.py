@@ -125,19 +125,10 @@ class SaleOrder(models.Model):
 
     def _action_confirm(self):
         """ On SO confirmation, some lines should generate a task or a project. """
-        self._generate_template()
-        for record in self:
-            for lines in record.order_line:
-                if (not lines.project_id.sale_line_id):
-                    lines.project_id.sale_line_id = lines
-        return super()._action_confirm()
 
-    def _generate_template(self):
-        """ On SO confirmation, some lines should generate a task or a project. """
         if self.env.context.get('disable_project_task_generation'):
-            return False
+            return super()._action_confirm()
 
-        project_count = len(self.sudo().project_ids)
         if len(self.company_id) == 1:
             # All orders are in the same company
             self.order_line.sudo().with_company(self.company_id)._timesheet_service_generation()
@@ -146,16 +137,24 @@ class SaleOrder(models.Model):
             for order in self:
                 order.order_line.sudo().with_company(order.company_id)._timesheet_service_generation()
 
-        # If the order has exactly one project and that project comes from a template, set the company of the template
-        # on the project.
         for order in self.sudo(): # Salesman may not have access to projects
+            sale_line_to_assign = next((sol for sol in self.order_line if sol.is_service), False)
+            if not sale_line_to_assign:
+                continue
+            for project in order.project_ids.sudo():
+                if not project.sale_line_id and project.reinvoiced_sale_order_id:
+                    project.sale_line_id = sale_line_to_assign
+            # If the order has exactly one project and that project comes from a template, set the company of the template
+            # on the project.
+        for order in self.sudo():
             if len(order.project_ids) == 1:
                 project = order.project_ids[0]
                 for sol in order.order_line:
                     if project == sol.project_id and (project_template := sol.product_template_id.project_template_id):
                         project.sudo().company_id = project_template.sudo().company_id
                         break
-        return len(self.sudo().project_ids) > project_count
+
+        return super()._action_confirm()
 
     def _tasks_ids_domain(self):
         return ['&', ('is_template', '=', False), ('project_id', '!=', False), '|', ('sale_line_id', 'in', self.order_line.ids), ('sale_order_id', 'in', self.ids), ('has_template_ancestor', '=', False)]
@@ -168,13 +167,9 @@ class SaleOrder(models.Model):
                 'tag': 'display_notification',
                 'params': {
                     'type': 'danger',
-                    'message': self.env._("The project couldn't be created because you don't have the right to creat a project"),
+                    'message': self.env._("The project couldn't be created because you don't have the right to create a project"),
                 }
             }
-        # generates projects based on the pre-existing SOLs befor prompting for template selection
-        if (self._generate_template()):
-            return
-
         sorted_line = self.order_line.sorted('sequence')
         default_sale_line = next((
             sol for sol in sorted_line
