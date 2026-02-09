@@ -2860,7 +2860,6 @@ class HttpCase(TransactionCase):
         optional delay between steps `step_delay`. Other arguments from
         `browser_js` can be passed as keyword arguments."""
         options = {
-            'stepDelay': step_delay or 0,
             'debug': kwargs.get('debug', False),
         }
         code = kwargs.pop('code', f"odoo.startTour({tour_name!r}, {json.dumps(options)})")
