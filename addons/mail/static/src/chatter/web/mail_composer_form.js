@@ -44,14 +44,29 @@ export class MailComposerFormRenderer extends formView.Renderer {
             () => [this.props.record.isInEdition, this.root.el, this.props.record.resId]
         );
 
+<<<<<<< 5a190c38f865033946684751c5d76bd0547f7f01
         const getActiveMailThreads = () =>
             JSON.parse(this.props.record.data.res_ids).map((resId) => {
                 const thread = this.mailStore["mail.thread"].insert({
+||||||| 8a8d43c68042c52d6e9b34328df3cb6f512e63db
+        const getActiveMailThreads = () =>
+            JSON.parse(this.props.record.data.res_ids).map((resId) => {
+                const thread = this.mailStore.Thread.insert({
+=======
+        const getActiveMailThreads = () => {
+            // composer does not store res_ids past a certain limit, assume active_ids is used
+            const resIds = this.props.record.data.res_ids
+                ? JSON.parse(this.props.record.data.res_ids)
+                : this.props.record.context.active_ids;
+            return resIds.map((resId) => {
+                const thread = this.mailStore.Thread.insert({
+>>>>>>> 16d9e4946a75868a3254a522b3f0441f14a63465
                     model: this.props.record.data.model,
                     id: resId,
                 });
                 return thread;
             });
+        };
 
         // Add file dropzone on full mail composer:
         this.attachmentUploadService = useService("mail.attachment_upload");
