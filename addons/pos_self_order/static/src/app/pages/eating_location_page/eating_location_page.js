@@ -13,16 +13,15 @@ export class EatingLocationPage extends Component {
         this.router = useService("router");
         this.scrollContainerRef = useRef("scrollContainer");
         this.scrollShadow = useScrollShadow(this.scrollContainerRef);
-        this.redirectPage = history.state.redirectPage;
     }
 
     onClickBack() {
-        this.router.navigate(this.redirectPage || "default");
+        this.router.navigate(history.state.redirectPage || "default");
     }
 
     selectPreset(preset) {
         this.selfOrder.currentOrder.setPreset(preset);
-        this.router.navigate(this.redirectPage || "product_list");
+        this.router.navigate(history.state.redirectPage || "product_list");
     }
 
     // In the self, we don't want to display presets that have service_at table. Except if the clients are in
