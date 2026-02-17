@@ -152,7 +152,6 @@ class TestHrHolidaysCommon(common.TransactionCase):
             allocation = allocation.with_user(creator_user)
         with Form(allocation, 'hr_holidays.hr_leave_allocation_view_form_manager') as form:
             form.name = 'Test accrual allocation'
-            form.allocation_type = 'accrual'
             form.accrual_plan_id = accrual_plan
             form.employee_id = employee
             form.work_entry_type_id = work_entry_type

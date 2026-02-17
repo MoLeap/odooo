@@ -75,7 +75,6 @@ class TestAllocations(TestHrHolidaysCommon):
             'employee_ids': [(4, self.employee.id), (4, self.employee_emp.id)],
             'work_entry_type_id': self.work_entry_type.id,
             'duration': 2,
-            'allocation_type': 'regular',
         })
 
         employee_allocation.action_generate_allocations()
@@ -100,7 +99,6 @@ class TestAllocations(TestHrHolidaysCommon):
             'date_to': date(2019, 5, 6),
             'employee_ids': (employee_1 + employee_2).ids,
             'duration': 2,
-            'allocation_type': 'regular',
         })
         allocation_wizard.action_generate_allocations()
 
@@ -113,7 +111,6 @@ class TestAllocations(TestHrHolidaysCommon):
         employee_allocation = self.env['hr.leave.allocation'].create({
             'employee_id': self.employee.id,
             'work_entry_type_id': self.work_entry_type.id,
-            'allocation_type': 'regular',
         })
 
         with Form(employee_allocation.with_context(is_employee_allocation=True), 'hr_holidays.hr_leave_allocation_view_form_dashboard') as allocation:
@@ -131,7 +128,6 @@ class TestAllocations(TestHrHolidaysCommon):
         employee_allocation = self.env['hr.leave.allocation'].create({
             'employee_id': self.employee.id,
             'work_entry_type_id': self.work_entry_type.id,
-            'allocation_type': 'regular',
             'type_request_unit': 'half_day',
         })
 
@@ -151,13 +147,7 @@ class TestAllocations(TestHrHolidaysCommon):
             'holiday_type': 'employee',
             'employee_id': self.employee.id,
             'work_entry_type_id': self.work_entry_type.id,
-            'allocation_type': 'regular',
         })
-
-        with Form(employee_allocation.with_context(is_employee_allocation=True), 'hr_holidays.hr_leave_allocation_view_form_dashboard') as allocation:
-            allocation.allocation_type = 'extra'
-            allocation.allocation_type = 'regular'
-            employee_allocation = allocation.save()
 
         self.assertEqual(employee_allocation.number_of_days, 1.0)
 
@@ -171,7 +161,6 @@ class TestAllocations(TestHrHolidaysCommon):
             'employee_ids': [(4, self.employee.id), (4, self.employee_emp.id)],
             'work_entry_type_id': self.work_entry_type.id,
             'duration': 10,
-            'allocation_type': 'regular',
         })
 
         self.assertEqual(self.employee.resource_calendar_id.hours_per_day, 7.0)
@@ -200,14 +189,8 @@ class TestAllocations(TestHrHolidaysCommon):
             'holiday_type': 'employee',
             'employee_id': self.employee.id,
             'work_entry_type_id': self.work_entry_type.id,
-            'allocation_type': 'regular',
             'type_request_unit': 'hour',
         })
-
-        with Form(employee_allocation.with_context(is_employee_allocation=True), 'hr_holidays.hr_leave_allocation_view_form_dashboard') as allocation:
-            allocation.allocation_type = 'extra'
-            allocation.allocation_type = 'regular'
-            employee_allocation = allocation.save()
 
         self.assertEqual(employee_allocation.number_of_days, 1.0)
 
@@ -292,7 +275,6 @@ class TestAllocations(TestHrHolidaysCommon):
             'employee_id': self.employee.id,
             'work_entry_type_id': work_entry_type.id,
             'number_of_days': 3,
-            'allocation_type': 'regular',
             'date_from': date(2024, 1, 1),
             'date_to': date(2024, 4, 30)
         })
@@ -303,7 +285,6 @@ class TestAllocations(TestHrHolidaysCommon):
             'employee_id': self.employee.id,
             'work_entry_type_id': work_entry_type.id,
             'number_of_days': 9,
-            'allocation_type': 'regular',
             'date_from': date(2024, 5, 1),
             'date_to': date(2024, 12, 31)
         })
@@ -341,7 +322,6 @@ class TestAllocations(TestHrHolidaysCommon):
         })
 
         with Form(self.env['hr.leave.allocation'].with_user(self.user_hrmanager)) as allocation_form:
-            allocation_form.allocation_type = 'regular'
             allocation_form.employee_id = employee
             allocation_form.work_entry_type_id = work_entry_type
             allocation_form.number_of_hours_display = 10
@@ -349,9 +329,10 @@ class TestAllocations(TestHrHolidaysCommon):
 
         self.assertEqual(allocation.number_of_hours_display, 10.0)
 
-    def test_automatic_allocation_type(self):
+    def test_accrual_plan_determines_allocation_type(self):
         """
-        Make sure that an allocation with an accrual plan imported will automatically set the allocation_type to 'accrual'
+        Make sure that an allocation is considered accrual when it has an accrual plan,
+        and regular when it doesn't.
         """
         work_entry_type = self.env['hr.work.entry.type'].create({
             'name': 'Hourly Leave Type',
@@ -374,13 +355,13 @@ class TestAllocations(TestHrHolidaysCommon):
             'accrual_plan_id': accrual_plan.id,
         })
 
-        self.assertEqual(allocation.allocation_type, 'accrual')
+        self.assertTrue(allocation.accrual_plan_id, "Allocation should have an accrual plan")
 
         allocation.update({
             'accrual_plan_id': False,
         })
 
-        self.assertEqual(allocation.allocation_type, 'regular')
+        self.assertFalse(allocation.accrual_plan_id, "Allocation should not have an accrual plan")
 
     def test_create_allocation_from_company_with_no_employee_for_current_user(self):
         """
@@ -406,7 +387,6 @@ class TestAllocations(TestHrHolidaysCommon):
             'employee_id': self.employee.id,
             'work_entry_type_id': work_entry_type.id,
             'number_of_days': 5,
-            'allocation_type': 'regular',
             'date_from': date(2024, 1, 1),
             'date_to': date(2024, 4, 30)
         })
@@ -417,7 +397,6 @@ class TestAllocations(TestHrHolidaysCommon):
             'employee_id': self.employee.id,
             'work_entry_type_id': work_entry_type.id,
             'number_of_days': 10,
-            'allocation_type': 'regular',
             'date_from': date(2024, 1, 1),
             'date_to': False
         })
@@ -428,7 +407,6 @@ class TestAllocations(TestHrHolidaysCommon):
             'employee_id': self.employee.id,
             'work_entry_type_id': work_entry_type.id,
             'number_of_days': 12,
-            'allocation_type': 'regular',
             'date_from': date(2025, 1, 1),
             'date_to': date.today()
         })
@@ -515,7 +493,6 @@ class TestAllocations(TestHrHolidaysCommon):
         self.work_entry_type.unit_of_measure = "hour"
         with self.assertRaises(AssertionError):  # AssertionError raised by Form as employee is required
             with Form(self.env['hr.leave.allocation']) as allocation_form:
-                allocation_form.allocation_type = "regular"
                 allocation_form.work_entry_type_id = self.work_entry_type
                 allocation_form.number_of_hours_display = 10
                 allocation_form.employee_id = self.env["hr.employee"]
@@ -635,7 +612,6 @@ class TestAllocations(TestHrHolidaysCommon):
         self.env['hr.leave.allocation'].create({
             'employee_id': self.employee.id,
             'work_entry_type_id': self.work_entry_type.id,
-            'allocation_type': 'regular',
             'date_from': '2023-12-25'
         })
         self.assertEqual(1, self.work_entry_type.allocation_count)

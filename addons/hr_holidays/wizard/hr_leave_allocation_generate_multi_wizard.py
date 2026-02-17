@@ -36,10 +36,6 @@ class HrLeaveAllocationGenerateMultiWizard(models.TransientModel):
     unit_of_measure = fields.Selection(related="work_entry_type_id.unit_of_measure")
     employee_ids = fields.Many2many('hr.employee', string='Employees', domain=lambda self: self._get_employee_domain())
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company, required=True)
-    allocation_type = fields.Selection([
-        ('regular', 'Regular Allocation'),
-        ('accrual', 'Based on Accrual Plan')
-    ], string="Allocation Type", default="regular", required=True)
     accrual_plan_id = fields.Many2one('hr.leave.accrual.plan')
     date_from = fields.Date('Start Date', default=fields.Date.context_today, required=True)
     date_to = fields.Date('End Date')
@@ -73,7 +69,6 @@ class HrLeaveAllocationGenerateMultiWizard(models.TransientModel):
             'number_of_days': self.duration if self.unit_of_measure != "hour" else self.duration / hours_per_day[employee.id],
             'employee_id': employee.id,
             'state': 'confirm',
-            'allocation_type': self.allocation_type,
             'date_from': self.date_from,
             'date_to': self.date_to,
             'accrual_plan_id': self.accrual_plan_id.id,
