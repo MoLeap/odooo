@@ -7,8 +7,8 @@
         <field name="arch" type="xml">
             <form>
                 <group>
-                    <field name="l10n_hu_edi_receive_from" string="From"/>
-                    <field name="l10n_hu_edi_receive_to" string="To"/>
+                    <field name="l10n_hu_edi_receive_from" string="Datetimerange" widget="daterange" options="{'end_date_field': 'l10n_hu_edi_receive_to'}"/>
+                    <field name="l10n_hu_edi_receive_to" invisible="1"/>
                 </group>
                 <footer>
                     <button name="action_receive_bills" string="Fetch Bills"

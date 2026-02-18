@@ -1,5 +1,6 @@
 import { accountMoveUploadListView } from "@account/views/account_move_list/account_move_list_view";
 import { AccountMoveListController } from "@account/views/account_move_list/account_move_list_controller";
+import { AccountMoveListRenderer } from "@account/views/account_move_list/account_move_list_renderer";
 import { registry } from "@web/core/registry";
 import { Component, onWillStart } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
@@ -41,8 +42,9 @@ export class L10nHuEdiAccountMoveListController extends AccountMoveListControlle
 
 export const l10nHuEdiAccountMoveUploadListView = {
     ...accountMoveUploadListView,
-    buttonTemplate: "l10n_hu_edi_receive.ListView.Buttons",
     Controller: L10nHuEdiAccountMoveListController,
+    Renderer: AccountMoveListRenderer,
+    buttonTemplate: "l10n_hu_edi_receive.ListView.Buttons",
 };
 
 registry.category("views").add("l10n_hu_edi_account_move_tree", l10nHuEdiAccountMoveUploadListView);
