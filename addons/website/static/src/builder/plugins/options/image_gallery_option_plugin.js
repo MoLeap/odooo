@@ -1,12 +1,13 @@
 import { registry } from "@web/core/registry";
 import { Plugin } from "@html_editor/plugin";
 import { loadImageInfo } from "@html_editor/utils/image_processing";
-import { renderToElement } from "@web/core/utils/render";
 import { updateCarouselIndicators } from "../carousel_option_plugin";
 import { BuilderAction } from "@html_builder/core/builder_action";
-import { uniqueId } from "@web/core/utils/functions";
 import { forwardToThumbnail } from "@html_builder/utils/utils_css";
 import { ClassAction } from "@html_builder/core/core_builder_action_plugin";
+import { _t } from "@web/core/l10n/translation";
+import { uniqueId } from "@web/core/utils/functions";
+import { renderToElement } from "@web/core/utils/render";
 
 /**
  * @typedef { Object } ImageGalleryOptionShared
@@ -277,6 +278,8 @@ export class ImageGalleryOptionPlugin extends Plugin {
             id: "slideshow_" + new Date().getTime(),
             colorContrast,
             copyAttributes: true,
+            getIndicatorLabel: (itemPosition, total) =>
+                _t("Slide %(itemPosition)s of %(total)s", { itemPosition, total }),
         });
         if (carouselEl) {
             carouselEl.removeEventListener("slid.bs.carousel", this.onCarouselSlid);
