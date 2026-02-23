@@ -3,14 +3,7 @@
     'version': '1.0',
     'category': 'Accounting/Localizations/Reporting',
     'summary': 'PDP Flux 10 e-reporting flow for France',
-    'author': 'Odoo',
-    'depends': [
-        'account',
-        'account_edi_proxy_client',
-        'account_edi_ubl_cii_tax_extension',
-        'l10n_fr_account',
-        'mail',
-    ],
+    'depends': ['l10n_fr_pdp', 'account_edi_ubl_cii_tax_extension'],
     'data': [
         'security/ir.model.access.csv',
         'data/pdp_cron.xml',
@@ -22,6 +15,7 @@
         'views/pdp_flow_views.xml',
         'views/account_dashboard_pdp.xml',
         'views/pdp_send_wizard_views.xml',
+        'views/res_config_settings_views.xml',
     ],
     'installable': True,
     'license': 'LGPL-3',
