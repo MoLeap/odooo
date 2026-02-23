@@ -15,12 +15,22 @@
         </div>
     </t>
     <t t-name="website.s_dynamic_snippet.carousel.base">
-        <div t-att-id="unique_id" t-attf-class="carousel slide #{extraCarouselClass || ''}"
+        <div t-att-id="unique_id" t-attf-class="carousel slide d-flex flex-column-reverse #{extraCarouselClass || ''}"
              t-att-style="extraCarouselStyle"
              t-att-data-bs-interval="interval" data-bs-ride="carousel">
-            <!-- Content -->
             <t t-set="slideSize" t-value="rowSize * rowPerSlide" />
             <t t-set="slideIndexGenerator" t-value="Array(Math.ceil(data.length/slideSize))"/>
+            <!-- Controls and indicators are set before the content so that they
+                 are focused in priority when navigating the page with tab. -->
+            <!-- Controls -->
+            <t t-if='slideIndexGenerator.length > minControlValue'>
+                <div class="s_dynamic_snippet_arrows d-flex gap-2 w-100 pe-none z-2">
+                    <t t-call="website.s_dynamic_snippet.carousel.arrows">
+                        <t t-set="unique_id" t-value="unique_id" />
+                    </t>
+                </div>
+            </t>
+            <!-- Content -->
             <t t-set="rowIndexGenerator" t-value="Array(rowPerSlide)"/>
             <t t-set="colIndexGenerator" t-value="Array(rowSize)"/>
             <div class="carousel-inner w-100 mx-auto" role="listbox"
@@ -46,14 +56,6 @@
                     </div>
                 </t>
             </div>
-            <!-- Controls -->
-            <t t-if='slideIndexGenerator.length > minControlValue'>
-                <div class="s_dynamic_snippet_arrows d-flex gap-2 w-100 pe-none z-1">
-                    <t t-call="website.s_dynamic_snippet.carousel.arrows">
-                        <t t-set="unique_id" t-value="unique_id" />
-                    </t>
-                </div>
-            </t>
         </div>
     </t>
     <t t-name="website.s_dynamic_snippet.carousel.page_scroll">
