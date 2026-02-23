@@ -22,7 +22,7 @@
                     <div class="carousel-indicators s_image_gallery_indicators_bars" role="tablist">
                         <t t-foreach="images" t-as="image" t-key="image_index">
                             <button type="button"
-                                    aria-label="Carousel indicator"
+                                    t-attf-aria-label="Slide {{image_index}} of {{images.length}}"
                                     t-attf-data-bs-target="##{id}"
                                     t-att-data-bs-slide-to="image_index"
                                     t-att-class="image_index == index and 'active' or None"
