@@ -140,6 +140,7 @@ export class SocialMediaOptionPlugin extends Plugin {
             EditRecordedSocialMediaLinkAction,
             EditSocialMediaLinkAction,
             AddSocialMediaLinkAction,
+            ShareMediaLinksAction,
         },
         normalize_processors: this.normalize.bind(this),
         on_ready_to_save_document_handlers: this.saveRecordedSocialMedia.bind(this),
@@ -154,6 +155,7 @@ export class SocialMediaOptionPlugin extends Plugin {
             selector: ".s_social_media > a > i",
             target: ".s_social_media",
         },
+        immutable_link_selectors: [".s_share a"],
     };
 
     /** The social media's name for which there is an entry in the orm */
@@ -236,7 +238,7 @@ export class SocialMediaOptionPlugin extends Plugin {
         }
 
         // ensure one '\n' between each element + before and after
-        for (const element of selectElements(root, ".s_social_media > *")) {
+        for (const element of selectElements(root, ".s_social_media > *, .s_share > *")) {
             if (element.nextSibling?.nodeType === Node.TEXT_NODE) {
                 while (element.nextSibling.nextSibling?.nodeType === Node.TEXT_NODE) {
                     element.parentNode.removeChild(element.nextSibling);
@@ -464,6 +466,32 @@ export class AddSocialMediaLinkAction extends BuilderAction {
                 editingElement.querySelector(":scope > a")
             )
         );
+    }
+}
+export class ShareMediaLinksAction extends BuilderAction {
+    static id = "shareMediaLinks";
+    getValue({ editingElement }) {
+        return JSON.stringify(
+            Array.from(editingElement.querySelectorAll(":scope > a"), (mediaEl) => ({
+                name: mediaEl.ariaLabel,
+                status: !mediaEl.classList.contains("d-none"),
+            }))
+        );
+    }
+    apply({ editingElement, value }) {
+        const mediaNameElMap = new Map();
+        const fragment = document.createDocumentFragment();
+        editingElement.querySelectorAll(":scope > a").forEach((mediaEl) => {
+            mediaNameElMap.set(mediaEl.ariaLabel, mediaEl);
+        });
+        JSON.parse(value).forEach((mediaInfo) => {
+            const shareMediaEl = mediaNameElMap.get(mediaInfo.name);
+            if (shareMediaEl) {
+                shareMediaEl.classList.toggle("d-none", !mediaInfo.status);
+                fragment.appendChild(shareMediaEl);
+            }
+        });
+        editingElement.appendChild(fragment);
     }
 }
 
