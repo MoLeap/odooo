@@ -17,7 +17,8 @@
     <t t-name="website.s_dynamic_snippet.carousel.base">
         <div t-att-id="unique_id" t-attf-class="carousel slide d-flex flex-column-reverse #{extraCarouselClass || ''}"
              t-att-style="extraCarouselStyle"
-             t-att-data-bs-interval="interval" data-bs-ride="carousel">
+             t-att-data-bs-interval="interval" data-bs-ride="carousel"
+             aria-roledescription="carousel">
             <t t-set="slideSize" t-value="rowSize * rowPerSlide" />
             <t t-set="slideIndexGenerator" t-value="Array(Math.ceil(data.length/slideSize))"/>
             <!-- Controls and indicators are set before the content so that they
@@ -34,10 +35,10 @@
             <t t-set="rowIndexGenerator" t-value="Array(rowPerSlide)"/>
             <t t-set="colIndexGenerator" t-value="Array(rowSize)"/>
             <div class="carousel-inner w-100 mx-auto" role="listbox"
-                 aria-label="Carousel">
+                 aria-label="Carousel" aria-live="off">
                 <t t-foreach="slideIndexGenerator" t-as="slideIndex" t-key="slideIndex_index">
                     <t t-set="slideOffset" t-value="slideIndex_index * slideSize"/>
-                    <div t-attf-class="carousel-item #{extraClasses || ''} #{slideIndex_first ? 'active' : ''}" role="option">
+                    <div t-attf-class="carousel-item #{extraClasses || ''} #{slideIndex_first ? 'active' : ''}" role="option" aria-roledescription="slide">
                         <t t-foreach="rowIndexGenerator" t-as="rowIndex" t-key="rowIndex_index">
                             <t t-set="rowOffset" t-value="slideOffset + (rowIndex_index * rowSize)"/>
                             <t t-if="rowOffset &lt; data.length">

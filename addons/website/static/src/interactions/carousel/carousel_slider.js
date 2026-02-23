@@ -55,6 +55,10 @@ export class CarouselSlider extends Interaction {
         } else if (!this.hasInterval) {
             this.el.dataset.bsInterval = "1000";
         }
+        // No need for Bootstrap's default aria-current, we set aria-selected.
+        this.el
+            .querySelector(".carousel-indicators button[aria-current]")
+            ?.removeAttribute("aria-current");
     }
 
     start() {
@@ -134,6 +138,18 @@ export class CarouselSlider extends Interaction {
      * @param {Event} ev The Bootstrap Carousel slid event.
      */
     onSlidCarousel(ev) {
+        if (this.el.querySelector(".carousel-indicators button")) {
+            // aria-selected with role=tab is a better default than Bootstrap's
+            // aria-current.
+            this.el
+                .querySelector(".carousel-indicators button[aria-selected='true']")
+                .setAttribute("aria-selected", "false");
+            const activeIndicatorEl = this.el.querySelector(".carousel-indicators button.active");
+            // Somehow `activeIndicatorEl` is sometimes null in edit mode.
+            activeIndicatorEl?.setAttribute("aria-selected", "true");
+            activeIndicatorEl?.removeAttribute("aria-current");
+        }
+
         if (this.options.scrollMode === "single") {
             this.onSlidSingleScroll(ev);
         }
