@@ -1935,10 +1935,7 @@ class SaleOrderLine(models.Model):
                     self.order_id._is_readonly()
                     or bool(self.combo_item_id)
                 ),
-                "uomDisplayName": self.product_uom_id.display_name,
-                "productUomDisplayName": self.product_id.uom_id.display_name,
-                "uomId": self.product_uom_id.id,
-                "productUomFactor": self[0].product_id.uom_id.factor / self[0].product_uom_id.factor,
+                **self.order_id._get_product_catalog_uom_data(self.product_id, self[0].product_uom_id),
             }
         if self:
             self.product_id.ensure_one()
