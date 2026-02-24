@@ -108,6 +108,7 @@ For more specific needs, you may also assign custom-defined actions
         'views/discuss_public_templates.xml',
         'views/mail_alias_domain_views.xml',
         'views/mail_alias_views.xml',
+        'views/mail_attachment_views.xml',
         'views/mail_gateway_allowed_views.xml',
         'views/mail_guest_views.xml',
         'views/mail_message_reaction_views.xml',
@@ -259,7 +260,10 @@ For more specific needs, you may also assign custom-defined actions
             'mail/static/src/discuss/**/public/**/*',
             ('remove', 'mail/static/src/discuss/**/*.dark.scss'),
             ('remove', 'web/static/src/**/*.dark.scss'),
-        ]
+        ],
+        'mail.assets_markdown': [
+            'mail/static/src/markdown_assets/mail_markdown_assets.scss',
+        ],
     },
     'author': 'Odoo S.A.',
     'license': 'LGPL-3',
