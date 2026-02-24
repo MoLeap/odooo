@@ -5532,6 +5532,7 @@ class TestTourMrpOrder(HttpCase):
                     'product_id': component.id,
                     'quantity': 2,
                     'child_field': 'move_raw_ids',
+                    'uom_id': component.uom_id.id,
                 },
             },
         )

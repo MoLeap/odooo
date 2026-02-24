@@ -1922,14 +1922,23 @@ class SaleOrderLine(models.Model):
                 'price': float,
                 'readOnly': bool,
                 'uomDisplayName': String,
+                'uomId': int,
+                'productUomFactor': float (optional),
+                'productUomDisplayName': string (optional),
             }
         """
         if len(self) == 1:
             return {
                 "quantity": self.product_uom_qty,
                 "price": self._get_discounted_price(),
-                "readOnly": (self.order_id._is_readonly() or bool(self.combo_item_id)),
+                "readOnly": (
+                    self.order_id._is_readonly()
+                    or bool(self.combo_item_id)
+                ),
                 "uomDisplayName": self.product_uom_id.display_name,
+                "productUomDisplayName": self.product_id.uom_id.display_name,
+                "uomId": self.product_uom_id.id,
+                "productUomFactor": self[0].product_id.uom_id.factor / self[0].product_uom_id.factor,
             }
         if self:
             self.product_id.ensure_one()
