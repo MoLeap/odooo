@@ -8,7 +8,7 @@ import { withSequence } from "@html_editor/utils/resource";
 import { between } from "@html_builder/utils/option_sequence";
 import { WEBSITE_BACKGROUND_OPTIONS, BOX_BORDER_SHADOW } from "@website/builder/option_sequence";
 import { selectElements } from "@html_editor/utils/dom_traversal";
-import { BaseOptionComponent } from "@html_builder/core/utils";
+import { BaseOptionComponent, useDomState } from "@html_builder/core/utils";
 
 /**
  * @typedef { Object } CarouselOptionShared
@@ -33,18 +33,28 @@ export class CarouselOption extends BaseOptionComponent {
     static exclude =
         ".s_carousel_intro_wrapper, .s_carousel_cards_wrapper, .s_quotes_carousel_wrapper:has(>.s_quotes_carousel_compact)";
     static applyTo = ":scope > .carousel";
+
+    setup() {
+        super.setup();
+        this.state = useDomState((editingElement) => ({
+            // Compatibility before .o_carousel_pause button.
+            hasPauseButton: !!editingElement.querySelector(".o_carousel_pause"),
+        }));
+    }
 }
 
-export class CarouselBottomControllersOption extends BaseOptionComponent {
+export class CarouselBottomControllersOption extends CarouselOption {
     static template = "website.CarouselBottomControllersOption";
     static selector = "section";
     static applyTo = ".s_carousel_intro, .s_quotes_carousel_compact";
+    static exclude = "";
 }
 
-export class CarouselCardsOption extends BaseOptionComponent {
+export class CarouselCardsOption extends CarouselBottomControllersOption {
     static template = "website.CarouselCardsOption";
     static selector = "section";
     static applyTo = ".s_carousel_cards";
+    static exclude = "";
 }
 
 export class CarouselOptionPlugin extends Plugin {
@@ -391,6 +401,9 @@ export class SetAutoplayAction extends BuilderAction {
     apply({ editingElement, params: { bsRide, ariaLive } }) {
         editingElement.dataset.bsRide = bsRide;
         editingElement.querySelector(".carousel-inner")?.setAttribute("aria-live", ariaLive);
+        if (bsRide === "false") {
+            editingElement.classList.add("o_carousel_pause_btn_hidden");
+        }
     }
 }
 

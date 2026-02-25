@@ -103,6 +103,10 @@
                     preview="false"
                     applyWithUnit="false"/>
             </BuilderRow>
+
+            <BuilderRow t-if="this.state.hasPauseButton" label.translate="Pause Button" tooltip.translate="Allow your visitors to pause the carousel" level="1">
+                <BuilderCheckbox classAction="'o_carousel_pause_btn_hidden'" inverseAction="true"/>
+            </BuilderRow>
         </t>
     </BuilderContext>
 

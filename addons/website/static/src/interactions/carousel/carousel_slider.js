@@ -1,5 +1,6 @@
 import { Interaction } from "@web/public/interaction";
 import { getActiveHotkey } from "@web/core/hotkeys/hotkey_service";
+import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { onceAllImagesLoaded } from "@website/utils/images";
 
@@ -35,6 +36,23 @@ export class CarouselSlider extends Interaction {
                 }
             },
         },
+        ".o_carousel_pause": {
+            "t-on-click": this.onPauseBtnClick,
+            "t-att-class": () => ({
+                paused: this.isPaused,
+                playing: !this.isPaused,
+            }),
+            "t-att-title": () => (this.isPaused ? _t("Play") : _t("Pause")),
+        },
+        ".o_carousel_pause .fa": {
+            "t-att-class": () => ({
+                "fa-pause": !this.isPaused,
+                "fa-play": this.isPaused,
+            }),
+        },
+        ".o_carousel_pause .visually-hidden": {
+            "t-out": () => (this.isPaused ? _t("Play") : _t("Pause")),
+        },
     };
     carouselOptions = undefined;
     showClickableSlideLinks = true;
@@ -59,13 +77,15 @@ export class CarouselSlider extends Interaction {
         this.el
             .querySelector(".carousel-indicators button[aria-current]")
             ?.removeAttribute("aria-current");
+
+        this.isPaused = this.el.dataset.bsRide === "false";
     }
 
     start() {
         this.computeMaxHeight();
         this.updateContent();
-        const carouselBS = window.Carousel.getOrCreateInstance(this.el, this.carouselOptions);
-        this.registerCleanup(() => carouselBS.dispose());
+        this.bsCarousel = window.Carousel.getOrCreateInstance(this.el, this.carouselOptions);
+        this.registerCleanup(() => this.bsCarousel.dispose());
 
         const itemWidth = getComputedStyle(this.el).getPropertyValue(
             "--o-carousel-item-width-percentage"
@@ -122,7 +142,7 @@ export class CarouselSlider extends Interaction {
             // slide once the next images are loaded.
             ev.preventDefault();
             onceAllImagesLoaded(this.carouselInnerEl).then(() => {
-                window.Carousel.getOrCreateInstance(this.el).to(ev.to);
+                this.bsCarousel.to(ev.to);
             });
             return;
         }
@@ -188,6 +208,22 @@ export class CarouselSlider extends Interaction {
             const carouselItemsEls = this.carouselInnerEl.querySelectorAll(".carousel-item");
             this.carouselInnerEl.appendChild(carouselItemsEls[0]);
         }
+    }
+
+    onPauseBtnClick() {
+        if (!this.isPaused) {
+            this.bsCarousel.pause();
+            this.bsCarousel.dispose();
+            this.bsCarousel = window.Carousel.getOrCreateInstance(this.el, {
+                pause: true,
+                ride: false,
+            });
+        } else {
+            this.bsCarousel.dispose();
+            this.bsCarousel = window.Carousel.getOrCreateInstance(this.el, this.carouselOptions);
+            this.bsCarousel.cycle();
+        }
+        this.isPaused = !this.isPaused;
     }
 
     /**

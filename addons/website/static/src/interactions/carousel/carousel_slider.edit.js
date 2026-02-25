@@ -9,6 +9,9 @@ const CarouselSliderEdit = (I) =>
                 ...this.dynamicContent._root,
                 "t-on-content_changed": this.onContentChanged,
             },
+            ".o_carousel_pause": {
+                "t-on-click": () => {},
+            },
         };
         // Pause carousel in edit mode.
         carouselOptions = { ride: false, pause: true, keyboard: false };
