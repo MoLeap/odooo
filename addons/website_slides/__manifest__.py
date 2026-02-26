@@ -122,7 +122,6 @@ Featuring
             'web/static/src/core/color_picker/color_picker.scss',
             'web/static/src/views/fields/translation_dialog.scss',
             'web/static/src/views/fields/signature/signature_field.scss',
-            'website/static/src/libs/zoomodoo/zoomodoo.scss',
 
             'web/static/src/module_loader.js',
             'web/static/src/session.js',
@@ -162,7 +161,6 @@ Featuring
             'web/static/lib/bootstrap/js/dist/toast.js',
             'web/static/src/libs/bootstrap.js',
             'web/static/src/legacy/js/libs/jquery.js',
-            'website/static/src/libs/zoomodoo/zoomodoo.js',
             'web/static/src/core/**/*.js',
             'web/static/src/env.js',
             ('remove', 'web/static/src/core/emoji_picker/emoji_data.js'),
