@@ -1042,3 +1042,33 @@ class TestExpenses(TestExpenseCommon):
         self.assertEqual(form.is_editable, False)
         form.company_id = self.env.company
         self.assertEqual(form.is_editable, True)
+
+    def test_expense_based_bill_duplicate_detection(self):
+        """ Test that bills linked to expenses use expense-based duplication logic. """
+        expense_1, expense_2 = self.create_expenses([
+            {
+                'name': 'Expense 1',
+                'employee_id': self.expense_employee.id,
+                'product_id': self.product_a.id,
+                'total_amount_currency': 100.0,
+                'payment_mode': 'own_account',
+                'company_id': self.company_data['company'].id,
+            },
+            {
+                'name': 'Expense 2',
+                'employee_id': self.expense_employee.id,
+                'product_id': self.product_a.id,
+                'total_amount_currency': 100.0,
+                'payment_mode': 'own_account',
+                'company_id': self.company_data['company'].id,
+            },
+        ])
+
+        all_expenses = expense_1 | expense_2
+        all_expenses.action_submit()
+        all_expenses._do_approve()  # Skip duplicate wizard
+        self.post_expenses_with_wizard(expense_1)
+        self.post_expenses_with_wizard(expense_2)
+
+        self.assertTrue(expense_1.account_move_id.duplicated_ref_ids)
+        self.assertTrue(expense_2.account_move_id.duplicated_ref_ids)
