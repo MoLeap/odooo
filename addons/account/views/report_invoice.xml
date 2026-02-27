@@ -142,11 +142,21 @@
 
                                     <tr t-att-class="'fw-bold o_line_section' if line.display_type == 'line_section' else 'fst-italic o_line_note' if line.display_type == 'line_note' else ''">
                                         <t t-if="line.display_type == 'product'" name="account_invoice_line_accountable">
+<<<<<<< 224c6e8a30401e16c7b214841c7650504b939c2d
                                             <td name="account_invoice_line_name">
                                                 <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}">Bacon Burger</span>
                                             </td>
                                             <td name="td_quantity" class="o_td_quantity text-end">
                                                 <span t-field="line.quantity" class="text-nowrap">3.00</span>
+||||||| 05d0944a7640e196db989039140ae5ddb12152ac
+                                            <td name="account_invoice_line_name"><span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}">Bacon Burger</span></td>
+                                            <td name="td_quantity" class="text-end">
+                                                <span t-field="line.quantity">3.00</span>
+=======
+                                            <td name="account_invoice_line_name"><span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}" dir="auto">Bacon Burger</span></td>
+                                            <td name="td_quantity" class="text-end">
+                                                <span t-field="line.quantity">3.00</span>
+>>>>>>> 36dd15588fd39c3bb56e4a404befeeb0df465737
                                                 <span t-field="line.product_uom_id"  groups="uom.group_uom">units</span>
                                             </td>
                                             <td name="td_price_unit" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
@@ -165,14 +175,14 @@
                                         </t>
                                         <t t-elif="line.display_type == 'line_section'">
                                             <td colspan="99">
-                                                <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}">A section title</span>
+                                                <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}" dir="auto">A section title</span>
                                             </td>
                                             <t t-set="current_section" t-value="line"/>
                                             <t t-set="current_subtotal" t-value="0"/>
                                         </t>
                                         <t t-elif="line.display_type == 'line_note'">
                                             <td colspan="99">
-                                                <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}">A note, whose content usually applies to the section or product above.</span>
+                                                <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}" dir="auto">A note, whose content usually applies to the section or product above.</span>
                                             </td>
                                         </t>
                                     </tr>
