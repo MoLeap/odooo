@@ -1,15 +1,14 @@
 import { registry } from "@web/core/registry";
 
-registry.category("web_tour.tours").add('website_profile_description', {
-    url: "/profile/users",
-    steps: () => [{
+function get_website_profile_description_steps(editClass) {
+    return [{
         content: "Click on one user profile card",
         trigger: "div[onclick]:contains(\"test_user\")",
         run: "click",
         expectUnloadPage: true,
     }, {
         content: "Edit profile",
-        trigger: "a:contains('EDIT PROFILE')",
+        trigger: `a.o_wprofile_editor.${editClass}`,
         run: "click",
     }, {
         content: "Add some content",
@@ -23,5 +22,15 @@ registry.category("web_tour.tours").add('website_profile_description', {
     }, {
         content: "Check the content is saved",
         trigger: "span[data-oe-field='website_description']:contains('content <p>code here</p>')",
-    }]
-})
+    }];
+}
+
+registry.category("web_tour.tours").add("website_profile_description", {
+    url: "/profile/users",
+    steps: () => get_website_profile_description_steps("d-md-inline-block"),
+});
+
+registry.category("web_tour.tours").add("website_profile_description_mobile", {
+    url: "/profile/users",
+    steps: () => get_website_profile_description_steps("d-inline-block"),
+});
