@@ -110,14 +110,14 @@
                         <t t-set="tx_sudo" t-value="object.get_portal_last_transaction()"/>
                         Your order <span style="font-weight:bold;" t-out="object.name or ''">S00049</span>
                         <t t-if="object.state == 'sale' or (tx_sudo and tx_sudo.state in ('done', 'authorized'))">
-                            <t t-if="hasattr(object, 'carrier_id') 
-                                and object.carrier_id.delivery_type == 'in_store'"
+                            <t
+                                t-if="hasattr(object, 'carrier_id') and object.carrier_id.delivery_type == 'in_store'"
                             >
-                                <t t-if="object.commitment_date
-                                    and object.commitment_date.date() != datetime.date.today()"
+                                <t
+                                    t-if="object.commitment_date and object.commitment_date.date() != datetime.date.today()"
                                 >
-                                    has been confirmed and will be ready on 
-                                    <span 
+                                    has been confirmed and will be ready on
+                                    <span
                                         t-field="object.commitment_date"
                                         t-options='{"widget": "date"}'
                                     />.<br/>
@@ -341,8 +341,8 @@
                         <table t-if="object.partner_shipping_id and not object.only_services" width="295" style="vertical-align: top; font-size: 14px; margin-bottom: 12px;" align="left" role="presentation">
                             <tr>
                                 <td style="padding-bottom: 4px; font-weight: bold;">
-                                    <t t-if="not (hasattr(object, 'carrier_id')
-                                        and object.carrier_id.delivery_type == 'in_store')"
+                                    <t
+                                        t-if="not (hasattr(object, 'carrier_id') and object.carrier_id.delivery_type == 'in_store')"
                                     >
                                         <span style="opacity: 0.9;">Delivery with</span>
                                     </t>
