@@ -110,13 +110,6 @@ class PaymentTransaction(models.Model):
         if self.provider_code != "nuvei":
             return super()._extract_amount_data(payment_data)
 
-        # When a user declines to pay and leaves the payment page, no information
-        # is sent back to odoo via the endpoint. As such there is no currency or
-        # amount set so we return early. This only occurs in the leaving flow so
-        # no issue should arise leaving early.
-        if not payment_data:
-            return None
-
         is_mandatory_integer_pm = self.payment_method_code in const.INTEGER_METHODS
         rounding = 0 if is_mandatory_integer_pm else self.currency_id.decimal_places
 
