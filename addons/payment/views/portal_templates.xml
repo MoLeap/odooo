@@ -267,7 +267,7 @@
         <t t-set="waiting_heading">
             <p>Please wait...</p>
         </t>
-        <t t-set="tx_status_message" t-value="tx.provider_id.sudo()._get_status_message(tx.state)"/>
+        <t t-set="tx_status_message" t-value="tx.provider_id.sudo()._get_status_message(tx)"/>
         <t t-if="tx.state == 'draft'">
             <t t-set="alert_style" t-value="'warning'"/>
             <t t-if="is_processing" t-set="status_heading" t-value="waiting_heading"/>

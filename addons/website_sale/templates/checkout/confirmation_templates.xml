@@ -115,7 +115,7 @@
             <div
                 t-if="tx_sudo"
                 t-attf-class="alert px-3 pb-0 pt-3 #{
-                    (tx_sudo.state == 'pending' and tx_sudo.payment_method_code == 'pay_on_invoice' and 'alert-success') or
+                    (tx_sudo.state == 'pending' and tx_sudo.provider_id.custom_mode in ['pay_on_invoice', 'cash_on_delivery', 'on_site'] and 'alert-success') or
                     (tx_sudo.state == 'pending' and 'alert-info') or
                     (tx_sudo.state == 'done' and order.amount_total == tx_sudo.amount and 'alert-success') or
                     (tx_sudo.state == 'done' and order.amount_total != tx_sudo.amount and 'alert-warning') or
@@ -135,7 +135,10 @@
                     <i class="fa fa-pencil"/>
                 </a>
                 <div>
-                    <t t-if="tx_sudo.state == 'pending'">
+                     <t t-if="tx_sudo.state == 'pending' and tx_sudo.provider_id.custom_mode in ['pay_on_invoice', 'cash_on_delivery', 'on_site']">
+                        <t t-out="tx_sudo.provider_id.sudo().done_msg"/>
+                    </t>
+                    <t t-else="tx_sudo.state == 'pending'">
                         <t t-out="tx_sudo.provider_id.sudo().pending_msg"/>
                     </t>
                     <t t-if="tx_sudo.state == 'done'">
@@ -156,7 +159,7 @@
                         <span t-out="tx_sudo.state_message"/>
                     </t>
                 </div>
-                <t t-if="tx_sudo.provider_code == 'custom' and tx_sudo.payment_method_code != 'pay_on_invoice'">
+                <t t-if="tx_sudo.provider_code == 'custom' and tx_sudo.payment_method_code == 'wire_transfer'">
                     <div id="order_reference" t-if="order.reference" class="mt-2">
                         <b>Communication: </b><span t-out='order.reference'/>
                     </div>

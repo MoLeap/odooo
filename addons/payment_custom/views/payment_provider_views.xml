@@ -38,13 +38,13 @@
                             class="oe_link ms-0 ps-0"
                             icon="fa-refresh"
                             />
-              </div>
+                </div>
             </field>
             <field name="pending_msg" position="attributes">
                 <attribute name="invisible" separator="or" add="custom_mode == 'pay_on_invoice'"/>
             </field>
             <field name="done_msg" position="attributes">
-                <attribute name="invisible" separator="or" add="code == 'custom' and custom_mode != 'pay_on_invoice'"/>
+                <attribute name="invisible" separator="or" add="custom_mode == 'wire_transfer'"/>
             </field>
             <field name="cancel_msg" position="attributes">
                 <attribute name="invisible" separator="or" add="code == 'custom'"/>

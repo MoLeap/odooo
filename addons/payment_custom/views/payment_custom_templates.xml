@@ -16,7 +16,7 @@
     <template id="custom_state_header" inherit_id="payment.state_header">
 
         <xpath expr="//div[@name='o_payment_status_alert']" position="before">
-            <h1 t-if=" tx.provider_id.sudo().custom_mode == 'wire_transfer' and tx.state == 'pending'"
+            <h1 t-if=" tx.provider_id.sudo().custom_mode == 'wire_transfer'"
                 class="mb-3">
                 Finalize your payment
             </h1>

@@ -3,8 +3,8 @@
 
     <record id="payment.payment_provider_pay_on_invoice" model="payment.provider">
         <field name="code">custom</field>
-        <field name="redirect_form_view_id" ref="redirect_form"/>
-        <field name="pending_msg" type="html">
+        <field name="redirect_form_view_id" ref="payment.generic_redirect_form"/>
+        <field name="done_msg" type="html">
             <p>Your order is confirmed, you will receive your invoice shortly.</p>
         </field>
         <field name="custom_mode">pay_on_invoice</field>
