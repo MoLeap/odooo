@@ -307,6 +307,14 @@ class WebsiteSale(payment_portal.PaymentPortal):
             )
             return request.redirect(f"{self._get_shop_path(category, page)}?{query}", code=301)
 
+        website = request.env["website"].get_current_website()
+        tax_display = website.show_line_subtotals_tax_selection
+        default_tax = (
+            website.company_id.account_sale_tax_id.sudo().amount
+            if tax_display == "tax_included"
+            else 0.0
+        )
+
         try:
             min_price = float(min_price)
         except ValueError:
@@ -316,7 +324,6 @@ class WebsiteSale(payment_portal.PaymentPortal):
         except ValueError:
             max_price = 0
 
-        website = request.env["website"].get_current_website()
         website_domain = website.website_domain()
 
         ppg = website.shop_ppg or 21
@@ -372,11 +379,36 @@ class WebsiteSale(payment_portal.PaymentPortal):
         if search:
             post["search"] = search
 
+        if tax_display == "tax_included" and default_tax:
+            tax_factor = 1 + default_tax / 100
+            currency_rounding = website.currency_id.rounding
+            min_price_filtered = (
+                float_round(
+                    min_price / tax_factor,
+                    precision_rounding=currency_rounding,
+                    rounding_method="DOWN",
+                )
+                if min_price
+                else 0
+            )
+            max_price_filtered = (
+                float_round(
+                    max_price / tax_factor,
+                    precision_rounding=currency_rounding,
+                    rounding_method="UP",
+                )
+                if max_price
+                else 0
+            )
+        else:
+            min_price_filtered = min_price
+            max_price_filtered = max_price
+
         options = self._get_search_options(
             category=category,
             attribute_value_dict=attribute_value_dict,
-            min_price=min_price,
-            max_price=max_price,
+            min_price=min_price_filtered,
+            max_price=max_price_filtered,
             conversion_rate=conversion_rate,
             display_currency=website.currency_id,
             extra_domain=Domain.OR([
@@ -409,6 +441,13 @@ class WebsiteSale(payment_portal.PaymentPortal):
             )
             available_min_price, available_max_price = request.env.execute_query(sql)[0]
 
+            if tax_display == "tax_included" and default_tax:
+                available_min_price_display = available_min_price * (1 + default_tax / 100)
+                available_max_price_display = available_max_price * (1 + default_tax / 100)
+            else:
+                available_min_price_display = available_min_price
+                available_max_price_display = available_max_price
+
             if min_price or max_price:
                 # The if/else condition in the min_price / max_price value assignment
                 # tackles the case where we switch to a list of products with different
@@ -418,12 +457,16 @@ class WebsiteSale(payment_portal.PaymentPortal):
                 # min exceeds the max, and / or the specified max is lower than the available min.
                 if min_price:
                     min_price = (
-                        min_price if min_price <= available_max_price else available_min_price
+                        min_price
+                        if min_price <= available_max_price_display
+                        else available_min_price_display
                     )
                     post["min_price"] = min_price
                 if max_price:
                     max_price = (
-                        max_price if max_price >= available_min_price else available_max_price
+                        max_price
+                        if max_price >= available_min_price_display
+                        else available_max_price_display
                     )
                     post["max_price"] = max_price
 
@@ -555,10 +598,10 @@ class WebsiteSale(payment_portal.PaymentPortal):
             ),
         }
         if filter_by_price_enabled:
-            values["min_price"] = min_price or available_min_price
-            values["max_price"] = max_price or available_max_price
-            values["available_min_price"] = float_round(available_min_price, 2)
-            values["available_max_price"] = float_round(available_max_price, 2)
+            values["min_price"] = min_price or available_min_price_display
+            values["max_price"] = max_price or available_max_price_display
+            values["available_min_price"] = float_round(available_min_price_display, 2)
+            values["available_max_price"] = float_round(available_max_price_display, 2)
         if filter_by_tags_enabled:
             values.update({"all_tags": all_tags, "tags": tags})
         if category:
