@@ -224,6 +224,10 @@
                                     </div>
                                 </div>
                             </div>
+                            <t
+                                t-if="show_navigation_button and website_sale_order and website_sale_order.website_order_line"
+                                t-call="website_sale.checkout_shorter_cart_summary_shared_dropzone"
+                            />
                         </div>
                     </div>
                     <!-- Mobile Order Summary | Bottom of page and Offcanvas -->
@@ -312,7 +316,18 @@
                     <t t-call="website_sale.navigation_buttons"/>
                 </div>
             </div>
+            <t
+                t-if="website_sale_order and website_sale_order.website_order_line"
+                t-call="website_sale.checkout_shorter_cart_summary_shared_dropzone"
+            />
         </div>
+    </template>
+
+    <template id="website_sale.checkout_shorter_cart_summary_shared_dropzone">
+        <nav
+            class="mt-2 oe_empty"
+            id="oe_structure_website_sale_checkout_shorter_cart_summary_all"
+        />
     </template>
 
     <!-- Called in `website_sale.checkout_layout` and `website_sale.confirmation`. -->
