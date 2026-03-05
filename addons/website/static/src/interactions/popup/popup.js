@@ -1,9 +1,9 @@
-import { Interaction } from "@web/public/interaction";
 import { registry } from "@web/core/registry";
+import { Interaction } from "@web/public/interaction";
 
 import { browser } from "@web/core/browser/browser";
 import { cookie } from "@web/core/browser/cookie";
-import { utils as uiUtils, SIZES } from "@web/core/ui/ui_service";
+import { SIZES, utils as uiUtils } from "@web/core/ui/ui_service";
 import { getTabableElements } from "@web/core/utils/ui";
 
 export class Popup extends Interaction {
@@ -94,7 +94,16 @@ export class Popup extends Interaction {
     }
 
     canShowPopup() {
-        return true;
+        const selector = this.el.dataset.showOnSelector;
+        if (!selector) {
+            // No selector = allPages, currentPage, or old popup without attrs.
+            // Always show.
+            return true;
+        }
+        // If selector matches current page DOM, show the popup. Otherwise don't.
+        // If the module that registered this selector is uninstalled, its page
+        // templates are gone so the selector never matches - popup stays hidden.
+        return !!this.el.ownerDocument.querySelector(selector);
     }
 
     hidePopup() {

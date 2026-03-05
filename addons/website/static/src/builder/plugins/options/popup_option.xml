@@ -51,8 +51,9 @@
     </BuilderRow>
     <BuilderRow label.translate="Show on">
         <BuilderSelect action="'moveBlock'" preview="false">
-            <BuilderSelectItem actionValue="'currentPage'">This page</BuilderSelectItem>
-            <BuilderSelectItem actionValue="'allPages'">All pages</BuilderSelectItem>
+            <t t-foreach="this.showOnOptions" t-as="option" t-key="option.value">
+                <BuilderSelectItem actionValue="option.value" t-out="option.label"/>
+            </t>
         </BuilderSelect>
     </BuilderRow>
 </t>

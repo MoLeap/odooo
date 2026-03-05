@@ -1,18 +1,29 @@
-import { SNIPPET_SPECIFIC, SNIPPET_SPECIFIC_END } from "@html_builder/utils/option_sequence";
-import { Plugin } from "@html_editor/plugin";
-import { registry } from "@web/core/registry";
-import { withSequence } from "@html_editor/utils/resource";
 import { BuilderAction } from "@html_builder/core/builder_action";
 import { BaseOptionComponent } from "@html_builder/core/utils";
+import { SNIPPET_SPECIFIC, SNIPPET_SPECIFIC_END } from "@html_builder/utils/option_sequence";
+import { Plugin } from "@html_editor/plugin";
+import { withSequence } from "@html_editor/utils/resource";
+import { _t } from "@web/core/l10n/translation";
+import { registry } from "@web/core/registry";
 
 export const POPUP = SNIPPET_SPECIFIC;
 export const COOKIES_BAR = SNIPPET_SPECIFIC_END;
+
+const SHARED_POPUPS_CONTAINER_SELECTOR = "#o_shared_blocks";
+const PAGE_SPECIFIC_POPUPS_CONTAINER_SELECTOR = "main .oe_structure.o_savable";
+const SHOW_ON_CURRENT_PAGE_VALUE = "currentPage";
+const SHOW_ON_ALL_PAGES_VALUE = "allPages";
 
 export class PopupOption extends BaseOptionComponent {
     static template = "website.PopupOption";
     static selector = ".s_popup";
     static exclude = "#website_cookies_bar";
     static applyTo = ".modal";
+
+    setup() {
+        super.setup();
+        this.showOnOptions = this.getResource("popup_show_on_options");
+    }
 }
 
 export class PopupCookiesOption extends BaseOptionComponent {
@@ -69,7 +80,19 @@ class PopupOptionPlugin extends Plugin {
         on_element_dropped_handlers: withSequence(0, this.onElementDropped.bind(this)),
         on_will_remove_handlers: this.onWillRemove.bind(this),
         no_parent_containers: ".s_popup",
-        popup_container_selectors: withSequence(10, "main .oe_structure.o_savable"),
+        popup_container_selectors: withSequence(10, PAGE_SPECIFIC_POPUPS_CONTAINER_SELECTOR),
+        popup_show_on_options: [
+            withSequence(10, {
+                value: SHOW_ON_CURRENT_PAGE_VALUE,
+                label: _t("This page"),
+                pageSelector: null,
+            }),
+            withSequence(20, {
+                value: SHOW_ON_ALL_PAGES_VALUE,
+                label: _t("All pages"),
+                pageSelector: null,
+            }),
+        ],
     };
 
     onCloned({ cloneEl }) {
@@ -81,6 +104,7 @@ class PopupOptionPlugin extends Plugin {
     onSnippetDropped({ snippetEl }) {
         if (snippetEl.matches(".s_popup")) {
             this.relocatePopup(snippetEl);
+            snippetEl.dataset.showOn = SHOW_ON_CURRENT_PAGE_VALUE;
             this.assignUniqueID(snippetEl);
             this.dependencies.history.addCustomMutation({
                 apply: () => {
@@ -117,7 +141,7 @@ class PopupOptionPlugin extends Plugin {
 
     relocatePopup(editingElement) {
         const popupEl = editingElement.closest(".s_popup");
-        if (popupEl.closest("#o_shared_blocks")) {
+        if (popupEl.closest(SHARED_POPUPS_CONTAINER_SELECTOR)) {
             return;
         }
         const containerEl = getPopupContainerFromSelectors(
@@ -130,27 +154,41 @@ class PopupOptionPlugin extends Plugin {
     }
 }
 
-// Moves the snippet in #o_shared_blocks to be common to all pages
-// or inside the first editable oe_structure in the main to be on
-// current page only.
+// Moves the snippet in SHARED_POPUPS_CONTAINER_SELECTOR to be common to all pages
+// or inside the first matching selector in popup_container_selectors resource
+// to be on the current page only.
 export class MoveBlockAction extends BuilderAction {
     static id = "moveBlock";
     isApplied({ editingElement, value }) {
-        return editingElement.closest("#o_shared_blocks")
-            ? value === "allPages"
-            : value === "currentPage";
+        const popupEl = editingElement.closest(".s_popup");
+        const showOn = popupEl?.dataset.showOn;
+        if (showOn) {
+            return showOn === value;
+        }
+        return popupEl.closest(SHARED_POPUPS_CONTAINER_SELECTOR)
+            ? value === SHOW_ON_ALL_PAGES_VALUE
+            : value === SHOW_ON_CURRENT_PAGE_VALUE;
     }
     apply({ editingElement, value }) {
         const popupEl = editingElement.closest(".s_popup");
-        const whereEl =
-            value === "allPages"
-                ? this.editable.querySelector("#o_shared_blocks")
-                : getPopupContainerFromSelectors(
+        popupEl.dataset.showOn = value;
+
+        const containerEl =
+            value === SHOW_ON_CURRENT_PAGE_VALUE
+                ? getPopupContainerFromSelectors(
                       this.editable,
                       this.getResource("popup_container_selectors")
-                  );
-        if (whereEl) {
-            whereEl.insertAdjacentElement("afterbegin", popupEl);
+                  )
+                : this.editable.querySelector(SHARED_POPUPS_CONTAINER_SELECTOR);
+        containerEl?.insertAdjacentElement("afterbegin", popupEl);
+
+        const showOnOption = this.getResource("popup_show_on_options").find(
+            (showOnOption) => showOnOption.value === value
+        );
+        if (showOnOption?.pageSelector) {
+            popupEl.dataset.showOnSelector = showOnOption.pageSelector;
+        } else {
+            delete popupEl.dataset.showOnSelector;
         }
     }
 }
