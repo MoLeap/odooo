@@ -2,10 +2,12 @@ import { BuilderAction } from "@html_builder/core/builder_action";
 import { BaseOptionComponent } from "@html_builder/core/base_option_component";
 import { getElementsWithOption } from "@html_builder/utils/utils";
 import { Plugin } from "@html_editor/plugin";
+import { closestElement } from "@html_editor/utils/dom_traversal";
 import { registry } from "@web/core/registry";
 import { renderToElement } from "@web/core/utils/render";
 import { StyleAction } from "@html_builder/core/core_builder_action_plugin";
 import { SelectTemplateAction } from "../customize_website_plugin";
+import { withSequence } from "@html_editor/utils/resource";
 
 export class CountdownOption extends BaseOptionComponent {
     static id = "countdown_option";
@@ -33,6 +35,18 @@ export class CountdownOptionPlugin extends Plugin {
             for (const countdownEl of countdownEls) {
                 countdownEl.classList.remove("s_countdown_enable_preview");
             }
+        },
+        toolbar_namespace_providers: [
+            withSequence(
+                1,
+                (nodeList, editableSelection) =>
+                    !editableSelection.isCollapsed &&
+                    nodeList.find((node) => closestElement(node, ".s_countdown")) &&
+                    "countdownToolbar"
+            ),
+        ],
+        toolbar_namespace_extra_group_providers: {
+            countdownToolbar: ["font", "decoration"],
         },
         before_insert_processors: (container, block) => {
             if (block.closest(".countdown_metrics")) {
