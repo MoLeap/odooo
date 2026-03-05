@@ -131,29 +131,29 @@ class ProductProduct(models.Model):
             combination=self.product_template_attribute_value_ids, product_id=self.id, **kwargs
         )
 
-    def _website_show_quick_add(self):
-        self.ensure_one()
-        if not self.filtered_domain(self.env["website"]._product_domain()):
-            return False
-        website = self.env["website"].get_current_website()
-        return not (
-            website.prevent_sale
-            and website._prevent_product_sale(self, not self._get_contextual_price())
-        )
-
     def _is_add_to_cart_allowed(self):
+        """Context-aware check to determine if the current user is permitted to buy the product.
+
+        :return: True if the current user session permits adding the item to cart, False otherwise.
+        :rtype: bool
+        """
         self.ensure_one()
         if self.env.user.has_group("base.group_system"):
             return True
+        # is archived or unpublished
         if not self.active or not self.website_published:
             return False
+        # is outside website domain
         if not self.filtered_domain(self.env["website"]._product_domain()):
             return False
+        # are prevent sale rules triggered
         website = self.env["website"].get_current_website()
-        if website.prevent_sale and website._prevent_product_sale(
-            self, not self._get_contextual_price()
+        if (
+            website.prevent_sale
+            and website._prevent_product_sale(self, not self._get_contextual_price())
         ):
             return False
+        # has eCommerce rights
         return website.has_ecommerce_access()
 
     @api.onchange("public_categ_ids")

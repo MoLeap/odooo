@@ -731,7 +731,7 @@ class SaleOrder(models.Model):
                 all_accessory_products |= accessory_products.filtered(
                     lambda product: (
                         product.id not in product_ids
-                        and product._website_show_quick_add()
+                        and product.product_tmpl_id._website_show_quick_add()
                         and product.filtered_domain(
                             self.env["product.product"]._check_company_domain(line.company_id)
                         )
