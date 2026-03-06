@@ -831,6 +831,7 @@ describe("popover for file uploads", () => {
 });
 
 describe("popover with empty URL", () => {
+    test.tags("desktop");
     test("should not close the popover when pressing Enter with an empty URL", async () => {
         const { editor } = await setupEditor("<p>ab[]</p>");
         await insertText(editor, "/link");

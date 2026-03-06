@@ -89,3 +89,8 @@
         width: 60px;
     }
 }
+
+.o_bottom_sheet_body .o-we-linkpopover {
+    box-shadow: none !important; // Counter BS shadow class
+    justify-self: center;
+}

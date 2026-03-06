@@ -70,6 +70,15 @@ export class Overlay {
                     range: selection.getRangeAt(0),
                 };
             }
+            if (this.options?.useBottomSheet) {
+                this._remove = this.plugin.services.bottom_sheet.add(
+                    { getRootNode: () => this.plugin.editable.ownerDocument.body },
+                    this.C,
+                    props,
+                    this.options
+                );
+                return;
+            }
             this._remove = this.plugin.services.overlay.add(
                 EditorOverlay,
                 markRaw({
