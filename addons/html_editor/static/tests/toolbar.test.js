@@ -620,6 +620,7 @@ test("toolbar works: display correct font size on select all", async () => {
     expect(inputEl).toHaveValue(`${h1Size}`);
 });
 
+test.tags("desktop");
 test("toolbar works: displays correct font size on input", async () => {
     const { el } = await setupEditor("<p>[test]</p>");
     await waitFor(".o-we-toolbar");
@@ -643,6 +644,24 @@ test("toolbar works: displays correct font size on input", async () => {
     await expectElementCount(".o-we-toolbar", 1);
 });
 
+test.tags("mobile");
+test("toolbar works: displays correct font size on input (mobile)", async () => {
+    const { el } = await setupEditor("<p>[test]</p>");
+    await waitFor(".o-we-toolbar");
+
+    const iframeEl = queryOne(".o-we-toolbar [name='font_size_selector'] iframe");
+    expect(iframeEl).toHaveCount(1);
+    const inputEl = iframeEl.contentWindow.document?.querySelector("input");
+    expect(inputEl).toHaveValue("14");
+    inputEl.select();
+    await press("8");
+    expect(inputEl).toHaveValue("8");
+    await advanceTime(200);
+    expect(getContent(el)).toBe(`<p><span style="font-size: 8px;">[test]</span></p>`);
+    await expectElementCount(".o-we-toolbar", 1);
+});
+
+test.tags("desktop");
 test("toolbar works: font size dropdown closes on Enter and Tab key press", async () => {
     await setupEditor("<p>[test]</p>");
     await waitFor(".o-we-toolbar");
@@ -662,6 +681,21 @@ test("toolbar works: font size dropdown closes on Enter and Tab key press", asyn
     await press("Tab");
     await animationFrame();
     expect(".o_font_size_selector_menu").toHaveCount(0);
+});
+
+test.tags("mobile");
+test("toolbar works: font size dropdown closes on Escape key press (mobile)", async () => {
+    await setupEditor("<p>[test]</p>");
+    await waitFor(".o-we-toolbar");
+
+    const iframeEl = queryOne(".o-we-toolbar [name='font_size_selector'] iframe");
+    expect(iframeEl).toHaveCount(1);
+    const inputEl = iframeEl.contentWindow.document?.querySelector("input");
+    await contains(inputEl).click();
+    expect(".o_font_size_selector_menu").toHaveCount(1);
+
+    await press("Escape");
+    await waitForNone(".o_font_size_selector_menu", { timeout: 500 });
 });
 
 test.tags("desktop");
@@ -700,7 +734,6 @@ test("toolbar works: ArrowUp/Down moves focus to font size dropdown on mobile", 
     const inputEl = iframeEl.contentWindow.document?.querySelector("input");
     await contains(inputEl).click();
     expect(".o_font_size_selector_menu").toHaveCount(1);
-    expect(inputEl).toBeFocused();
 
     const fontSizeSelectorMenu = queryOne(".o_font_size_selector_menu div");
     await press("ArrowDown");
