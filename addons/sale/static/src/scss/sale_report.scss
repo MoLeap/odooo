@@ -1,3 +1,16 @@
 .sale_tbody .o_line_note {
     word-break: break-word;
 }
+
+.o_product_cell_flex {
+    display: flex;
+    align-items: center;
+}
+
+.o_product_image_cell img {
+    width: 48px;
+    height: 48px;
+    margin: 0 20px 0 0;
+    border-radius: 5px;
+    object-fit: cover;
+}
