@@ -20,6 +20,13 @@ class PaymentProvider(models.Model):
             return super()._get_default_payment_method_codes()
         return const.DEFAULT_PAYMENT_METHOD_CODES
 
+    def _is_postpaid(self):
+        """Override of `payment_custom` to return whether a provider is postpaid."""
+        self.ensure_one()
+        if self.custom_mode != 'cash_on_delivery':
+            return super()._is_postpaid()
+        return self.custom_mode == 'cash_on_delivery'
+
     # === BUSINESS METHODS === #
 
     @api.model

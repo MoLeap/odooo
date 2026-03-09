@@ -41,6 +41,17 @@ class PaymentProvider(models.Model):
             return super()._get_default_payment_method_codes()
         return const.DEFAULT_PAYMENT_METHOD_CODES
 
+    def _is_postpaid(self):
+        """Return whether the provider is postpaid."""
+        self.ensure_one()
+        return self.custom_mode == 'pay_on_invoice'
+
+    def _get_status_message(self, status):
+        self.ensure_one()
+        if status == 'pending' and self._is_postpaid():
+            return self.done_msg
+        return super()._get_status_message(status)
+
     # === ACTION METHODS ===#
 
     def action_recompute_pending_msg(self):

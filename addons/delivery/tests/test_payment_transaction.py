@@ -8,6 +8,11 @@ from odoo.addons.delivery.tests.cash_on_delivery_common import CashOnDeliveryCom
 
 @tagged("post_install", "-at_install")
 class TestCODPaymentTransaction(CashOnDeliveryCommon):
+    def setUp(self):
+        # prevents the call to _post_process() in payment_custom
+        self.enable_post_process_patcher = False
+        super().setUp()
+
     def test_choosing_cod_payment_confirms_order(self):
         order = self.sale_order
         self.free_delivery.allow_cash_on_delivery = True
