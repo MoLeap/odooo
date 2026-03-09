@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import threading
 import time
 import typing
@@ -29,7 +30,7 @@ from werkzeug.urls import URL, url_encode, url_parse
 from werkzeug.utils import redirect
 
 import odoo
-from odoo.tools import consteq, json_default, profiler
+from odoo.tools import consteq, json_default, profiler, config
 
 if typing.TYPE_CHECKING:
     from collections.abc import Mapping, Iterable
@@ -52,6 +53,9 @@ request: Request = _request_stack()  # type: ignore[assignment]
 CSRF_TOKEN_SALT = 60 * 60 * 24 * 365  # 1 year
 """ The default csrf token lifetime, a salt against BREACH. """
 
+HTTP_PROFILE_ALL = None
+if os.environ.get('ODOO_PROFILE_HTTP'):
+    HTTP_PROFILE_ALL = profiler.make_session('')
 
 @contextmanager
 def borrow_request():
@@ -297,8 +301,11 @@ class Request:
         URL is profile-safe. Otherwise, get a context-manager that does
         nothing.
         """
-        if self.session.get('profile_session') and self.db:
-            if self.session['profile_expiration'] < str(datetime.now()):
+        db = self.db
+        if HTTP_PROFILE_ALL and not db:
+            db = config['db_name'][0]
+        if (HTTP_PROFILE_ALL or self.session.get('profile_session')) and db:
+            if not HTTP_PROFILE_ALL and (self.session['profile_expiration'] < str(datetime.now())):
                 # avoid having session profiling for too long if user forgets to disable profiling
                 self.session['profile_session'] = None
                 _logger.warning("Profiling expiration reached, disabling profiling")
@@ -314,9 +321,9 @@ class Request:
                     return profiler.Profiler(
                         db=self.db,
                         description=self.httprequest.full_path,
-                        profile_session=self.session['profile_session'],
-                        collectors=self.session['profile_collectors'],
-                        params=self.session['profile_params'],
+                        profile_session=self.session.get('profile_session', HTTP_PROFILE_ALL),
+                        collectors=self.session.get('profile_collectors'),
+                        params=self.session.get('profile_params'),
                     )._get_cm_proxy()
                 except Exception:
                     _logger.exception("Failure during Profiler creation")
