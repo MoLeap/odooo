@@ -10,40 +10,46 @@ class TestMailPublicPage(HttpCaseWithUserPortal, HttpCaseWithUserDemo):
     """Checks that the invite page redirects to the channel and that all
     modules load correctly on the welcome and channel page when authenticated as various users"""
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
         portal_user = mail_new_test_user(
-            self.env,
-            name='Portal Bowser',
-            login='portal_bowser',
-            email='portal_bowser@example.com',
-            groups='base.group_portal',
+            cls.env,
+            name="Portal Bowser",
+            login="portal_bowser",
+            email="portal_bowser@example.com",
+            groups="base.group_portal",
         )
         internal_user = mail_new_test_user(
-            self.env,
-            name='Internal Luigi',
-            login='internal_luigi',
-            email='internal_luigi@example.com',
-            groups='base.group_user',
+            cls.env,
+            name="Internal Luigi",
+            login="internal_luigi",
+            email="internal_luigi@example.com",
+            groups="base.group_user",
         )
-        guest = self.env['mail.guest'].create({'name': 'Guest Mario'})
+        guest = cls.env["mail.guest"].create({"name": "Guest Mario"})
 
-        self.channel = self.env['discuss.channel']._create_channel(group_id=None, name='Test channel')
-        self.channel._add_members(users=portal_user)
-        self.channel._add_members(users=internal_user)
-        self.channel._add_members(guests=guest)
-        internal_member = self.channel.channel_member_ids.filtered(lambda m: internal_user.partner_id == m.partner_id)
+        cls.channel = cls.env["discuss.channel"]._create_channel(group_id=None, name="Test channel")
+        cls.channel._add_members(users=portal_user)
+        cls.channel._add_members(users=internal_user)
+        cls.channel._add_members(guests=guest)
+        internal_member = cls.channel.channel_member_ids.filtered(
+            lambda m: internal_user.partner_id == m.partner_id,
+        )
         internal_member._rtc_join_call()
 
-        self.channel.message_post(
+        cls.channel.message_post(
             body="Hello @Internal Luigi",
             message_type="comment",
             partner_ids=[internal_user.partner_id.id],
             subtype_xmlid="mail.mt_comment",
         )
-        self.group = self.env['discuss.channel']._create_group(partners_to=(internal_user + portal_user).partner_id.ids, name="Test group")
-        self.group._add_members(guests=guest)
-        self.tour = "discuss_channel_public_tour.js"
+        cls.group = cls.env["discuss.channel"]._create_group(
+            partners_to=(internal_user + portal_user).partner_id.ids,
+            name="Test group",
+        )
+        cls.group._add_members(guests=guest)
+        cls.tour = "discuss_channel_public_tour.js"
 
     def _open_channel_page_as_user(self, login):
         user = self.env["res.users"].search([("login", "=", login)])

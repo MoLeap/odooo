@@ -3,10 +3,10 @@
 
 from odoo import Command, fields
 from odoo.tests.common import HttpCase, new_test_user
-from odoo.addons.bus.tests.common import BusCase
+from odoo.addons.mail.tests.common import MailCommon
 
 
-class TestImLivechatCommon(HttpCase, BusCase):
+class TestImLivechatCommon(MailCommon, HttpCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()

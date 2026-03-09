@@ -5,14 +5,14 @@ from freezegun import freeze_time
 from unittest.mock import patch
 
 from odoo import fields
-from odoo.addons.mail.tests.common import MailCommon
+from odoo.addons.mail.tests.discuss.discuss_common import DiscussCommon
 from odoo.addons.mail.tools.discuss import Store
-from odoo.tests.common import HttpCase, new_test_user, tagged, users
+from odoo.tests.common import HttpCase, tagged, users
 from odoo.tools.misc import mute_logger
 
 
 @tagged("RTC")
-class TestChannelRTC(MailCommon, HttpCase):
+class TestChannelRTC(DiscussCommon, HttpCase):
 
     @users('employee')
     @mute_logger('odoo.models.unlink')
@@ -147,10 +147,14 @@ class TestChannelRTC(MailCommon, HttpCase):
     @users('employee')
     @mute_logger('odoo.models.unlink')
     def test_10_start_call_in_chat_should_invite_all_members_to_call(self):
-        test_user = self.env['res.users'].sudo().create({'name': "Test User", 'login': 'test'})
-        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=(self.user_employee.partner_id + test_user.partner_id).ids)
+
+        channel = self.env["discuss.channel"]._get_or_create_chat(
+            partners_to=(self.user_employee.partner_id + self.alice_user.partner_id).ids,
+        )
         channel_member = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == self.user_employee.partner_id)
-        channel_member_test_user = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == test_user.partner_id)
+        channel_member_alice = channel.sudo().channel_member_ids.filtered(
+            lambda channel_member: channel_member.partner_id == self.alice_user.partner_id,
+        )
         channel_member._rtc_join_call()
         last_rtc_session_id = channel_member.rtc_session_ids.id
         channel_member._rtc_leave_call()
@@ -163,7 +167,7 @@ class TestChannelRTC(MailCommon, HttpCase):
                 # update new session, update call history
                 channel,
                 # incoming invitation
-                test_user,
+                self.alice_user,
                 # update list of invitations (not asserted below)
                 channel,
             ],
@@ -219,31 +223,31 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel": [
                             {
                                 "id": channel.id,
-                                "invited_member_ids": [("ADD", [channel_member_test_user.id])],
+                                "invited_member_ids": [("ADD", [channel_member_alice.id])],
                             }
                         ],
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
                             },
                         ],
                         "res.partner": self._filter_partners_fields(
                             {
-                                "avatar_128_access_token": channel_member_test_user.partner_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_user.partner_id.id,
-                                "im_status": channel_member_test_user.partner_id.im_status,
-                                "im_status_access_token": channel_member_test_user.partner_id._get_im_status_access_token(),
-                                "main_user_id": test_user.id,
-                                "mention_token": channel_member_test_user.partner_id._get_mention_token(),
-                                "name": channel_member_test_user.partner_id.name,
+                                "avatar_128_access_token": self.alice_partner._get_avatar_128_access_token(),
+                                "id": self.alice_partner.id,
+                                "im_status": self.alice_partner.im_status,
+                                "im_status_access_token": self.alice_partner._get_im_status_access_token(),
+                                "main_user_id": self.alice_user.id,
+                                "mention_token": self.alice_partner._get_mention_token(),
+                                "name": self.alice_partner.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_user.partner_id.write_date
+                                    self.alice_partner.write_date,
                                 ),
                             },
                         ),
-                        "res.users": [{"id": test_user.id}],
+                        "res.users": [{"id": self.alice_user.id}],
                     },
                 },
             ],
@@ -255,13 +259,15 @@ class TestChannelRTC(MailCommon, HttpCase):
     @users('employee')
     @mute_logger('odoo.models.unlink')
     def test_11_start_call_in_group_should_invite_all_members_to_call(self):
-        test_user = self.env['res.users'].sudo().create({'name': "Test User", 'login': 'test'})
-        test_guest = self.env['mail.guest'].sudo().create({'name': "Test Guest"})
-        self.env["mail.presence"]._update_presence(test_guest)
-        channel = self.env['discuss.channel']._create_group(partners_to=(self.user_employee.partner_id + test_user.partner_id).ids)
-        channel._add_members(guests=test_guest)
-        channel_member_test_user = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == test_user.partner_id)
-        channel_member_test_guest = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.guest_id == test_guest)
+        self.env["mail.presence"]._update_presence(self.guest)
+        channel = self.env["discuss.channel"]._create_group(
+            partners_to=(self.user_employee.partner_id + self.alice_user.partner_id).ids,
+        )
+        channel._add_members(guests=self.guest)
+        channel_member_alice = channel.sudo().channel_member_ids.filtered(
+            lambda channel_member: channel_member.partner_id == self.alice_user.partner_id,
+        )
+        channel_member_guest = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.guest_id == self.guest)
         channel_member = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == self.user_employee.partner_id)
         channel_member._rtc_join_call()
         last_rtc_session_id = channel_member.rtc_session_ids.id
@@ -276,9 +282,9 @@ class TestChannelRTC(MailCommon, HttpCase):
                 # update new session, update call history
                 channel,
                 # incoming invitation
-                test_user,
+                self.alice_user,
                 # incoming invitation
-                test_guest,
+                self.guest,
                 # update list of invitations
                 channel,
             ],
@@ -382,7 +388,7 @@ class TestChannelRTC(MailCommon, HttpCase):
                                 "invited_member_ids": [
                                     (
                                         "ADD",
-                                        [channel_member_test_user.id, channel_member_test_guest.id],
+                                        [channel_member_alice.id, channel_member_guest.id],
                                     )
                                 ],
                             },
@@ -390,42 +396,42 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
                             },
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_guest.id,
-                                "guest_id": channel_member_test_guest.guest_id.id,
+                                "id": channel_member_guest.id,
+                                "guest_id": channel_member_guest.guest_id.id,
                             },
                         ],
                         "mail.guest": [
                             {
-                                "avatar_128_access_token": channel_member_test_guest.guest_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_guest.guest_id.id,
-                                "im_status": channel_member_test_guest.guest_id.im_status,
-                                "im_status_access_token": channel_member_test_guest.guest_id._get_im_status_access_token(),
-                                "name": channel_member_test_guest.guest_id.name,
+                                "avatar_128_access_token": channel_member_guest.guest_id._get_avatar_128_access_token(),
+                                "id": channel_member_guest.guest_id.id,
+                                "im_status": channel_member_guest.guest_id.im_status,
+                                "im_status_access_token": channel_member_guest.guest_id._get_im_status_access_token(),
+                                "name": channel_member_guest.guest_id.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_guest.guest_id.write_date
+                                    channel_member_guest.guest_id.write_date,
                                 ),
                             },
                         ],
                         "res.partner": self._filter_partners_fields(
                             {
-                                "avatar_128_access_token": channel_member_test_user.partner_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_user.partner_id.id,
-                                "im_status": channel_member_test_user.partner_id.im_status,
-                                "im_status_access_token": channel_member_test_user.partner_id._get_im_status_access_token(),
-                                "main_user_id": test_user.id,
-                                "mention_token": channel_member_test_user.partner_id._get_mention_token(),
-                                "name": channel_member_test_user.partner_id.name,
+                                "avatar_128_access_token": self.alice_partner._get_avatar_128_access_token(),
+                                "id": self.alice_partner.id,
+                                "im_status": self.alice_partner.im_status,
+                                "im_status_access_token": self.alice_partner._get_im_status_access_token(),
+                                "main_user_id": self.alice_user.id,
+                                "mention_token": self.alice_partner._get_mention_token(),
+                                "name": self.alice_partner.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_user.partner_id.write_date
+                                    self.alice_partner.write_date,
                                 ),
                             },
                         ),
-                        "res.users": [{"id": test_user.id}],
+                        "res.users": [{"id": self.alice_user.id}],
                     },
                 },
             ],
@@ -434,21 +440,19 @@ class TestChannelRTC(MailCommon, HttpCase):
             with patch.object(fields.Datetime, 'now', lambda: now + relativedelta(seconds=5)):
                 channel_member._rtc_join_call()
 
-    @users('employee')
+    @users("employee")
     @mute_logger('odoo.models.unlink')
     def test_20_join_call_should_cancel_pending_invitations(self):
-        test_user = self.env['res.users'].sudo().create({'name': "Test User", 'login': 'test'})
-        test_guest = self.env['mail.guest'].sudo().create({'name': "Test Guest"})
-        self.env["mail.presence"]._update_presence(test_guest)
-        channel = self.env['discuss.channel']._create_group(partners_to=(self.user_employee.partner_id + test_user.partner_id).ids)
-        channel._add_members(guests=test_guest)
+        self.env["mail.presence"]._update_presence(self.guest)
+        channel = self.env['discuss.channel']._create_group(partners_to=(self.user_employee.partner_id + self.alice_user.partner_id).ids)
+        channel._add_members(guests=self.guest)
         channel_member = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == self.user_employee.partner_id)
         channel_member._rtc_join_call()
-        channel_member_test_user = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == test_user.partner_id)
+        channel_member_alice = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == self.alice_user.partner_id)
         last_rtc_session_id = channel_member.rtc_session_ids.id
         with self.assertBus(
             [
-                test_user,  # update invitation
+                self.alice_user,  # update invitation
                 channel,  # update list of invitations
                 channel,  # update sessions
             ],
@@ -459,8 +463,8 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
                                 "rtc_inviting_session_id": False,
                             },
                         ],
@@ -472,31 +476,31 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel": [
                             {
                                 "id": channel.id,
-                                "invited_member_ids": [("DELETE", [channel_member_test_user.id])],
+                                "invited_member_ids": [("DELETE", [channel_member_alice.id])],
                             },
                         ],
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
                             },
                         ],
                         "res.partner": self._filter_partners_fields(
                             {
-                                "avatar_128_access_token": channel_member_test_user.partner_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_user.partner_id.id,
-                                "im_status": channel_member_test_user.partner_id.im_status,
-                                "im_status_access_token": channel_member_test_user.partner_id._get_im_status_access_token(),
-                                "main_user_id": test_user.id,
-                                "mention_token": channel_member_test_user.partner_id._get_mention_token(),
-                                "name": channel_member_test_user.partner_id.name,
+                                "avatar_128_access_token": self.alice_partner._get_avatar_128_access_token(),
+                                "id": self.alice_partner.id,
+                                "im_status": self.alice_partner.im_status,
+                                "im_status_access_token": self.alice_partner._get_im_status_access_token(),
+                                "main_user_id": self.alice_user.id,
+                                "mention_token": self.alice_partner._get_mention_token(),
+                                "name": self.alice_partner.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_user.partner_id.write_date
+                                    self.alice_partner.write_date,
                                 ),
                             },
                         ),
-                        "res.users": [{"id": test_user.id}],
+                        "res.users": [{"id": self.alice_user.id}],
                     },
                 },
                 {
@@ -511,41 +515,41 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
                             },
                         ],
                         "discuss.channel.rtc.session": [
                             {
-                                "channel_member_id": channel_member_test_user.id,
+                                "channel_member_id": channel_member_alice.id,
                                 "id": last_rtc_session_id + 1,
                             },
                         ],
                         "res.partner": self._filter_partners_fields(
                             {
-                                "avatar_128_access_token": channel_member_test_user.partner_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_user.partner_id.id,
-                                "im_status": channel_member_test_user.partner_id.im_status,
-                                "im_status_access_token": channel_member_test_user.partner_id._get_im_status_access_token(),
-                                "main_user_id": test_user.id,
-                                "mention_token": channel_member_test_user.partner_id._get_mention_token(),
-                                "name": channel_member_test_user.partner_id.name,
+                                "avatar_128_access_token": self.alice_partner._get_avatar_128_access_token(),
+                                "id": self.alice_partner.id,
+                                "im_status": self.alice_partner.im_status,
+                                "im_status_access_token": self.alice_partner._get_im_status_access_token(),
+                                "main_user_id": self.alice_user.id,
+                                "mention_token": self.alice_partner._get_mention_token(),
+                                "name": self.alice_partner.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_user.partner_id.write_date
+                                    self.alice_partner.write_date,
                                 ),
                             },
                         ),
-                        "res.users": [{"id": test_user.id}],
+                        "res.users": [{"id": self.alice_user.id}],
                     },
                 },
             ],
         ):
-            channel_member_test_user._rtc_join_call()
+            channel_member_alice._rtc_join_call()
 
-        channel_member_test_guest = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.guest_id == test_guest)
+        channel_member_guest = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.guest_id == self.guest)
         with self.assertBus(
             [
-                test_guest,  # update invitation
+                self.guest,  # update invitation
                 channel,  # update list of invitations
                 channel,  # update sessions
             ],
@@ -556,8 +560,8 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "guest_id": channel_member_test_guest.guest_id.id,
-                                "id": channel_member_test_guest.id,
+                                "guest_id": channel_member_guest.guest_id.id,
+                                "id": channel_member_guest.id,
                                 "rtc_inviting_session_id": False,
                             },
                         ],
@@ -569,25 +573,25 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel": [
                             {
                                 "id": channel.id,
-                                "invited_member_ids": [("DELETE", [channel_member_test_guest.id])],
+                                "invited_member_ids": [("DELETE", [channel_member_guest.id])],
                             },
                         ],
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_guest.id,
-                                "guest_id": channel_member_test_guest.guest_id.id,
+                                "id": channel_member_guest.id,
+                                "guest_id": channel_member_guest.guest_id.id,
                             },
                         ],
                         "mail.guest": [
                             {
-                                "avatar_128_access_token": channel_member_test_guest.guest_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_guest.guest_id.id,
-                                "im_status": channel_member_test_guest.guest_id.im_status,
-                                "im_status_access_token": channel_member_test_guest.guest_id._get_im_status_access_token(),
-                                "name": channel_member_test_guest.guest_id.name,
+                                "avatar_128_access_token": channel_member_guest.guest_id._get_avatar_128_access_token(),
+                                "id": channel_member_guest.guest_id.id,
+                                "im_status": channel_member_guest.guest_id.im_status,
+                                "im_status_access_token": channel_member_guest.guest_id._get_im_status_access_token(),
+                                "name": channel_member_guest.guest_id.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_guest.guest_id.write_date
+                                    channel_member_guest.guest_id.write_date,
                                 ),
                             },
                         ],
@@ -605,25 +609,25 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_guest.id,
-                                "guest_id": channel_member_test_guest.guest_id.id,
+                                "id": channel_member_guest.id,
+                                "guest_id": channel_member_guest.guest_id.id,
                             },
                         ],
                         "discuss.channel.rtc.session": [
                             {
-                                "channel_member_id": channel_member_test_guest.id,
+                                "channel_member_id": channel_member_guest.id,
                                 "id": last_rtc_session_id + 2,
                             },
                         ],
                         "mail.guest": [
                             {
-                                "avatar_128_access_token": channel_member_test_guest.guest_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_guest.guest_id.id,
-                                "im_status": channel_member_test_guest.guest_id.im_status,
-                                "im_status_access_token": channel_member_test_guest.guest_id._get_im_status_access_token(),
-                                "name": channel_member_test_guest.guest_id.name,
+                                "avatar_128_access_token": channel_member_guest.guest_id._get_avatar_128_access_token(),
+                                "id": channel_member_guest.guest_id.id,
+                                "im_status": channel_member_guest.guest_id.im_status,
+                                "im_status_access_token": channel_member_guest.guest_id._get_im_status_access_token(),
+                                "name": channel_member_guest.guest_id.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_guest.guest_id.write_date
+                                    channel_member_guest.guest_id.write_date,
                                 ),
                             },
                         ],
@@ -631,23 +635,21 @@ class TestChannelRTC(MailCommon, HttpCase):
                 },
             ],
         ):
-            channel_member_test_guest._rtc_join_call()
+            channel_member_guest._rtc_join_call()
 
-    @users('employee')
+    @users("employee")
     @mute_logger('odoo.models.unlink')
     def test_21_leave_call_should_cancel_pending_invitations(self):
-        test_user = self.env['res.users'].sudo().create({'name': "Test User", 'login': 'test'})
-        test_guest = self.env['mail.guest'].sudo().create({'name': "Test Guest"})
-        self.env["mail.presence"]._update_presence(test_guest)
-        channel = self.env['discuss.channel']._create_group(partners_to=(self.user_employee.partner_id + test_user.partner_id).ids)
-        channel._add_members(guests=test_guest)
+        self.env["mail.presence"]._update_presence(self.guest)
+        channel = self.env['discuss.channel']._create_group(partners_to=(self.user_employee.partner_id + self.alice_user.partner_id).ids)
+        channel._add_members(guests=self.guest)
         channel_member = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == self.user_employee.partner_id)
         channel_member._rtc_join_call()
 
-        channel_member_test_user = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == test_user.partner_id)
+        channel_member_alice = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == self.alice_user.partner_id)
         with self.assertBus(
             [
-                test_user,  # update invitation
+                self.alice_user,  # update invitation
                 channel,  # update list of invitations
             ],
             [
@@ -657,8 +659,8 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
                                 "rtc_inviting_session_id": False,
                             },
                         ],
@@ -670,41 +672,41 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel": [
                             {
                                 "id": channel.id,
-                                "invited_member_ids": [("DELETE", [channel_member_test_user.id])],
+                                "invited_member_ids": [("DELETE", [channel_member_alice.id])],
                             },
                         ],
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
                             },
                         ],
                         "res.partner": self._filter_partners_fields(
                             {
-                                "avatar_128_access_token": channel_member_test_user.partner_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_user.partner_id.id,
-                                "im_status": channel_member_test_user.partner_id.im_status,
-                                "im_status_access_token": channel_member_test_user.partner_id._get_im_status_access_token(),
-                                "main_user_id": test_user.id,
-                                "mention_token": channel_member_test_user.partner_id._get_mention_token(),
-                                "name": channel_member_test_user.partner_id.name,
+                                "avatar_128_access_token": self.alice_partner._get_avatar_128_access_token(),
+                                "id": self.alice_partner.id,
+                                "im_status": self.alice_partner.im_status,
+                                "im_status_access_token": self.alice_partner._get_im_status_access_token(),
+                                "main_user_id": self.alice_user.id,
+                                "mention_token": self.alice_partner._get_mention_token(),
+                                "name": self.alice_partner.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_user.partner_id.write_date
+                                    self.alice_partner.write_date,
                                 ),
                             },
                         ),
-                        "res.users": [{"id": test_user.id}],
+                        "res.users": [{"id": self.alice_user.id}],
                     },
                 },
             ],
         ):
-            channel_member_test_user._rtc_leave_call()
+            channel_member_alice._rtc_leave_call()
 
-        channel_member_test_guest = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.guest_id == test_guest)
+        channel_member_guest = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.guest_id == self.guest)
         with self.assertBus(
             [
-                test_guest,  # update invitation
+                self.guest,  # update invitation
                 channel,  # update list of invitations
             ],
             [
@@ -714,8 +716,8 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "guest_id": channel_member_test_guest.guest_id.id,
-                                "id": channel_member_test_guest.id,
+                                "guest_id": channel_member_guest.guest_id.id,
+                                "id": channel_member_guest.id,
                                 "rtc_inviting_session_id": False,
                             },
                         ],
@@ -727,25 +729,25 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel": [
                             {
                                 "id": channel.id,
-                                "invited_member_ids": [("DELETE", [channel_member_test_guest.id])],
+                                "invited_member_ids": [("DELETE", [channel_member_guest.id])],
                             },
                         ],
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_guest.id,
-                                "guest_id": channel_member_test_guest.guest_id.id,
+                                "id": channel_member_guest.id,
+                                "guest_id": channel_member_guest.guest_id.id,
                             },
                         ],
                         "mail.guest": [
                             {
-                                "avatar_128_access_token": channel_member_test_guest.guest_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_guest.guest_id.id,
-                                "im_status": channel_member_test_guest.guest_id.im_status,
-                                "im_status_access_token": channel_member_test_guest.guest_id._get_im_status_access_token(),
-                                "name": channel_member_test_guest.guest_id.name,
+                                "avatar_128_access_token": channel_member_guest.guest_id._get_avatar_128_access_token(),
+                                "id": channel_member_guest.guest_id.id,
+                                "im_status": channel_member_guest.guest_id.im_status,
+                                "im_status_access_token": channel_member_guest.guest_id._get_im_status_access_token(),
+                                "name": channel_member_guest.guest_id.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_guest.guest_id.write_date
+                                    channel_member_guest.guest_id.write_date,
                                 ),
                             },
                         ],
@@ -753,26 +755,24 @@ class TestChannelRTC(MailCommon, HttpCase):
                 },
             ],
         ):
-            channel_member_test_guest._rtc_leave_call()
+            channel_member_guest._rtc_leave_call()
 
-    @users('employee')
-    @mute_logger('odoo.models.unlink')
+    @users("employee")
+    @mute_logger("odoo.models.unlink")
     @freeze_time("2023-03-15 12:34:56")
     def test_25_lone_call_participant_leaving_call_should_cancel_pending_invitations(self):
-        test_user = self.env['res.users'].sudo().create({'name': "Test User", 'login': 'test'})
-        test_guest = self.env['mail.guest'].sudo().create({'name': "Test Guest"})
-        self.env["mail.presence"]._update_presence(test_guest)
-        channel = self.env['discuss.channel']._create_group(partners_to=(self.user_employee.partner_id + test_user.partner_id).ids)
-        channel._add_members(guests=test_guest)
+        self.env["mail.presence"]._update_presence(self.guest)
+        channel = self.env['discuss.channel']._create_group(partners_to=(self.user_employee.partner_id + self.alice_user.partner_id).ids)
+        channel._add_members(guests=self.guest)
         channel_member = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == self.user_employee.partner_id)
-        channel_member_test_user = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == test_user.partner_id)
-        channel_member_test_guest = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.guest_id == test_guest)
+        channel_member_alice = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.partner_id == self.alice_user.partner_id)
+        channel_member_guest = channel.sudo().channel_member_ids.filtered(lambda channel_member: channel_member.guest_id == self.guest)
         channel_member._rtc_join_call()
         last_rtc_session_id = channel_member.rtc_session_ids.id
         with self.assertBus(
             [
-                test_user,  # update invitation
-                test_guest,  # update invitation
+                self.alice_user,  # update invitation
+                self.guest,  # update invitation
                 channel,  # update list of invitations
                 self.user_employee,  # end session
                 channel,  # update sessions, update call history
@@ -788,8 +788,8 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
                                 "rtc_inviting_session_id": False,
                             },
                         ],
@@ -801,8 +801,8 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "guest_id": channel_member_test_guest.guest_id.id,
-                                "id": channel_member_test_guest.id,
+                                "guest_id": channel_member_guest.guest_id.id,
+                                "id": channel_member_guest.id,
                                 "rtc_inviting_session_id": False,
                             },
                         ],
@@ -817,7 +817,7 @@ class TestChannelRTC(MailCommon, HttpCase):
                                 "invited_member_ids": [
                                     (
                                         "DELETE",
-                                        [channel_member_test_user.id, channel_member_test_guest.id],
+                                        [channel_member_alice.id, channel_member_guest.id],
                                     )
                                 ],
                             },
@@ -825,42 +825,42 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
                             },
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_guest.id,
-                                "guest_id": channel_member_test_guest.guest_id.id,
+                                "id": channel_member_guest.id,
+                                "guest_id": channel_member_guest.guest_id.id,
                             },
                         ],
                         "mail.guest": [
                             {
-                                "avatar_128_access_token": channel_member_test_guest.guest_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_guest.guest_id.id,
-                                "im_status": channel_member_test_guest.guest_id.im_status,
-                                "im_status_access_token": channel_member_test_guest.guest_id._get_im_status_access_token(),
-                                "name": channel_member_test_guest.guest_id.name,
+                                "avatar_128_access_token": channel_member_guest.guest_id._get_avatar_128_access_token(),
+                                "id": channel_member_guest.guest_id.id,
+                                "im_status": channel_member_guest.guest_id.im_status,
+                                "im_status_access_token": channel_member_guest.guest_id._get_im_status_access_token(),
+                                "name": channel_member_guest.guest_id.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_guest.guest_id.write_date
+                                    channel_member_guest.guest_id.write_date,
                                 ),
                             },
                         ],
                         "res.partner": self._filter_partners_fields(
                             {
-                                "avatar_128_access_token": channel_member_test_user.partner_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_user.partner_id.id,
-                                "im_status": channel_member_test_user.partner_id.im_status,
-                                "im_status_access_token": channel_member_test_user.partner_id._get_im_status_access_token(),
-                                "main_user_id": test_user.id,
-                                "mention_token": channel_member_test_user.partner_id._get_mention_token(),
-                                "name": channel_member_test_user.partner_id.name,
+                                "avatar_128_access_token": self.alice_partner._get_avatar_128_access_token(),
+                                "id": self.alice_partner.id,
+                                "im_status": self.alice_partner.im_status,
+                                "im_status_access_token": self.alice_partner._get_im_status_access_token(),
+                                "main_user_id": self.alice_user.id,
+                                "mention_token": self.alice_partner._get_mention_token(),
+                                "name": self.alice_partner.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_user.partner_id.write_date
+                                    self.alice_partner.write_date,
                                 ),
                             },
                         ),
-                        "res.users": [{"id": test_user.id}],
+                        "res.users": [{"id": self.alice_user.id}],
                     },
                 },
                 {
@@ -888,9 +888,7 @@ class TestChannelRTC(MailCommon, HttpCase):
     @users('employee')
     @mute_logger('odoo.models.unlink')
     def test_30_add_members_while_in_call_should_invite_new_members_to_call(self):
-        test_user = self.env['res.users'].sudo().create({'name': "Test User", 'login': 'test'})
-        test_guest = self.env['mail.guest'].sudo().create({'name': "Test Guest"})
-        self.env["mail.presence"]._update_presence(test_guest)
+        self.env["mail.presence"]._update_presence(self.guest)
         channel = self.env['discuss.channel']._create_group(partners_to=self.user_employee.partner_id.ids)
         channel_member = channel.sudo().channel_member_ids.filtered(lambda member: member.partner_id == self.user_employee.partner_id)
         now = fields.Datetime.now()
@@ -900,23 +898,23 @@ class TestChannelRTC(MailCommon, HttpCase):
 
         with self.mock_bus():
             with patch.object(fields.Datetime, 'now', lambda: now + relativedelta(seconds=10)):
-                channel._add_members(users=test_user, guests=test_guest, invite_to_rtc_call=True)
+                channel._add_members(users=self.alice_user, guests=self.guest, invite_to_rtc_call=True)
 
-        channel_member_test_user = channel.sudo().channel_member_ids.filtered(lambda member: member.partner_id == test_user.partner_id)
-        channel_member_test_guest = channel.sudo().channel_member_ids.filtered(lambda member: member.guest_id == test_guest)
+        channel_member_alice = channel.sudo().channel_member_ids.filtered(lambda member: member.partner_id == self.alice_user.partner_id)
+        channel_member_guest = channel.sudo().channel_member_ids.filtered(lambda member: member.guest_id == self.guest)
         last_rtc_session_id = channel_member.rtc_session_ids.id
         found_bus_notifs = self.assertBusNotifications(
             [
                 # mail.record/insert - discuss.channel (channel_name_member_ids)
                 channel,
                 # discuss.channel/joined
-                test_user,
+                self.alice_user,
                 # mail.record/insert - discuss.channel.member (message_unread_counter, new_message_separator, …)
                 self.user_employee,
                 # discuss.channel/new_message
                 channel,
                 # discuss.channel/joined
-                test_guest,
+                self.guest,
                 # mail.record/insert - discuss.channel.member (message_unread_counter, new_message_separator, …)
                 self.user_employee,
                 # discuss.channel/new_message
@@ -924,9 +922,9 @@ class TestChannelRTC(MailCommon, HttpCase):
                 # mail.record/insert - discuss.channel (member_count), discuss.channel.member
                 channel,
                 # mail.record/insert - discuss.channel.member (rtc_inviting_session_id)
-                test_user,
+                self.alice_user,
                 # mail.record/insert - discuss.channel.member (rtc_inviting_session_id)
-                test_guest,
+                self.guest,
                 # mail.record/insert - discuss.channel (invited_member_ids), discuss.channel.member
                 channel,
             ],
@@ -937,9 +935,9 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
-                                "rtc_inviting_session_id": channel_member_test_user.rtc_inviting_session_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
+                                "rtc_inviting_session_id": channel_member_alice.rtc_inviting_session_id.id,
                             },
                             {
                                 "channel_id": channel.id,
@@ -982,9 +980,9 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "guest_id": channel_member_test_guest.guest_id.id,
-                                "id": channel_member_test_guest.id,
-                                "rtc_inviting_session_id": channel_member_test_guest.rtc_inviting_session_id.id,
+                                "guest_id": channel_member_guest.guest_id.id,
+                                "id": channel_member_guest.id,
+                                "rtc_inviting_session_id": channel_member_guest.rtc_inviting_session_id.id,
                             },
                             {
                                 "channel_id": channel.id,
@@ -1028,7 +1026,7 @@ class TestChannelRTC(MailCommon, HttpCase):
                                 "invited_member_ids": [
                                     (
                                         "ADD",
-                                        [channel_member_test_user.id, channel_member_test_guest.id],
+                                        [channel_member_alice.id, channel_member_guest.id],
                                     )
                                 ],
                             }
@@ -1036,42 +1034,42 @@ class TestChannelRTC(MailCommon, HttpCase):
                         "discuss.channel.member": [
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_user.id,
-                                "partner_id": channel_member_test_user.partner_id.id,
+                                "id": channel_member_alice.id,
+                                "partner_id": self.alice_partner.id,
                             },
                             {
                                 "channel_id": channel.id,
-                                "id": channel_member_test_guest.id,
-                                "guest_id": channel_member_test_guest.guest_id.id,
+                                "id": channel_member_guest.id,
+                                "guest_id": channel_member_guest.guest_id.id,
                             },
                         ],
                         "mail.guest": [
                             {
-                                "avatar_128_access_token": channel_member_test_guest.guest_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_guest.guest_id.id,
-                                "im_status": channel_member_test_guest.guest_id.im_status,
-                                "im_status_access_token": channel_member_test_guest.guest_id._get_im_status_access_token(),
-                                "name": channel_member_test_guest.guest_id.name,
+                                "avatar_128_access_token": channel_member_guest.guest_id._get_avatar_128_access_token(),
+                                "id": channel_member_guest.guest_id.id,
+                                "im_status": channel_member_guest.guest_id.im_status,
+                                "im_status_access_token": channel_member_guest.guest_id._get_im_status_access_token(),
+                                "name": channel_member_guest.guest_id.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_guest.guest_id.write_date
+                                    channel_member_guest.guest_id.write_date,
                                 ),
                             },
                         ],
                         "res.partner": self._filter_partners_fields(
                             {
-                                "avatar_128_access_token": channel_member_test_user.partner_id._get_avatar_128_access_token(),
-                                "id": channel_member_test_user.partner_id.id,
-                                "im_status": channel_member_test_user.partner_id.im_status,
-                                "im_status_access_token": channel_member_test_user.partner_id._get_im_status_access_token(),
-                                "main_user_id": test_user.id,
-                                "mention_token": channel_member_test_user.partner_id._get_mention_token(),
-                                "name": channel_member_test_user.partner_id.name,
+                                "avatar_128_access_token": self.alice_partner._get_avatar_128_access_token(),
+                                "id": self.alice_partner.id,
+                                "im_status": self.alice_partner.im_status,
+                                "im_status_access_token": self.alice_partner._get_im_status_access_token(),
+                                "main_user_id": self.alice_user.id,
+                                "mention_token": self.alice_partner._get_mention_token(),
+                                "name": self.alice_partner.name,
                                 "write_date": fields.Datetime.to_string(
-                                    channel_member_test_user.partner_id.write_date
+                                    self.alice_partner.write_date,
                                 ),
                             },
                         ),
-                        "res.users": [{"id": test_user.id}],
+                        "res.users": [{"id": self.alice_user.id}],
                     },
                 },
             ],
@@ -1214,9 +1212,8 @@ class TestChannelRTC(MailCommon, HttpCase):
         store = Store()
         channel_member._rtc_join_call(store)
         join_call_values = store.get_result()
-        test_guest = self.env['mail.guest'].sudo().create({'name': "Test Guest"})
         test_channel_member = self.env['discuss.channel.member'].create({
-            'guest_id': test_guest.id,
+            'guest_id': self.guest.id,
             'channel_id': channel.id,
         })
         test_session = self.env['discuss.channel.rtc.session'].sudo().create({'channel_member_id': test_channel_member.id})
@@ -1225,7 +1222,7 @@ class TestChannelRTC(MailCommon, HttpCase):
         unused_ids = [9998, 9999]
         with self.assertBus(
             [
-                test_guest,  # session ended
+                self.guest,  # session ended
                 channel,  # update list of sessions
             ],
             [
@@ -1251,9 +1248,13 @@ class TestChannelRTC(MailCommon, HttpCase):
         self.assertFalse(outdated_rtc_sessions.exists())
 
     def test_07_call_invitation_ui(self):
-        bob = new_test_user(self.env, "bob", groups="base.group_user", email="bob@test.com")
-        john = new_test_user(self.env, "john", groups="base.group_user", email="john@test.com")
-        channel = self.env["discuss.channel"].with_user(bob)._create_group(partners_to=(bob | john).partner_id.ids)
-        channel.with_user(bob).self_member_id.sudo()._rtc_join_call()
+        channel = (
+            self.env["discuss.channel"]
+            .with_user(self.bob_user)
+            ._create_group(
+                partners_to=(self.bob_user | self.john_user).partner_id.ids,
+            )
+        )
+        channel.with_user(self.bob_user).self_member_id.sudo()._rtc_join_call()
         self._reset_bus()
-        self.start_tour("/odoo", "discuss_call_invitation.js", login="john")
+        self.start_tour("/odoo", "discuss_call_invitation.js", login=self.john_user.login)
