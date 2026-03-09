@@ -2164,7 +2164,6 @@ class IrModelAccess(models.Model):
     @tools.ormcache('self.env.uid', 'mode')
     def _get_allowed_models(self, mode='read'):
         assert mode in ('read', 'write', 'create', 'unlink'), 'Invalid access mode'
-
         group_ids = self.env.user._get_group_ids()
         self.flush_model()
         rows = self.env.execute_query(SQL("""
