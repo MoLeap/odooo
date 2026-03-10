@@ -6158,9 +6158,12 @@ class AccountMove(models.Model):
         }
 
     def action_move_download_all(self):
+        moves_to_export = self.filtered(lambda moves: moves._get_move_zip_export_docs())
+        if not moves_to_export:
+            return {}
         return {
             'type': 'ir.actions.act_url',
-            'url': f'/account/download_move_attachments/{",".join(str(move_id) for move_id in self.ids)}',
+            'url': f'/account/download_move_attachments/{",".join(str(move_id) for move_id in moves_to_export.ids)}',
             'target': 'download',
         }
 
@@ -7397,14 +7400,6 @@ class AccountMove(models.Model):
     def get_extra_print_items(self):
         """ Helper to dynamically add items in the 'Print' menu of list and form of account.move.
         """
-        if moves_to_export := self.filtered(lambda m: m._get_move_zip_export_docs()):
-            return [
-                {
-                    'key': 'download_all',
-                    'description': _("Export ZIP"),
-                    **moves_to_export.action_move_download_all(),
-                },
-            ]
         return []
 
     def _get_move_zip_export_docs(self):
