@@ -164,4 +164,14 @@ class ResCompany(models.Model):
 
     def _l10n_es_freelancer(self):
         self.ensure_one()
-        return self.vat and re.fullmatch(r"(ES)?(\d{8}[A-Z]|[X-Z].*)", self.vat) or False
+        if not self.vat:
+            return False
+
+        vat = self.vat
+        if vat.startswith('ES'):
+            vat = vat[2:]
+
+        if vat.startswith('E'):
+            return re.fullmatch(r"E(\d{8}[A-Z]?|[X-Z].*)", vat) or False
+
+        return re.fullmatch(r"(\d{8}[A-Z]?|[X-Z].*)", vat) or False
