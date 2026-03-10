@@ -34,7 +34,7 @@ export class MOListViewDropdown extends BadgeField {
     }
 
     async reload(){
-        await this.env.model.root.load();
+        await this.props.record.load();
         this.env.model.notify();
     }
 
