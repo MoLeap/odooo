@@ -8,7 +8,7 @@ import { withSequence } from "@html_editor/utils/resource";
 import { between } from "@html_builder/utils/option_sequence";
 import { WEBSITE_BACKGROUND_OPTIONS, BOX_BORDER_SHADOW } from "@website/builder/option_sequence";
 import { selectElements } from "@html_editor/utils/dom_traversal";
-import { BaseOptionComponent } from "@html_builder/core/utils";
+import { BaseOptionComponent, useDomState } from "@html_builder/core/utils";
 
 /**
  * @typedef { Object } CarouselOptionShared
@@ -33,18 +33,28 @@ export class CarouselOption extends BaseOptionComponent {
     static exclude =
         ".s_carousel_intro_wrapper, .s_carousel_cards_wrapper, .s_quotes_carousel_wrapper:has(>.s_quotes_carousel_compact)";
     static applyTo = ":scope > .carousel";
+
+    setup() {
+        super.setup();
+        this.state = useDomState((editingElement) => ({
+            // Compatibility before .o_carousel_pause button.
+            hasPauseButton: !!editingElement.querySelector(".o_carousel_pause"),
+        }));
+    }
 }
 
-export class CarouselBottomControllersOption extends BaseOptionComponent {
+export class CarouselBottomControllersOption extends CarouselOption {
     static template = "website.CarouselBottomControllersOption";
     static selector = "section";
     static applyTo = ".s_carousel_intro, .s_quotes_carousel_compact";
+    static exclude = "";
 }
 
-export class CarouselCardsOption extends BaseOptionComponent {
+export class CarouselCardsOption extends CarouselBottomControllersOption {
     static template = "website.CarouselCardsOption";
     static selector = "section";
     static applyTo = ".s_carousel_cards";
+    static exclude = "";
 }
 
 export class CarouselOptionPlugin extends Plugin {
@@ -80,6 +90,7 @@ export class CarouselOptionPlugin extends Plugin {
         },
         builder_actions: {
             AddSlideAction,
+            SetAutoplayAction,
             SlideCarouselAction,
             ToggleControllersAction,
             ToggleCardImgAction,
@@ -104,9 +115,9 @@ export class CarouselOptionPlugin extends Plugin {
             });
             carouselEl.querySelectorAll(".carousel-indicators > *").forEach((indicatorEl, i) => {
                 indicatorEl.classList.toggle("active", i === 0);
-                indicatorEl.removeAttribute("aria-current");
+                indicatorEl.setAttribute("aria-selected", "false");
                 if (i === 0) {
-                    indicatorEl.setAttribute("aria-current", "true");
+                    indicatorEl.setAttribute("aria-selected", "true");
                 }
             });
         }
@@ -132,6 +143,7 @@ export class CarouselOptionPlugin extends Plugin {
             activateClone: false,
         });
         newItemEl.classList.remove("active");
+        newItemEl.id = `${editingElement.id}_${Math.random().toString(36).substring(2)}`;
 
         // Show the controllers (now that there is always more than one item).
         const controlEls = editingElement.querySelectorAll(carouselControlsSelector);
@@ -140,11 +152,14 @@ export class CarouselOptionPlugin extends Plugin {
         });
 
         // Add the new indicator.
-        const indicatorsEl = editingElement.querySelector(".carousel-indicators");
-        const newIndicatorEl = this.document.createElement("button");
-        newIndicatorEl.setAttribute("data-bs-target", "#" + editingElement.id);
-        newIndicatorEl.setAttribute("aria-label", _t("Carousel indicator"));
-        indicatorsEl.appendChild(newIndicatorEl);
+        const activeIndicatorEl = editingElement.querySelector(
+            ".carousel-indicators button.active"
+        );
+        const newIndicatorEl = activeIndicatorEl.cloneNode(true);
+        newIndicatorEl.setAttribute("aria-controls", newItemEl.id);
+        newIndicatorEl.setAttribute("aria-selected", "false");
+        activeIndicatorEl.after(newIndicatorEl);
+        this.updateIndicatorsLabels(editingElement);
 
         // Slide to the new item.
         await this.slide(editingElement, "next");
@@ -176,6 +191,7 @@ export class CarouselOptionPlugin extends Plugin {
                 controlEl.classList.toggle("d-none", newLength === 1)
             );
         }
+        this.updateIndicatorsLabels(editingElement);
     }
 
     /**
@@ -224,7 +240,7 @@ export class CarouselOptionPlugin extends Plugin {
                         );
                         const activeIndicatorEl = [...indicatorEls][activeIndex];
                         activeIndicatorEl.classList.add("active");
-                        activeIndicatorEl.setAttribute("aria-current", "true");
+                        activeIndicatorEl.setAttribute("aria-selected", "true");
 
                         // Activate the active item.
                         this.dependencies["builderOptions"].setNextTarget(activeItemEl);
@@ -323,11 +339,34 @@ export class CarouselOptionPlugin extends Plugin {
             this.dependencies.builderOptions.setNextTarget(activeItemEl);
         }
     }
+    /**
+     * @param {HTMLElement} editingElement the carousel element
+     */
+    updateIndicatorsLabels(editingElement) {
+        const indicatorEls = editingElement.querySelectorAll(".carousel-indicators > *");
+        for (const indicatorEl of indicatorEls) {
+            updateIndicatorLabel(indicatorEl, indicatorEls);
+        }
+    }
+}
+
+/**
+ * @param {HTMLElement} indicatorEl one indicator
+ * @param {HTMLCollection|NodeList|HTMLElement[]} siblingEls all indicators
+ */
+export function updateIndicatorLabel(indicatorEl, siblingEls) {
+    indicatorEl.setAttribute(
+        "aria-label",
+        _t("Slide %(itemNr)s of %(total)s", {
+            itemNr: [...siblingEls].findIndex((el) => el === indicatorEl) + 1,
+            total: siblingEls.length,
+        })
+    );
 }
 
 /**
  * Updates the carousel indicators to make the one at the given index be the
- * active one.
+ * active one, as well as update the aria-labels.
  *
  * @param {HTMLElement} carouselEl the carousel element
  * @param {Number} newPosition the index
@@ -335,10 +374,11 @@ export class CarouselOptionPlugin extends Plugin {
 export function updateCarouselIndicators(carouselEl, newPosition) {
     const indicatorEls = carouselEl.querySelectorAll(".carousel-indicators > *");
     indicatorEls.forEach((indicatorEl, i) => {
+        updateIndicatorLabel(indicatorEl, indicatorEls);
         indicatorEl.classList.toggle("active", i === newPosition);
-        indicatorEl.removeAttribute("aria-current");
+        indicatorEl.setAttribute("aria-selected", "false");
         if (i === newPosition) {
-            indicatorEl.setAttribute("aria-current", "true");
+            indicatorEl.setAttribute("aria-selected", "true");
         }
     });
 }
@@ -352,6 +392,21 @@ export class AddSlideAction extends BuilderAction {
         return this.dependencies.carouselOption.addSlide(editingElement);
     }
 }
+
+export class SetAutoplayAction extends BuilderAction {
+    static id = "setAutoplay";
+    isApplied({ editingElement, params: { bsRide } }) {
+        return editingElement.dataset.bsRide === bsRide;
+    }
+    apply({ editingElement, params: { bsRide, ariaLive } }) {
+        editingElement.dataset.bsRide = bsRide;
+        editingElement.querySelector(".carousel-inner")?.setAttribute("aria-live", ariaLive);
+        if (bsRide === "false") {
+            editingElement.classList.add("o_carousel_pause_btn_hidden");
+        }
+    }
+}
+
 export class SlideCarouselAction extends BuilderAction {
     static id = "slideCarousel";
     static dependencies = ["carouselOption"];

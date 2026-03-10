@@ -5,7 +5,7 @@
     <BuilderRow label.translate="Slide">
         <BuilderButton type="'success'" title.translate="Add Slide"  action="'addSlide'">Add Slide</BuilderButton>
     </BuilderRow>
-    
+
     <BuilderRow label.translate="Style">
         <BuilderSelect>
             <BuilderSelectItem classAction="''">Regular</BuilderSelectItem>
@@ -47,10 +47,10 @@
     </BuilderRow>
 
     <BuilderRow label.translate="Autoplay" level="1">
-        <BuilderSelect dataAttributeAction="'bsRide'">
-            <BuilderSelectItem id="'auto_after_first_hover'" dataAttributeActionValue="'true'">After First Hover</BuilderSelectItem>
-            <BuilderSelectItem id="'auto_always'" dataAttributeActionValue="'carousel'">Always</BuilderSelectItem>
-            <BuilderSelectItem dataAttributeActionValue="'false'">Never</BuilderSelectItem>
+        <BuilderSelect action="'setAutoplay'">
+            <BuilderSelectItem id="'auto_after_first_hover'" actionParam="{ bsRide: 'true', ariaLive: 'off' }">After First Hover</BuilderSelectItem>
+            <BuilderSelectItem id="'auto_always'" actionParam="{ bsRide: 'carousel', ariaLive: 'off' }">Always</BuilderSelectItem>
+            <BuilderSelectItem actionParam="{ bsRide: 'false', ariaLive: 'polite' }">Never</BuilderSelectItem>
         </BuilderSelect>
     </BuilderRow>
 
@@ -64,6 +64,10 @@
                 min="1"
                 preview="false"
                 applyWithUnit="false"/>
+        </BuilderRow>
+
+        <BuilderRow t-if="this.state.hasPauseButton" label.translate="Pause Button" tooltip.translate="Allow your visitors to pause the carousel" level="1">
+            <BuilderCheckbox classAction="'o_carousel_pause_btn_hidden'" inverseAction="true"/>
         </BuilderRow>
     </t>
 
