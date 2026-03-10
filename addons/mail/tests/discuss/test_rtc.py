@@ -1237,6 +1237,7 @@ class TestChannelRTC(MailCommon, HttpCase):
     def _res_for_user(self, user):
         return {
             "employee_ids": [],
+            "has_active_call_and_not_manual_offline": False,
             "id": user.id,
             "partner_id": user.partner_id.id,
         }
