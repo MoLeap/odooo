@@ -12,6 +12,7 @@ Then it can be made specific at the product level.
     """,
     "depends": ["website_sale", "sale_stock", "stock_delivery"],
     "data": [
+        "security/ir.model.access.csv",
         "views/product_template_views.xml",
         "views/res_config_settings_views.xml",
         "views/sale_order_views.xml",

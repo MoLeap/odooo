@@ -16,6 +16,9 @@ class ProductWishlist(models.Model):
             record.stock_notification = record.product_id._has_stock_notification(record.partner_id)
 
     def _inverse_stock_notification(self):
+        website = self.env["website"].get_current_website()
         for record in self:
-            if record.stock_notification:
-                record.product_id.stock_notification_partner_ids += record.partner_id
+            if record.stock_notification and record.partner_id.email:
+                record.product_id.sudo()._add_stock_notification(
+                    partner=record.partner_id, website=website
+                )
