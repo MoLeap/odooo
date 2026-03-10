@@ -1623,7 +1623,14 @@ Please change the quantity done or the rounding precision in your settings.""",
                 move.picking_type_id = move.picking_type_id.return_picking_type_id
             # We are returning some products, we must take them in the source location
             move.procure_method = 'make_to_stock'
-        neg_r_moves._assign_picking()
+
+        if neg_r_moves:
+            neg_with_orig = neg_r_moves.filtered(lambda m: m.move_orig_ids)
+            neg_with_orig.write({'state': 'waiting'})
+            (neg_r_moves - neg_with_orig).write({'state': 'confirmed'})
+            neg_r_moves.filtered(lambda move: move.picking_type_id.reservation_method == 'at_confirm')\
+                .write({'reservation_date': fields.Date.today()})
+            neg_r_moves._assign_picking()
 
         # Call `_action_assign` on confirmed moves eligible for auto-assignment at confirmation.
         moves._filtered_for_assign()._action_assign()
