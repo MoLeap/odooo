@@ -8,17 +8,13 @@ export class ImgGroup extends Component {
     };
 
     setup() {
-        this.load = () => {};
-        this.imgProms = [];
+        this.imgItems = [];
         this.loadImgs = batched(this._loadImgs.bind(this));
 
         useSubEnv({
             imgGroup: {
-                loaded: new Promise((resolve) => {
-                    this.load = resolve;
-                }),
-                addImgProm: (promise) => {
-                    this.imgProms.push(promise);
+                addImgProm: (promise, onLoaded) => {
+                    this.imgItems.push({ promise, onLoaded });
                     this.loadImgs();
                 },
             },
@@ -26,7 +22,16 @@ export class ImgGroup extends Component {
     }
 
     async _loadImgs() {
-        await Promise.all(this.imgProms);
-        this.load();
+        const items = this.imgItems;
+        this.imgItems = [];
+        await Promise.all(items.map((item) => item.promise));
+        for (const item of items) {
+            item.onLoaded();
+        }
+        // If more items arrived while we were awaiting (next scroll batch),
+        // trigger another _loadImgs run for them.
+        if (this.imgItems.length) {
+            this.loadImgs();
+        }
     }
 }
