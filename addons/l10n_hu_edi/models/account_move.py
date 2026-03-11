@@ -61,7 +61,7 @@ class AccountMove(models.Model):
         index='btree_not_null',
     )
     l10n_hu_edi_batch_upload_index = fields.Integer(
-        string='Index of invoice within a transaction',
+        string='Index of invoice within a batch upload',
         copy=False,
     )
     l10n_hu_edi_attachment = fields.Binary(

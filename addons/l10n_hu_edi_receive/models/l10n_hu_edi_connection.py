@@ -8,7 +8,10 @@ from odoo.addons.l10n_hu_edi.models.l10n_hu_edi_connection import L10nHuEdiConne
 
 class L10nHuEdiConnection(BaseL10nHuEdiConnection):
 
-    def query_invoice_digest(self, credentials, datetime_from, datetime_to, page=1, digests=[]):
+    def query_invoice_digest(self, credentials, datetime_from, datetime_to, page=1, digests=None):
+        if digests is None:
+            digests = []
+
         template_values = {
             **self._get_header_values(credentials),
             'page': page,

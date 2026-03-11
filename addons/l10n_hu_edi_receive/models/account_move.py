@@ -4,6 +4,7 @@ from base64 import b64decode, b64encode
 import gzip
 from datetime import datetime
 from lxml import etree
+from markupsafe import Markup
 
 from odoo import Command, _, api, fields, models
 from odoo.addons.base.models.res_bank import sanitize_account_number
@@ -29,17 +30,9 @@ def parse_vat(tax_number_xml):
 class AccountMove(models.Model):
     _inherit = 'account.move'
 
-    l10n_hu_edi_batch_index = fields.Integer(
-        string="Batch Index",
-        help="""Index of invoice within a batch modification:
-                - 1 ,2 ,3 ... for batch modification
-                - 0 for normal invoice""",
-        copy=False,
-    )
-
     @api.depends('name', 'ref')
     def _compute_l10n_hu_edi_attachment_filename(self):
-        nav_receiving_moves = self.filtered(lambda m: m.move_type in self.env['account.move'].get_purchase_types() and m.ref)
+        nav_receiving_moves = self.filtered(lambda m: m.move_type in self.get_purchase_types() and m.ref)
         for move in nav_receiving_moves:
             move.l10n_hu_edi_attachment_filename = f'{move.ref.replace("/", "_")}.xml'
         super(AccountMove, self - nav_receiving_moves)._compute_l10n_hu_edi_attachment_filename()
@@ -48,27 +41,28 @@ class AccountMove(models.Model):
     def _l10n_hu_edi_parse_digest_response(self, response_xml):
         digests = []
         for digest in response_xml.iterfind('api:invoiceDigestResult/api:invoiceDigest', namespaces=XML_NAMESPACES):
-            l10n_hu_edi_transaction_code = digest.findtext('api:transactionId', namespaces=XML_NAMESPACES)
-            l10n_hu_edi_batch_upload_index = int(digest.findtext('api:index', namespaces=XML_NAMESPACES))
+            invoice_number = digest.findtext('api:invoiceNumber', namespaces=XML_NAMESPACES)
+            batch_index = digest.findtext('api:batchIndex', namespaces=XML_NAMESPACES)
+            supplier_tax_number = digest.findtext('api:supplierTaxNumber', namespaces=XML_NAMESPACES)
+            supplier_group_member_tax_number = digest.findtext('api:supplierGroupMemberTaxNumber', namespaces=XML_NAMESPACES)
+
             move_domain = [
-                *self.env['account.move']._check_company_domain(self.env.company),
-                ('move_type', 'in', self.env['account.move'].get_purchase_types()),
-                ('l10n_hu_edi_transaction_code', '=', l10n_hu_edi_transaction_code),
-                ('l10n_hu_edi_batch_upload_index', '=', l10n_hu_edi_batch_upload_index),
+                *self._check_company_domain(self.env.company),
+                ('move_type', 'in', self.get_purchase_types()),
+                ('ref', '=', (invoice_number + '-' + batch_index) if batch_index else invoice_number),
+                ('partner_id.vat', '=ilike', (supplier_group_member_tax_number or supplier_tax_number) + '%'),
             ]
-            if l10n_hu_edi_batch_index := digest.findtext('api:batchIndex', namespaces=XML_NAMESPACES):
-                move_domain.append(('l10n_hu_edi_batch_index', '=', int(l10n_hu_edi_batch_index)))
-            move = self.env['account.move'].search(move_domain, limit=1)
+            move = self.search(move_domain, limit=1)
             if move:
                 continue
 
             query_invoice_data_params = {
-                'invoiceNumber': digest.findtext('api:invoiceNumber', namespaces=XML_NAMESPACES),
+                'invoiceNumber': invoice_number,
                 'invoiceDirection': 'INBOUND',
-                'supplierTaxNumber': digest.findtext('api:supplierTaxNumber', namespaces=XML_NAMESPACES),
+                'supplierTaxNumber': supplier_tax_number,
             }
-            if l10n_hu_edi_batch_index:
-                query_invoice_data_params['batchIndex'] = l10n_hu_edi_batch_index
+            if batch_index:
+                query_invoice_data_params['batchIndex'] = batch_index
 
             digests.append(query_invoice_data_params)
 
@@ -91,7 +85,9 @@ class AccountMove(models.Model):
         return self._l10n_hu_edi_parse_invoice_data_xml(etree.fromstring(b64decode(invoice_data_b64)), move_vals)
 
     @api.model
-    def _l10n_hu_edi_parse_invoice_data_xml(self, invoice_data_xml, move_vals={}):
+    def _l10n_hu_edi_parse_invoice_data_xml(self, invoice_data_xml, move_vals=None):
+        if move_vals is None:
+            move_vals = {}
         moves_vals = []
         move_vals.update({
             'ref': invoice_data_xml.findtext('data:invoiceNumber', namespaces=XML_NAMESPACES),
@@ -109,7 +105,7 @@ class AccountMove(models.Model):
                 moves_vals.append({
                     **move_vals,
                     **self._l10n_hu_edi_parse_invoice_xml(batch_invoice.find('data:invoice', namespaces=XML_NAMESPACES)),
-                    'l10n_hu_edi_batch_index': int(batch_invoice.findtext('data:batchIndex', namespaces=XML_NAMESPACES)),
+                    'ref': move_vals['ref'] + '-' + batch_invoice.findtext('data:batchIndex', namespaces=XML_NAMESPACES),
                 })
 
         return moves_vals
@@ -124,12 +120,19 @@ class AccountMove(models.Model):
         invoice_reference = invoice_xml.find('data:invoiceReference', namespaces=XML_NAMESPACES)
         base_invoice = invoice_reference is None
 
+        gross_total = invoice_xml.findtext('data:invoiceSummary/data:summaryGrossData/data:invoiceGrossAmount', namespaces=XML_NAMESPACES)
+        if gross_total is None:
+            net_amount = float(invoice_xml.findtext('data:invoiceSummary/data:summaryNormal/data:invoiceNetAmount', namespaces=XML_NAMESPACES))
+            vat_amount = float(invoice_xml.findtext('data:invoiceSummary/data:summaryNormal/data:invoiceVatAmount', namespaces=XML_NAMESPACES))
+            gross_total = net_amount + vat_amount
+        else:
+            gross_total = float(gross_total)
+        post_process_data = {'gross_total': gross_total, 'messages': []}
+
         if base_invoice:
             move_type = 'in_invoice'
         else:
-            total_path = 'data:invoiceSummary/data:summaryGrossData/data:invoiceGrossAmount' if simplified else 'data:invoiceSummary/data:summaryNormal/data:invoiceNetAmount'
-            total = float(invoice_xml.findtext(total_path, namespaces=XML_NAMESPACES))
-            move_type = 'in_refund' if total < 0 else 'in_invoice'
+            move_type = 'in_refund' if gross_total < 0 else 'in_invoice'
 
         supplier_info = invoice_head.find('data:supplierInfo', namespaces=XML_NAMESPACES)
         partner_vat = (
@@ -140,7 +143,9 @@ class AccountMove(models.Model):
         if not partner:
             supplier_tax_number = parse_vat(supplier_info.find('data:supplierTaxNumber', namespaces=XML_NAMESPACES))
             supplier_group_member_tax_number = parse_vat(supplier_info.find('data:groupMemberTaxNumber', namespaces=XML_NAMESPACES))
-            supplier_address = supplier_info.find('data:supplierAddress/base:simpleAddress', namespaces=XML_NAMESPACES) or supplier_info.find('data:supplierAddress/base:detailedAddress', namespaces=XML_NAMESPACES)
+            supplier_address = supplier_info.find('data:supplierAddress/base:simpleAddress', namespaces=XML_NAMESPACES)
+            if supplier_address is None:
+                supplier_address = supplier_info.find('data:supplierAddress/base:detailedAddress', namespaces=XML_NAMESPACES)
             partner_vals = {
                 'name': supplier_info.findtext('data:supplierName', namespaces=XML_NAMESPACES),
                 'vat': supplier_group_member_tax_number or supplier_tax_number,
@@ -168,6 +173,7 @@ class AccountMove(models.Model):
             'invoice_currency_rate': float(invoice_detail.findtext('data:exchangeRate', namespaces=XML_NAMESPACES)),
             'move_type': move_type,
             'partner_id': partner.id,
+            'post_process_data': post_process_data
         }
 
         if l10n_hu_payment_mode := invoice_detail.findtext('data:paymentMethod', namespaces=XML_NAMESPACES):
@@ -205,6 +211,7 @@ class AccountMove(models.Model):
             move_vals['partner_bank_id'] = partner_bank.id
 
         lines_vals = []
+        no_tax_logs = []
         for line in invoice_xml.iterfind('data:invoiceLines/data:line', namespaces=XML_NAMESPACES):
             line_vals = {'display_type': 'product'}
 
@@ -244,85 +251,88 @@ class AccountMove(models.Model):
                 if quantity < 0:
                     quantity *= sign
                     sign = 1
-            else:
-                quantity = 1
-            line_vals['quantity'] = quantity
+                line_vals['quantity'] = quantity
 
             amounts = line.find('data:lineAmountsSimplified' if simplified else 'data:lineAmountsNormal', namespaces=XML_NAMESPACES)
-            if price_unit := line.findtext('data:unitPrice', namespaces=XML_NAMESPACES):
-                line_vals['price_unit'] = sign * float(price_unit)
+            skip_tax = False
+            if bool(price_unit := float(line.findtext('data:unitPrice', namespaces=XML_NAMESPACES) or 0)):
+                price_unit = sign * price_unit
             else:
                 total_path = 'data:lineGrossAmountSimplified' if simplified else 'data:lineNetAmountData/data:lineNetAmount'
-                total = amounts.findtext(total_path, namespaces=XML_NAMESPACES)
-                line_vals['price_unit'] = sign * float(total) / quantity
+                total = float(amounts.findtext(total_path, namespaces=XML_NAMESPACES))
+                if total == 0 and not simplified and (vat_amount := amounts.findtext('data:lineVatData/data:lineVatAmount', namespaces=XML_NAMESPACES)):
+                    total = float(vat_amount)
+                    skip_tax = True
+                price_unit = sign * total
 
-            line_vat_rate = amounts.find('data:lineVatRate', namespaces=XML_NAMESPACES)
-            l10n_hu_tax_type = rate = None
-            if vat_percentage := line_vat_rate.findtext('data:vatPercentage', namespaces=XML_NAMESPACES):
-                rate = vat_percentage
-                l10n_hu_tax_type = 'VAT'
-            elif (vat_exemption := line_vat_rate.find('data:vatExemption', namespaces=XML_NAMESPACES)) is not None:
-                l10n_hu_tax_type = vat_exemption.findtext('data:case', namespaces=XML_NAMESPACES)
-            elif (vat_out_of_scope := line_vat_rate.find('data:vatOutOfScope', namespaces=XML_NAMESPACES)) is not None:
-                l10n_hu_tax_type = vat_out_of_scope.findtext('data:case', namespaces=XML_NAMESPACES)
-            elif boolean(line_vat_rate.findtext('data:vatDomesticReverseCharge', namespaces=XML_NAMESPACES)):
-                l10n_hu_tax_type = 'DOMESTIC_REVERSE'
-            elif margin_scheme_indicator := line_vat_rate.findtext('data:marginSchemeIndicator', namespaces=XML_NAMESPACES):
-                l10n_hu_tax_type = margin_scheme_indicator
-            elif (vat_amount_mismatch := line_vat_rate.find('data:vatAmountMismatch', namespaces=XML_NAMESPACES)) is not None:
-                l10n_hu_tax_type = vat_amount_mismatch.findtext('data:case', namespaces=XML_NAMESPACES)
-                rate = vat_amount_mismatch.findtext('data:vatRate/data:vatPercentage', namespaces=XML_NAMESPACES)
-            elif boolean(line_vat_rate.findtext('data:noVatCharge', namespaces=XML_NAMESPACES)):
-                l10n_hu_tax_type = 'NO_VAT'
-            elif rate := line_vat_rate.findtext('data:vatContent', namespaces=XML_NAMESPACES):
-                pass
+            line_vals['price_unit'] = price_unit
 
-            tax_domain = [
-                *self.env['account.tax']._check_company_domain(self.env.company),
-                ('type_tax_use', '=', 'purchase'),
-                ('price_include', '=', simplified),
-            ]
-            if l10n_hu_tax_type:
-                tax_domain.append(('l10n_hu_tax_type', '=', l10n_hu_tax_type))
-            if rate:
-                tax_domain.append(('amount', '=', float(rate) * 100))
-            if tax := self.env['account.tax'].search(tax_domain, limit=1):
-                line_vals['tax_ids'] = [Command.set([tax.id])]
+            if not skip_tax:
+                line_vat_rate = amounts.find('data:lineVatRate', namespaces=XML_NAMESPACES)
+                l10n_hu_tax_type = rate = None
+                if vat_percentage := line_vat_rate.findtext('data:vatPercentage', namespaces=XML_NAMESPACES):
+                    rate = vat_percentage
+                    l10n_hu_tax_type = 'VAT'
+                elif (vat_exemption := line_vat_rate.find('data:vatExemption', namespaces=XML_NAMESPACES)) is not None:
+                    l10n_hu_tax_type = vat_exemption.findtext('data:case', namespaces=XML_NAMESPACES)
+                elif (vat_out_of_scope := line_vat_rate.find('data:vatOutOfScope', namespaces=XML_NAMESPACES)) is not None:
+                    l10n_hu_tax_type = vat_out_of_scope.findtext('data:case', namespaces=XML_NAMESPACES)
+                elif boolean(line_vat_rate.findtext('data:vatDomesticReverseCharge', namespaces=XML_NAMESPACES)):
+                    l10n_hu_tax_type = 'DOMESTIC_REVERSE'
+                elif margin_scheme_indicator := line_vat_rate.findtext('data:marginSchemeIndicator', namespaces=XML_NAMESPACES):
+                    l10n_hu_tax_type = margin_scheme_indicator
+                elif (vat_amount_mismatch := line_vat_rate.find('data:vatAmountMismatch', namespaces=XML_NAMESPACES)) is not None:
+                    l10n_hu_tax_type = vat_amount_mismatch.findtext('data:case', namespaces=XML_NAMESPACES)
+                    rate = vat_amount_mismatch.findtext('data:vatRate/data:vatPercentage', namespaces=XML_NAMESPACES)
+                elif boolean(line_vat_rate.findtext('data:noVatCharge', namespaces=XML_NAMESPACES)):
+                    l10n_hu_tax_type = 'NO_VAT'
+                elif rate := line_vat_rate.findtext('data:vatContent', namespaces=XML_NAMESPACES):
+                    pass
+
+                tax_domain = [
+                    *self.env['account.tax']._check_company_domain(self.env.company),
+                    ('type_tax_use', '=', 'purchase'),
+                    ('price_include', '=', simplified),
+                ]
+                tax_details = []
+                if l10n_hu_tax_type:
+                    tax_domain.append(('l10n_hu_tax_type', '=', l10n_hu_tax_type))
+                    tax_details.append(l10n_hu_tax_type)
+                if rate:
+                    rate = float(rate) * 100
+                    tax_domain.append(('amount', '=', rate))
+                    tax_details.append(str(rate) + ' %')
+                if tax := self.env['account.tax'].search(tax_domain, limit=1):
+                    line_vals['tax_ids'] = [Command.set([tax.id])]
+                else:
+                    no_tax_logs.append(_(
+                        "Could not retrieve the tax: %(tax_name)s for line '%(line)s'.",
+                        tax_name=' '.join(tax_details),
+                        line=line_vals.get('name')
+                    ))
 
             lines_vals.append(Command.create(line_vals))
 
         move_vals['invoice_line_ids'] = lines_vals
 
+        if no_tax_logs:
+            body = Markup("<ul>%s</ul>") % \
+                Markup().join(Markup("<li>%s</li>") % l for l in no_tax_logs)
+            post_process_data['messages'].append(body)
+
         return move_vals
 
-    def _l10n_hu_edi_check_amounts_mismatch(self):
-        for move in self:
-            invoice_data_xml = etree.fromstring(b64decode(move.l10n_hu_edi_attachment))
-            invoice_xml = invoice_data_xml.find('data:invoiceMain/data:invoice', namespaces=XML_NAMESPACES)
-            if invoice_xml is None:
-                for batch_invoice in invoice_data_xml.iterfind('data:invoiceMain/data:batchInvoice', namespaces=XML_NAMESPACES):
-                    if int(batch_invoice.findtext('data:batchIndex', namespaces=XML_NAMESPACES)) == move.l10n_hu_edi_batch_index:
-                        invoice_xml = batch_invoice.find('data:invoice', namespaces=XML_NAMESPACES)
-                        break
-
-            gross_total = invoice_xml.findtext('data:invoiceSummary/data:summaryGrossData/data:invoiceGrossAmount', namespaces=XML_NAMESPACES)
-            if gross_total is None:
-                net_amount = float(invoice_xml.findtext('data:invoiceSummary/data:summaryNormal/data:invoiceNetAmount', namespaces=XML_NAMESPACES))
-                vat_amount = float(invoice_xml.findtext('data:invoiceSummary/data:summaryNormal/data:invoiceVatAmount', namespaces=XML_NAMESPACES))
-                gross_total = net_amount + vat_amount
-            if move.currency_id.compare_amounts(float(gross_total), -move.amount_total_in_currency_signed) != 0:
+    @api.model
+    def _l10n_hu_edi_check_amounts_mismatch(self, move_post_process_data_zip):
+        for move, post_process_data in move_post_process_data_zip:
+            if move.currency_id.compare_amounts(post_process_data['gross_total'], -move.amount_total_in_currency_signed) != 0:
                 move.l10n_hu_edi_messages = {
                     'error_title': _("Amount mismatch detected."),
                     'errors': [_("The gross total on the bill received from NAV and computed is not the same. Please check XML file in 'NAV 3.0' tab.")],
                     'blocking_level': 'warning',
                 }
-
-            if invoice_xml.findtext('data:invoiceHead/data:invoiceDetail/data:invoiceCategory', namespaces=XML_NAMESPACES) == 'AGGREGATE':
-                move.message_post(body=_(
-                    "This is an aggregate invoice covering time period from %(start)s to %(end)s.",
-                    start=invoice_xml.findtext('data:invoiceHead/data:invoiceDetail/data:invoiceDeliveryPeriodStart', namespaces=XML_NAMESPACES),
-                    end=invoice_xml.findtext('data:invoiceHead/data:invoiceDetail/data:invoiceDeliveryPeriodEnd', namespaces=XML_NAMESPACES),
-                ))
+            for body in post_process_data['messages']:
+                move.message_post(body=body)
 
     def _get_edi_decoder(self, file_data, new=False):
         # EXTENDS 'account'
@@ -332,9 +342,10 @@ class AccountMove(models.Model):
             and (root := etree.QName(file_data['xml_tree']).localname) in ('InvoiceData', 'QueryInvoiceDataResponse')
         ):
             moves_vals = self._l10n_hu_edi_parse_invoice_data_xml(file_data['xml_tree']) if root == 'InvoiceData' else self._l10n_hu_edi_parse_query_invoice_data_response(file_data['xml_tree'])
+            post_process_data_list = [move_vals.pop('post_process_data') for move_vals in moves_vals]
             self.write(moves_vals[0])
             moves = self + self.create(moves_vals[1:])
-            moves._l10n_hu_edi_check_amounts_mismatch()
+            self._l10n_hu_edi_check_amounts_mismatch(zip(moves, post_process_data_list))
             return
 
         return super()._get_edi_decoder(file_data, new=new)

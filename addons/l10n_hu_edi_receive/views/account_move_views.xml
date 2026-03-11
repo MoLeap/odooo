@@ -20,9 +20,6 @@
             <page id="l10n_hu_edi" position="attributes">
                 <attribute name="invisible">not l10n_hu_edi_attachment</attribute>
             </page>
-            <field name="l10n_hu_invoice_chain_index" position="after">
-                <field name="l10n_hu_edi_batch_index" readonly="1" invisible="move_type not in ('in_invoice', 'in_refund')"/>
-            </field>
         </field>
     </record>
 

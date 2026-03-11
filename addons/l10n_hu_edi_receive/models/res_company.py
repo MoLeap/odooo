@@ -20,4 +20,7 @@ class ResCompany(models.Model):
             digests = connection.query_invoice_digest(credentials, format_timestamp(datetime_from), format_timestamp(datetime_to))
             moves_vals = connection.query_invoice_data(credentials, digests)
 
-        return self.env['account.move'].create(moves_vals)
+        post_process_data_list = [move_vals.pop('post_process_data') for move_vals in moves_vals]
+        moves = self.env['account.move'].create(moves_vals)
+        self.env['account.move']._l10n_hu_edi_check_amounts_mismatch(zip(moves, post_process_data_list))
+        return moves

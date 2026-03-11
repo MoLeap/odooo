@@ -22,7 +22,6 @@ class L10nHuEdiReceiveBillsWizard(models.TransientModel):
         moves = self.env['account.move']
         for company in self.env.companies.filtered(lambda c: c.l10n_hu_edi_server_mode in ('test', 'production')):
             moves += company.with_company(company).l10n_hu_edi_receive_inbound_invoices(self.l10n_hu_edi_receive_from, self.l10n_hu_edi_receive_to)
-        moves._l10n_hu_edi_check_amounts_mismatch()
 
         if moves:
             message = _("Bills were successfully received from NAV.")
