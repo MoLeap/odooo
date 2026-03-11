@@ -1,5 +1,5 @@
 import { useRef, useState } from "@web/owl2/utils";
-import { Component } from "@odoo/owl";
+import { Component, useEffect } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { useSelfOrder } from "@pos_self_order/app/services/self_order_service";
 import { OrderWidget } from "@pos_self_order/app/components/order_widget/order_widget";
@@ -28,6 +28,17 @@ export class CartPage extends Component {
         });
 
         this.scrollShadow = useScrollShadow(useRef("scrollContainer"));
+        useEffect(
+            () => this.selfOrder.ensureDeliveryLine(),
+            () => {
+                const order = this.selfOrder.currentOrder;
+                const nonDeliveryId = order?.preset_id?.delivery_product_id?.id;
+                const nonDeliveryTotal = order?.lines
+                    ?.filter((l) => l.product_id?.product_tmpl_id?.id !== nonDeliveryId)
+                    .reduce((sum, l) => sum + (l.qty || 0) * (l.price_unit || 0), 0);
+                return [order?.preset_id?.id, nonDeliveryTotal];
+            }
+        );
     }
 
     get showCancelButton() {
@@ -382,6 +393,11 @@ export class CartPage extends Component {
     }
     get displayTaxes() {
         return !this.selfOrder.isTaxesIncludedInPrice();
+    }
+
+    isDeliveryLine(line) {
+        const deliveryTmplId = this.selfOrder.currentOrder?.preset_id?.delivery_product_id?.id;
+        return deliveryTmplId && line.product_id?.product_tmpl_id?.id === deliveryTmplId;
     }
 
     formatProductName(product) {
