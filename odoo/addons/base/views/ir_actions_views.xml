@@ -171,6 +171,9 @@
                         <group name="help" string="Help">
                             <field name="help" nolabel="1" class="oe-bordered-editor"/>
                         </group>
+                        <group name="explication" string="Explication">
+                            <field name="explication" nolabel="1" class="oe-bordered-editor"/>
+                        </group>
                     </sheet>
                 </form>
             </field>

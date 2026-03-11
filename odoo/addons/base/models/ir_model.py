@@ -224,6 +224,7 @@ class IrModel(models.Model):
     order = fields.Char(string='Order', default='id', required=True,
                         help='SQL expression for ordering records in the model; e.g. "x_sequence asc, id desc"')
     info = fields.Text(string='Information')
+    explication = fields.Text(string='Explication')
     field_id = fields.One2many('ir.model.fields', 'model_id', string='Fields', required=True, copy=True,
                                default=_default_field_id)
     inherited_model_ids = fields.Many2many('ir.model', compute='_inherited_models', string="Inherited models",
@@ -456,9 +457,23 @@ class IrModel(models.Model):
 
     def _reflect_model_params(self, model):
         """ Return the values to write to the database for the given model. """
+        explications = []
+        is_first = True
+        for cls in reversed(type(model).mro()):
+            if '_explication' in cls.__dict__ and cls.__dict__['_explication']:
+                if cls.__dict__.get('_name') == model._name:
+                    module_parts = cls.__module__.split('.')
+                    module_name = module_parts[2] if module_parts[:2] == ['odoo', 'addons'] else module_parts[0]
+                    
+                    if is_first:
+                        explications.append(f'<definition module="{module_name}">\n{cls.__dict__["_explication"]}\n</definition>')
+                        is_first = False
+                    else:
+                        explications.append(f'<extension module="{module_name}">\n{cls.__dict__["_explication"]}\n</extension>')
         return {
             'model': model._name,
             'name': model._description,
+            'explication': "\n\n".join(explications) or None,
             'order': model._order,
             'info': next(cls.__doc__ for cls in self.env.registry[model._name].mro() if cls.__doc__),
             'state': 'manual' if model._custom else 'base',

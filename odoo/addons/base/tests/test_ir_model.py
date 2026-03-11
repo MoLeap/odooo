@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import csv
+import io
+
 from psycopg2 import IntegrityError
 from psycopg2.errors import NotNullViolation
 
@@ -360,3 +363,69 @@ class TestIrModelInherit(TransactionCase):
         self.assertEqual(len(imi), 1)
         self.assertEqual(imi.parent_id.model, "res.partner")
         self.assertEqual(imi.parent_field_id.name, "partner_id")
+
+@tagged('at_install', '-post_install')
+class TestIrModelExplication(TransactionCase):
+    def test_explication_mro_reflection(self):
+        model = self.env['res.partner']
+        # The dynamic class has a MRO
+        cls_mro = type(model).mro()
+        
+        # Manually inject _explication into two classes in the MRO to simulate
+        # base class definition and module extension.
+        cls_base = cls_mro[2]
+        cls_ext = cls_mro[1]
+        
+        original_base_explication = getattr(cls_base, '_explication', None)
+        original_ext_explication = getattr(cls_ext, '_explication', None)
+        original_base_module = cls_base.__module__
+        original_ext_module = cls_ext.__module__
+        
+        try:
+            cls_base._explication = 'Base explanation'
+            cls_ext._explication = 'Extension explanation'
+            cls_base.__module__ = 'odoo.addons.base.models.partner'
+            cls_ext.__module__ = 'odoo.addons.hr.models.partner'
+            cls_base._name = model._name
+            cls_ext._name = model._name
+            
+            params = self.env['ir.model']._reflect_model_params(model)
+            
+            expected = '<definition module="base">\nBase explanation\n</definition>\n\n<extension module="hr">\nExtension explanation\n</extension>'
+            self.assertIn(expected, params['explication'])
+        finally:
+            cls_base.__module__ = original_base_module
+            cls_ext.__module__ = original_ext_module
+            
+            if original_base_explication is not None:
+                cls_base._explication = original_base_explication
+            else:
+                del cls_base._explication
+                
+            if original_ext_explication is not None:
+                cls_ext._explication = original_ext_explication
+            else:
+                del cls_ext._explication
+
+    def test_print_explications_csv(self):
+
+        
+        models_with_explication = self.env['ir.model'].search([('explication', '!=', False)], order='model')
+        
+        output = io.StringIO()
+        writer = csv.writer(output, quoting=csv.QUOTE_ALL)
+        writer.writerow(['Model ID', 'Technical Name', 'Character Count', 'Explication'])
+        
+        total_chars = 0
+        for m in models_with_explication:
+            text = m.explication or ""
+            char_count = len(text)
+            total_chars += char_count
+            writer.writerow([m.id, m.model, char_count, text])
+            
+        print("\n\n--- AI EXPLICATIONS CSV OUTPUT ---")
+        print(f"Found {len(models_with_explication)} models with AI explications.")
+        print(output.getvalue())
+        print(f"TOTAL CHARACTERS ACROSS ALL EXPLICATIONS: {total_chars}")
+        print("----------------------------------\n\n")
+

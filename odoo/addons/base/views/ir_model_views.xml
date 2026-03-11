@@ -172,7 +172,10 @@
                             </field>
                         </page>
                         <page string="Notes" name="notes" groups="base.group_no_one">
+                            <separator string="Information"/>
                             <field name="info"/>
+                            <separator string="Explication"/>
+                            <field name="explication"/>
                         </page>
                         <page string="Views" name="views" groups="base.group_no_one">
                             <field name="view_ids"/>
