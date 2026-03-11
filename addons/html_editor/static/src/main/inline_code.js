@@ -19,6 +19,9 @@ export class InlineCodePlugin extends Plugin {
             selectElements(root, ".o_inline_code").flatMap((code) =>
                 this.dependencies.feff.surroundWithFeffs(code, cursors)
             ),
+        should_show_hint_predicates: (node) => !node.querySelector(".o_inline_code"),
+        should_show_power_buttons_predicates: ({ anchorNode }) =>
+            !closestBlock(anchorNode).querySelector(".o_inline_code"),
     };
 
     setup() {
