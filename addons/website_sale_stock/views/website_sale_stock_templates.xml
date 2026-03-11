@@ -25,4 +25,46 @@
         </xpath>
     </template>
 
+    <template
+        id="website_sale_stock.ribbon_filter_in_stock"
+        inherit_id="website_sale.products"
+        name="In Stock Ribbon Filter"
+    >
+        <xpath expr="//div[@id='o_wsale_ribbon_filters']" position="inside">
+            <t t-if="show_in_stock_filter">
+                <t t-set="_active" t-value="ribbon_filter == 'in_stock'"/>
+                <a
+                    t-att-href="keep(ribbon=0 if _active else 'in_stock')"
+                    t-att-class="
+                        'text-decoration-none text-white bg-dark border border-secondary '
+                        'rounded px-3 py-1 small fw-semibold '
+                        + ('opacity-100' if _active else 'opacity-50')
+                    "
+                >
+                    In stock
+                </a>
+            </t>
+        </xpath>
+    </template>
+
+    <template
+        id="website_sale_stock.ribbon_filter_in_stock_offcanvas"
+        inherit_id="website_sale.o_wsale_offcanvas"
+        name="In Stock Ribbon Filter Offcanvas"
+    >
+        <xpath expr="//div[@id='o_wsale_ribbon_filters_offcanvas']" position="inside">
+            <t t-if="show_in_stock_filter">
+                <t t-set="_active" t-value="ribbon_filter == 'in_stock'"/>
+                <a
+                    t-att-href="keep(ribbon=0 if _active else 'in_stock')"
+                    t-att-class="
+                        'text-decoration-none text-white bg-dark border border-secondary '
+                        'rounded px-3 py-1 small fw-semibold '
+                        + ('opacity-100' if _active else 'opacity-50')
+                    "
+                >In stock</a>
+            </t>
+        </xpath>
+    </template>
+
 </odoo>
