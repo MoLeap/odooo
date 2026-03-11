@@ -29,7 +29,7 @@ export function checkBtn(buttonName) {
 
 export function clickOrderNoteBtn() {
     return {
-        trigger: ".order-note",
+        trigger: ".order-note button",
         run: "click",
     };
 }
