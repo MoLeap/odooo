@@ -290,3 +290,203 @@ class TestHolidaysOvertime(TransactionCase):
 
         leave.with_user(self.user_manager).action_approve(check_state=False)
         self.assertEqual(self.employee.total_overtime, 8)
+
+    def test_auto_check_out_with_leave(self):
+        self.company.write({
+            'auto_check_out': True,
+            'auto_check_out_tolerance': 0
+        })
+
+        attendance_with_leave = self.env['hr.attendance'].create({
+            'employee_id': self.employee.id,
+            'check_in': datetime(2024, 12, 3, 8, 0),
+        })
+
+        leave_type = self.env['hr.leave.type'].create({
+            'name': 'Unpaid Leave',
+            'company_id': self.company.id,
+            'requires_allocation': 'no',
+        })
+
+        leave1 = self.env['hr.leave'].create({
+            'name': 'Time Off',
+            'employee_id': self.employee.id,
+            'holiday_status_id': leave_type.id,
+            'request_unit_hours': True,
+            'request_date_from': datetime(2024, 12, 3),
+            'request_date_to': datetime(2024, 12, 3),
+            'request_hour_from': 15,
+            'request_hour_to': 17,
+        })
+
+        leave1.with_user(self.user_manager).action_approve()
+
+        with freeze_time("2024-12-03 22:00:00"):
+            self.env['hr.attendance']._cron_auto_check_out()
+            self.assertEqual(attendance_with_leave.check_out, datetime(2024, 12, 3, 15, 0))
+            self.assertEqual(attendance_with_leave.worked_hours, 6)
+
+    def test_auto_check_out_with_midday_hourly_leave(self):
+        self.company.write({
+            'auto_check_out': True,
+            'auto_check_out_tolerance': 0,
+        })
+        attendance = self.env['hr.attendance'].create({
+            'employee_id': self.employee.id,
+            'check_in': datetime(2024, 12, 3, 8, 0),
+        })
+        leave_type = self.env['hr.leave.type'].create({
+            'name': 'Hourly Leave Midday',
+            'company_id': self.company.id,
+            'requires_allocation': 'no',
+        })
+        leave = self.env['hr.leave'].create({
+            'name': 'Time Off',
+            'employee_id': self.employee.id,
+            'holiday_status_id': leave_type.id,
+            'request_unit_hours': True,
+            'request_date_from': datetime(2024, 12, 3),
+            'request_date_to': datetime(2024, 12, 3),
+            'request_hour_from': 10,
+            'request_hour_to': 12,
+        })
+        leave.with_user(self.user_manager).action_approve()
+
+        with freeze_time("2024-12-03 22:00:00"):
+            self.env['hr.attendance']._cron_auto_check_out()
+            self.assertEqual(attendance.check_out, datetime(2024, 12, 3, 15, 0))
+            self.assertEqual(attendance.worked_hours, 6)
+
+    def test_auto_check_out_with_hourly_leave_before_schedule_start(self):
+        self.company.write({
+            'auto_check_out': True,
+            'auto_check_out_tolerance': 0,
+        })
+        attendance = self.env['hr.attendance'].create({
+            'employee_id': self.employee.id,
+            'check_in': datetime(2024, 12, 3, 8, 0),
+        })
+        leave_type = self.env['hr.leave.type'].create({
+            'name': 'Hourly Leave Before Start',
+            'company_id': self.company.id,
+            'requires_allocation': 'no',
+        })
+        leave = self.env['hr.leave'].create({
+            'name': 'Time Off',
+            'employee_id': self.employee.id,
+            'holiday_status_id': leave_type.id,
+            'request_unit_hours': True,
+            'request_date_from': datetime(2024, 12, 3),
+            'request_date_to': datetime(2024, 12, 3),
+            'request_hour_from': 7,
+            'request_hour_to': 10,
+        })
+        leave.with_user(self.user_manager).action_approve()
+
+        with freeze_time("2024-12-03 22:00:00"):
+            self.env['hr.attendance']._cron_auto_check_out()
+            self.assertEqual(attendance.check_out, datetime(2024, 12, 3, 15, 0))
+            self.assertEqual(attendance.worked_hours, 6)
+
+    def test_auto_check_out_with_full_day_hourly_leave(self):
+        self.company.write({
+            'auto_check_out': True,
+            'auto_check_out_tolerance': 0,
+        })
+        attendance = self.env['hr.attendance'].create({
+            'employee_id': self.employee.id,
+            'check_in': datetime(2024, 12, 3, 8, 0),
+        })
+        leave_type = self.env['hr.leave.type'].create({
+            'name': 'Hourly Leave Full Day',
+            'company_id': self.company.id,
+            'requires_allocation': 'no',
+        })
+        leave = self.env['hr.leave'].create({
+            'name': 'Time Off',
+            'employee_id': self.employee.id,
+            'holiday_status_id': leave_type.id,
+            'request_unit_hours': True,
+            'request_date_from': datetime(2024, 12, 3),
+            'request_date_to': datetime(2024, 12, 3),
+            'request_hour_from': 8,
+            'request_hour_to': 17,
+        })
+        leave.with_user(self.user_manager).action_approve()
+
+        with freeze_time("2024-12-03 22:00:00"):
+            self.env['hr.attendance']._cron_auto_check_out()
+            self.assertEqual(attendance.check_out, datetime(2024, 12, 3, 9, 0))
+
+    def test_auto_check_out_ignores_worked_time_hourly_leave(self):
+        self.company.write({
+            'auto_check_out': True,
+            'auto_check_out_tolerance': 0,
+        })
+        attendance = self.env['hr.attendance'].create({
+            'employee_id': self.employee.id,
+            'check_in': datetime(2024, 12, 3, 8, 0),
+        })
+        worked_time_leave_type = self.env['hr.leave.type'].create({
+            'name': 'Worked Time Leave',
+            'company_id': self.company.id,
+            'requires_allocation': 'no',
+            'time_type': 'other',
+        })
+        leave = self.env['hr.leave'].create({
+            'name': 'Training',
+            'employee_id': self.employee.id,
+            'holiday_status_id': worked_time_leave_type.id,
+            'request_unit_hours': True,
+            'request_date_from': datetime(2024, 12, 3),
+            'request_date_to': datetime(2024, 12, 3),
+            'request_hour_from': 15,
+            'request_hour_to': 17,
+        })
+        leave.with_user(self.user_manager).action_approve()
+
+        with freeze_time("2024-12-03 22:00:00"):
+            self.env['hr.attendance']._cron_auto_check_out()
+            self.assertEqual(attendance.check_out, datetime(2024, 12, 3, 17, 0))
+            self.assertEqual(attendance.worked_hours, 8)
+
+    def test_auto_check_out_with_multiple_hourly_leaves(self):
+        self.company.write({
+            'auto_check_out': True,
+            'auto_check_out_tolerance': 0,
+        })
+        attendance = self.env['hr.attendance'].create({
+            'employee_id': self.employee.id,
+            'check_in': datetime(2024, 12, 3, 8, 0),
+        })
+        leave_type = self.env['hr.leave.type'].create({
+            'name': 'Multiple Hourly Leaves',
+            'company_id': self.company.id,
+            'requires_allocation': 'no',
+        })
+        leave1 = self.env['hr.leave'].create({
+            'name': 'Time Off 1',
+            'employee_id': self.employee.id,
+            'holiday_status_id': leave_type.id,
+            'request_unit_hours': True,
+            'request_date_from': datetime(2024, 12, 3),
+            'request_date_to': datetime(2024, 12, 3),
+            'request_hour_from': 10,
+            'request_hour_to': 11,
+        })
+        leave2 = self.env['hr.leave'].create({
+            'name': 'Time Off 2',
+            'employee_id': self.employee.id,
+            'holiday_status_id': leave_type.id,
+            'request_unit_hours': True,
+            'request_date_from': datetime(2024, 12, 3),
+            'request_date_to': datetime(2024, 12, 3),
+            'request_hour_from': 15,
+            'request_hour_to': 17,
+        })
+        (leave1 | leave2).with_user(self.user_manager).action_approve()
+
+        with freeze_time("2024-12-03 22:00:00"):
+            self.env['hr.attendance']._cron_auto_check_out()
+            self.assertEqual(attendance.check_out, datetime(2024, 12, 3, 14, 0))
+            self.assertEqual(attendance.worked_hours, 5)

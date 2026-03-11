@@ -750,6 +750,8 @@ class HrAttendance(models.Model):
         for previous in previous_attendances:
             mapped_previous_duration[previous.employee_id][check_in_tz(previous).date()] += previous.worked_hours
 
+        current_datetime = fields.Datetime.now()
+        expected_worked_hours_by_employee_day = {}
         all_companies = to_verify.employee_id.company_id
 
         for company in all_companies:
@@ -757,20 +759,29 @@ class HrAttendance(models.Model):
             to_verify_company = to_verify.filtered(lambda a: a.employee_id.company_id.id == company.id)
 
             for att in to_verify_company:
-
+                calendar = att.employee_id.resource_calendar_id
+                employee_resource = att.employee_id.resource_id
                 employee_timezone = pytz.timezone(att.employee_id._get_tz())
                 check_in_datetime = check_in_tz(att)
-                now_datetime = fields.Datetime.now().astimezone(employee_timezone)
+                now_datetime = current_datetime.astimezone(employee_timezone)
                 current_attendance_duration = (now_datetime - check_in_datetime).total_seconds() / 3600
                 previous_attendances_duration = mapped_previous_duration[att.employee_id][check_in_datetime.date()]
 
-                expected_worked_hours = sum(
-                    att.employee_id.resource_calendar_id.attendance_ids.filtered(
-                        lambda a: a.dayofweek == str(check_in_datetime.weekday())
-                            and (not a.two_weeks_calendar or a.week_type == str(a.get_week_type(check_in_datetime.date())))
-                    ).mapped("duration_hours")
-                )
+                cache_key = (calendar.id, employee_resource.id, check_in_datetime.date())
+                if cache_key not in expected_worked_hours_by_employee_day:
+                    day_start = employee_timezone.localize(datetime.combine(check_in_datetime.date(), datetime.min.time()))
+                    day_end = employee_timezone.localize(datetime.combine(check_in_datetime.date() + timedelta(days=1), datetime.min.time()))
+                    daily_work_intervals = calendar._work_intervals_batch(
+                        day_start,
+                        day_end,
+                        resources=employee_resource,
+                        tz=employee_timezone,
+                    )[employee_resource.id]
+                    expected_worked_hours_by_employee_day[cache_key] = sum(
+                        (stop - start).total_seconds() / 3600 for start, stop, _attendance in daily_work_intervals
+                    )
 
+                expected_worked_hours = expected_worked_hours_by_employee_day[cache_key]
                 # Attendances where Last open attendance time + previously worked time on that day + tolerance greater than the attendances hours (including lunch) in his calendar
                 if (current_attendance_duration + previous_attendances_duration - max_tol) > expected_worked_hours:
                     att.check_out = att.check_in.replace(hour=23, minute=59, second=59)
