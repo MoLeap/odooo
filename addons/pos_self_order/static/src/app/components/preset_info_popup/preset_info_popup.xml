@@ -34,14 +34,32 @@
                         t-att-placeholder="this.partnerIsSelected ? '*************' : 'Email'"
                         t-custom-model="state.email"
                         t-att-disabled="this.partnerIsSelected" />
-                    <t t-if="this.preset.needsName || this.preset.needsPartner">
-                        <input type="text"
-                            class="form-control form-control-lg"
-                            t-att-placeholder="this.partnerIsSelected ? '*************' : 'Phone'"
-                            t-custom-model="state.phone"
+                    <div t-if="this.preset.needsName || this.preset.needsPartner" class="input-group input-group-lg">
+                        <!-- Country prefix picker: transparent select overlays a styled display div -->
+                        <div class="position-relative" style="max-width: 25%; min-width: 90px">
+                            <div class="form-select h-100 d-flex align-items-center gap-1 pe-none user-select-none">
+                                <t t-if="selectedCountry">
+                                    <t t-out="flagEmoji(selectedCountry.code)"/>
+                                    <span>+<t t-out="selectedCountry.phone_code"/></span>
+                                </t>
+                            </div>
+                            <select class="position-absolute top-0 start-0 w-100 h-100 opacity-0"
+                                style="cursor: pointer"
+                                t-model.number="state.phoneCountryId"
+                                t-att-disabled="this.partnerIsSelected">
+                                <option t-foreach="this.allCountries" t-as="c" t-key="c.id"
+                                    t-att-value="c.id">
+                                    <t t-out="flagEmoji(c.code)"/> +<t t-out="c.phone_code"/> <t t-out="c.name"/>
+                                </option>
+                            </select>
+                        </div>
+                        <input type="tel"
+                            class="form-control"
+                            placeholder="Phone number"
+                            t-model="state.phoneLocal"
                             t-att-disabled="this.partnerIsSelected"/>
-                        <p t-if="!this.checkPhoneFormat()" class="text-danger">Enter a valid phone number starting with the country code (e.g. +32)</p>
-                    </t>
+                    </div>
+                    <p t-if="!this.checkPhoneFormat()" class="text-danger">Enter a valid phone number</p>
                     <t t-if="this.preset.needsPartner">
                         <select class="partner-select form-select form-select-lg" t-custom-model="state.countryId" t-att-disabled="this.partnerIsSelected">
                             <option value="">

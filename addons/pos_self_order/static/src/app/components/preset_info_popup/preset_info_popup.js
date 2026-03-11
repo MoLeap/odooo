@@ -20,8 +20,8 @@ export class PresetInfoPopup extends Component {
             selectedPartnerId: null,
             name: "",
             email: "",
-            phone: "",
-            phoneError: "",
+            phoneCountryId: this.selfOrder.config.company_id.country_id.id,
+            phoneLocal: "",
             street: "",
             countryId: this.selfOrder.config.company_id.country_id.id,
             stateId: this.selfOrder.config.company_id.country_id.state_ids[0]?.id || null,
@@ -35,12 +35,12 @@ export class PresetInfoPopup extends Component {
     }
 
     async setInformations() {
-        if (this.preset.needsPartner || this.state.phone) {
+        if (this.preset.needsPartner || this.state.phoneLocal) {
             const data = {
                 access_token: this.selfOrder.access_token,
                 name: this.state.name,
                 email: this.state.email,
-                phone: this.state.phone,
+                phone: this.fullPhone,
                 street: this.state.street,
                 city: this.state.city,
                 country_id: this.state.countryId,
@@ -71,12 +71,27 @@ export class PresetInfoPopup extends Component {
         const partner = this.selfOrder.models["res.partner"].get(event.target.value);
         this.state.name = partner?.name || "";
         this.state.email = partner?.email || "";
-        this.state.phone = partner?.phone || "";
         this.state.street = partner?.street || "";
         this.state.city = partner?.city || "";
         this.state.countryId = partner?.country_id?.id || null;
         this.state.stateId = partner?.state_id?.id || null;
         this.state.zip = partner?.zip || "";
+        // Parse phone into prefix + local digits
+        const phone = partner?.phone || "";
+        if (phone.startsWith("+")) {
+            const sorted = [...this.allCountries].sort(
+                (a, b) => String(b.phone_code).length - String(a.phone_code).length
+            );
+            const matched = sorted.find((c) => phone.startsWith("+" + c.phone_code));
+            if (matched) {
+                this.state.phoneCountryId = matched.id;
+                this.state.phoneLocal = phone.slice(("+" + matched.phone_code).length).trim();
+            } else {
+                this.state.phoneLocal = phone;
+            }
+        } else {
+            this.state.phoneLocal = phone;
+        }
     }
 
     get existingPartners() {
@@ -110,12 +125,39 @@ export class PresetInfoPopup extends Component {
         return country?.state_ids || [];
     }
 
+    flagEmoji(code) {
+        return [...code.toUpperCase()]
+            .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+            .join("");
+    }
+
+    get allCountries() {
+        return this.selfOrder.models["res.country"]
+            .getAll()
+            .filter((c) => c.phone_code)
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    get selectedCountry() {
+        return this.selfOrder.models["res.country"].get(this.state.phoneCountryId);
+    }
+
+    get phonePrefix() {
+        const country = this.selectedCountry;
+        return country?.phone_code ? `+${country.phone_code}` : "";
+    }
+
+    get fullPhone() {
+        const local = this.state.phoneLocal.trim();
+        return local ? this.phonePrefix + local : "";
+    }
+
     get validSelection() {
         return this.selfOrder.isValidSelection(this.selfOrder.currentOrder.raw.preset_time, {
             id: parseInt(this.state.selectedPartnerId),
             name: this.state.name,
             email: this.state.email,
-            phone: this.state.phone,
+            phone: this.fullPhone,
             street: this.state.street,
             city: this.state.city,
             country_id: this.state.countryId,
@@ -130,6 +172,6 @@ export class PresetInfoPopup extends Component {
     }
 
     checkPhoneFormat() {
-        return !this.state.phone || isValidPhone(this.state.phone);
+        return !this.state.phoneLocal || isValidPhone(this.fullPhone);
     }
 }
