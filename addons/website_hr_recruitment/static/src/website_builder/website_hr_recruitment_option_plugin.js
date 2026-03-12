@@ -2,6 +2,7 @@ import { BaseOptionComponent } from "@html_builder/core/utils";
 import { Plugin } from "@html_editor/plugin";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
+import { withSequence } from "@html_editor/utils/resource";
 
 export class JobsPageOption extends BaseOptionComponent {
     static template = "website_hr_recruitment.JobsPageOption";
@@ -15,6 +16,11 @@ class WebsiteHrRecruitmentPageOption extends Plugin {
     static id = "websiteHrRecruitmentPageOption";
     resources = {
         builder_options: [JobsPageOption],
+        popup_show_on_options: withSequence(30, {
+            value: "allJobs",
+            label: _t("All Jobs"),
+            pageSelector: "main:has(.js_hr_recruitment)",
+        }),
     };
 }
 

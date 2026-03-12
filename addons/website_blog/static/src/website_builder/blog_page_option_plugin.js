@@ -1,6 +1,7 @@
 import { BuilderAction } from "@html_builder/core/builder_action";
 import { BaseOptionComponent, useDomState } from "@html_builder/core/utils";
 import { Plugin } from "@html_editor/plugin";
+import { withSequence } from "@html_editor/utils/resource";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 
@@ -30,6 +31,11 @@ export class BlogPageOptionPlugin extends Plugin {
         builder_actions: {
             SetRecommendedNextPostAction,
         },
+        popup_show_on_options: withSequence(10, {
+            value: "allBlogs",
+            label: _t("All Blogs"),
+            pageSelector: "main:has(#o_wblog_post_main)",
+        }),
     };
 }
 

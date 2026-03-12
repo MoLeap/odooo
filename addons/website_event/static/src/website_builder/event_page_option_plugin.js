@@ -32,6 +32,11 @@ export class EventPageOptionPlugin extends Plugin {
         builder_actions: {
             DisplaySubMenuAction,
         },
+        popup_show_on_options: withSequence(40, {
+            value: "allEvents",
+            label: _t("All Events"),
+            pageSelector: "main:has(.o_wevent_event)",
+        }),
     };
 }
 

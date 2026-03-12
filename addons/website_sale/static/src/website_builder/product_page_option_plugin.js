@@ -6,6 +6,8 @@ import { isImageCorsProtected } from "@html_editor/utils/image";
 import { TABS } from "@html_editor/main/media/media_dialog/media_dialog";
 import { WebsiteConfigAction, PreviewableWebsiteConfigAction } from "@website/builder/plugins/customize_website_plugin";
 import { BuilderAction } from "@html_builder/core/builder_action";
+import { withSequence } from "@html_editor/utils/resource";
+import { _t } from "@web/core/l10n/translation";
 import wSaleUtils from "@website_sale/js/website_sale_utils";
 
 class ProductPageOptionPlugin extends Plugin {
@@ -76,6 +78,12 @@ class ProductPageOptionPlugin extends Plugin {
                 value: ProductPageOption.selector,
             },
         ],
+        popup_container_selectors: withSequence(5, "#product_full_description"),
+        popup_show_on_options: withSequence(30, {
+            value: "allProducts",
+            label: _t("All Products"),
+            pageSelector: ".o_wsale_product_page",
+        }),
     };
 
     setup() {
