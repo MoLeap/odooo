@@ -52,10 +52,6 @@
             <BuilderCheckbox actionParam="{views: ['website_blog.opt_blog_cover_post_fullwidth_design']}"/>
         </BuilderRow>
 
-        <!-- Posts Options -->
-        <div class="options-container-section-title ps-2 pt-3 pb-1 fw-bold">Posts</div>
-        <hr class="mx-2 mt-0 mb-2"/>
-
         <!-- Style: global setting for the all-blogs homepage -->
         <t t-if="!state.isOnBlogPage">
             <BuilderRow label.translate="Style">
@@ -111,6 +107,17 @@
                 </BuilderSelect>
             </BuilderRow>
 
+            <!-- Size -->
+            <t t-if="this.isActiveItem('blog_posts_bordered_grid_opt') or (this.isActiveItem('blog_posts_grid_opt') and !this.isActiveItem('blog_posts_promoted_opt'))">
+                <BuilderRow label.translate="Size" level="1">
+                    <BuilderSelect>
+                        <BuilderSelectItem id="'blog_posts_columns_2_opt'" actionParam="{views: ['website_blog.opt_blog_grid_columns_2']}">2 Columns</BuilderSelectItem>
+                        <BuilderSelectItem id="'blog_posts_columns_3_opt'" actionParam="{views: ['website_blog.opt_blog_grid_columns_3']}">3 Columns</BuilderSelectItem>
+                        <BuilderSelectItem id="'blog_posts_columns_4_opt'" actionParam="{views: ['website_blog.opt_blog_grid_columns_4']}">4 Columns</BuilderSelectItem>
+                    </BuilderSelect>
+                </BuilderRow>
+            </t>
+
             <!-- Promote latest Post -->
             <t t-if="this.isActiveItem('blog_posts_grid_opt') and !this.isActiveItem('blog_posts_split_grid_opt') and !this.isActiveItem('blog_posts_bordered_grid_opt')">
                 <BuilderRow
@@ -118,10 +125,14 @@
                     tooltip.translate="Emphasize the most recent post in the blog posts list"
                     level="1"
                 >
-                    <BuilderCheckbox actionParam="{views: ['website_blog.opt_blog_promoted_post']}"/>
+                    <BuilderCheckbox
+                        id="'blog_posts_promoted_opt'"
+                        actionParam="{views: ['website_blog.opt_blog_promoted_post']}"
+                    />
                 </BuilderRow>
             </t>
 
+            <!-- Cards Design -->
             <t t-if="this.isActiveItem('blog_posts_grid_opt')">
                 <BuilderRow label.translate="Cards Design" level="1">
                     <BuilderCheckbox actionParam="{views: ['website_blog.opt_blog_cards_design']}"/>
@@ -200,11 +211,26 @@
                     </BuilderSelectItem>
                 </BuilderSelect>
             </BuilderRow>
+
+            <!-- Size -->
+            <t t-if="this.isActiveItem('blog_layout_grid_opt') or this.isActiveItem('blog_layout_bordered_grid_opt')">
+                <BuilderRow label.translate="Size" level="1">
+                    <BuilderSelect>
+                        <BuilderSelectItem id="'blog_posts_columns_2_opt'" actionParam="{views: ['website_blog.opt_blog_grid_columns_2']}">2 Columns</BuilderSelectItem>
+                        <BuilderSelectItem id="'blog_posts_columns_3_opt'" actionParam="{views: ['website_blog.opt_blog_grid_columns_3']}">3 Columns</BuilderSelectItem>
+                        <BuilderSelectItem id="'blog_posts_columns_4_opt'" actionParam="{views: ['website_blog.opt_blog_grid_columns_4']}">4 Columns</BuilderSelectItem>
+                    </BuilderSelect>
+                </BuilderRow>
+            </t>
         </t>
 
-        <!-- Post Cover -->
+        <!-- Text & content Options -->
+        <div class="options-container-section-title ps-2 pt-3 pb-1 fw-bold">Text &amp; content</div>
+        <hr class="mx-2 mt-0 mb-2"/>
+
+        <!-- Cover image -->
         <t t-if="!this.isActiveItem('blog_posts_simple_list_opt') and !this.isActiveItem('blog_posts_compact_list_opt') and !this.isActiveItem('blog_posts_split_grid_opt')">
-            <BuilderRow label.translate="Post Cover" level="1">
+            <BuilderRow label.translate="Cover image">
                 <BuilderCheckbox
                     actionParam="{views: ['website_blog.opt_posts_loop_show_cover']}"/>
             </BuilderRow>

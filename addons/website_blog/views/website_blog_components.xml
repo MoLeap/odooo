@@ -162,7 +162,7 @@
 <template id="post_author">
     <div class="o_not_editable">
         <t t-out="blog_post.author_name"/><span
-            t-if="opt_posts_loop_show_date and (opt_blog_list_view or opt_blog_large_list_view or (opt_blog_grid_view and not opt_blog_cards_design))"
+            t-if="opt_posts_loop_show_date and (opt_blog_list_view or opt_blog_large_list_view or opt_blog_grid_view)"
             t-att-class="(opt_blog_list_view or opt_blog_large_list_view) and 'd-lg-none' or ''"
         >&#44;</span>
     </div>

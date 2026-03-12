@@ -220,8 +220,14 @@ according to the enabled options.
                 <!-- Define 'colWidth' qWeb variable, to be assigned later.
                 Adjust accordingly if sidebar and/or readability modes are active. -->
                 <t t-if="opt_blog_grid_view">
-                    <t t-if="opt_blog_sidebar_show" t-set="colWidth" t-value="'col-md-6 col-xl-4'"/>
-                    <t t-else="" t-set="colWidth" t-value="'col-md-6 col-lg-4'"/>
+                    <t t-set="colWidth" t-value="'col-md-6'"/>
+                    <t t-set="_grid_cols" t-value="
+                        2 if is_view_active('website_blog.opt_blog_grid_columns_2') else
+                        4 if is_view_active('website_blog.opt_blog_grid_columns_4') else
+                        3
+                    "/>
+                    <t t-if="_grid_cols == 3" t-set="colWidth" t-value="colWidth + ' col-lg-4'"/>
+                    <t t-elif="_grid_cols == 4" t-set="colWidth" t-value="colWidth + ' col-lg-3'"/>
                 </t>
                 <!-- Loop through posts: exclude the first one if already displayed as top banner -->
                 <t t-foreach="posts" t-as="blog_post">
@@ -445,5 +451,10 @@ according to the enabled options.
 <template id="opt_posts_loop_date_format_dd_MMM" name="Date format: DD MMM" inherit_id="website_blog.posts_loop" active="False"/>
 <template id="opt_posts_loop_date_format_dd_MMM_yyyy" name="Date format: DD MMM YYYY" inherit_id="website_blog.posts_loop" active="False"/>
 <template id="opt_posts_loop_date_format_dd_MM_yyyy" name="Date format: DD/MM/YYYY" inherit_id="website_blog.posts_loop" active="False"/>
+
+<!-- (Option) Grid: Number of columns (mutually exclusive; 3 is the default) -->
+<template id="opt_blog_grid_columns_2" name="Grid: 2 Columns" inherit_id="website_blog.posts_loop" active="False"/>
+<template id="opt_blog_grid_columns_3" name="Grid: 3 Columns" inherit_id="website_blog.posts_loop" active="True"/>
+<template id="opt_blog_grid_columns_4" name="Grid: 4 Columns" inherit_id="website_blog.posts_loop" active="False"/>
 
 </odoo>
