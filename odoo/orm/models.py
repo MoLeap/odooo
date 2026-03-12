@@ -3756,12 +3756,13 @@ class BaseModel(metaclass=MetaModel):
             instance) for ``self`` in cache.
         """
         # determine which fields can be prefetched
+        batch_prefetch_limit = self.env.context.get('batch_prefetch_limit', 1000)
         if self.env.context.get('prefetch_fields', True) and field.prefetch:
             fnames = [
                 name
                 for name, f in self._fields.items()
                 # select fields with the same prefetch group
-                if f.prefetch == field.prefetch
+                if f.prefetch == field.prefetch and (len(self.ids) < batch_prefetch_limit or f._get_cache(self.env))
                 # discard fields with groups that the user may not access
                 if self._has_field_access(f, 'read')
             ]
