@@ -56,6 +56,12 @@
             </t>
         </BuilderSelect>
     </BuilderRow>
+    <BuilderRow label="' '" level="1" t-if="this.isShowOnOptionUnavailable()">
+        <div class="small text-warning ps-1">
+            <i class="fa fa-exclamation-triangle me-1"/>
+            <t t-out="this.unavailableShowOnWarningMessage"/>
+        </div>
+    </BuilderRow>
 </t>
 
 <t t-name="website.PopupCookiesOption">

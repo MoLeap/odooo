@@ -280,11 +280,18 @@ describe("Popup 'Show on' dropdown", () => {
             class extends Plugin {
                 static id = "showOnTestPlugin";
                 resources = {
-                    popup_show_on_options: withSequence(30, {
-                        value: "allTests",
-                        label: "All Tests",
-                        pageSelector: ".o_test_page",
-                    }),
+                    popup_show_on_options: [
+                        withSequence(30, {
+                            value: "allTests",
+                            label: "All Tests",
+                            pageSelector: ".o_test_page",
+                        }),
+                        withSequence(31, {
+                            value: "allProducts",
+                            label: "All Products",
+                            pageSelector: ".o_wsale_product_page",
+                        }),
+                    ],
                     popup_container_selectors: withSequence(1, ".o_test_page"),
                 };
             }
@@ -359,6 +366,63 @@ describe("Popup 'Show on' dropdown", () => {
         await contains(".o_popover[role=menu] [data-action-value='currentPage']").click();
         await animationFrame();
         expect(":iframe .s_popup").toHaveAttribute("data-show-on", "currentPage");
+        expect(":iframe .s_popup[data-show-on-selector]").toHaveCount(0);
+    });
+
+    test("moving popup to product shared area relocates it to #o_shared_blocks with allProducts attrs", async () => {
+        const { waitSidebarUpdated } = await setupWebsiteBuilder(
+            `<div class="o_wsale_product_page">
+                <div class="oe_structure oe_empty oe_structure_not_nearest" id="oe_structure_website_sale_product_1"></div>
+                <div id="product_full_description" class="oe_structure oe_empty mt16">
+                    ${popupSnippetHtml}
+                </div>
+            </div>`,
+            {
+                footerContent: `<div id="o_shared_blocks"></div>`,
+            }
+        );
+        await contains(":iframe .s_popup section p").click();
+        await waitSidebarUpdated();
+        await contains(".o_overlay_options .o_move_handle").dragAndDrop(
+            ":iframe #oe_structure_website_sale_product_1"
+        );
+        await animationFrame();
+        expect(":iframe #o_shared_blocks .s_popup").toHaveCount(1);
+        expect(":iframe .s_popup").toHaveAttribute("data-show-on", "allProducts");
+        expect(":iframe .s_popup").toHaveAttribute(
+            "data-show-on-selector",
+            ".o_wsale_product_page"
+        );
+    });
+
+    test("stale show-on value displays warning and resolves after selecting an available value", async () => {
+        const { waitSidebarUpdated } = await setupWebsiteBuilder(
+            `<div class="test-popup-container">
+                <div class="s_popup" id="sPopup1" data-snippet="s_popup" data-name="Popup"
+                     data-show-on="allUnavailable" data-show-on-selector=".o_missing_page">
+                    <div class="modal s_popup_middle"
+                         data-display="afterDelay" data-show-after="5000" data-consents-duration="7"
+                         data-bs-focus="false" data-bs-backdrop="false">
+                        <div class="modal-dialog d-flex">
+                            <div class="modal-content oe_structure">
+                                <div class="s_popup_close js_close_popup">×</div>
+                                <section><p>Popup content</p></section>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`
+        );
+        await contains(":iframe .s_popup section p").click();
+        await waitSidebarUpdated();
+        expect("[data-label='Show on'] button.o-dropdown").toHaveText("None");
+        expect(".text-warning:contains(module uninstalled)").toHaveCount(1);
+
+        await contains("[data-label='Show on'] button.o-dropdown").click();
+        await contains(".o_popover[role=menu] [data-action-value='allPages']").click();
+        await animationFrame();
+        expect(".text-warning:contains(module uninstalled)").toHaveCount(0);
+        expect(":iframe .s_popup").toHaveAttribute("data-show-on", "allPages");
         expect(":iframe .s_popup[data-show-on-selector]").toHaveCount(0);
     });
 });

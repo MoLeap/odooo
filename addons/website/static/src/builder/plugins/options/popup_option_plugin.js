@@ -1,5 +1,5 @@
 import { BuilderAction } from "@html_builder/core/builder_action";
-import { BaseOptionComponent } from "@html_builder/core/utils";
+import { BaseOptionComponent, useDomState } from "@html_builder/core/utils";
 import { SNIPPET_SPECIFIC, SNIPPET_SPECIFIC_END } from "@html_builder/utils/option_sequence";
 import { Plugin } from "@html_editor/plugin";
 import { withSequence } from "@html_editor/utils/resource";
@@ -10,9 +10,12 @@ export const POPUP = SNIPPET_SPECIFIC;
 export const COOKIES_BAR = SNIPPET_SPECIFIC_END;
 
 const SHARED_POPUPS_CONTAINER_SELECTOR = "#o_shared_blocks";
+const PRODUCT_SHARED_BLOCKS_SELECTOR =
+    "[id^='oe_structure_website_sale_product_'].oe_structure_not_nearest";
 const PAGE_SPECIFIC_POPUPS_CONTAINER_SELECTOR = "main .oe_structure.o_savable";
 const SHOW_ON_CURRENT_PAGE_VALUE = "currentPage";
 const SHOW_ON_ALL_PAGES_VALUE = "allPages";
+const SHOW_ON_ALL_PRODUCTS_VALUE = "allProducts";
 
 export class PopupOption extends BaseOptionComponent {
     static template = "website.PopupOption";
@@ -20,9 +23,43 @@ export class PopupOption extends BaseOptionComponent {
     static exclude = "#website_cookies_bar";
     static applyTo = ".modal";
 
+    getPopupElement() {
+        const editingElement = this.env.getEditingElement?.();
+        return editingElement?.closest(".s_popup");
+    }
+
     setup() {
         super.setup();
         this.showOnOptions = this.getResource("popup_show_on_options");
+        this.domState = useDomState((editingElement) => {
+            const popupEl = editingElement?.closest(".s_popup");
+            const showOn = popupEl?.dataset.showOn || "";
+            const hasMatch = this.showOnOptions.some((option) => option.value === showOn);
+            const isUnavailableShowOn = !!showOn && !hasMatch;
+            return { showOn, isUnavailableShowOn };
+        });
+        this.unavailableShowOnWarningMessage = _t(
+            "The selected visibility target is unavailable (module uninstalled). Choose one of the available values."
+        );
+    }
+
+    isShowOnOptionUnavailable() {
+        if ("isUnavailableShowOn" in this.domState) {
+            return this.domState.isUnavailableShowOn;
+        }
+        const popupEl = this.getPopupElement();
+        const showOn = popupEl?.dataset.showOn;
+        const hasMatch = this.showOnOptions.some((option) => option.value === showOn);
+        const isUnavailable = !!showOn && !hasMatch;
+        return isUnavailable;
+    }
+
+    get unavailableShowOnValue() {
+        if ("showOn" in this.domState) {
+            return this.domState.showOn;
+        }
+        const value = this.getPopupElement()?.dataset.showOn || "";
+        return value;
     }
 }
 
@@ -104,7 +141,9 @@ class PopupOptionPlugin extends Plugin {
     onSnippetDropped({ snippetEl }) {
         if (snippetEl.matches(".s_popup")) {
             this.relocatePopup(snippetEl);
-            snippetEl.dataset.showOn = SHOW_ON_CURRENT_PAGE_VALUE;
+            if (!snippetEl.dataset.showOn) {
+                snippetEl.dataset.showOn = SHOW_ON_CURRENT_PAGE_VALUE;
+            }
             this.assignUniqueID(snippetEl);
             this.dependencies.history.addCustomMutation({
                 apply: () => {
@@ -142,6 +181,22 @@ class PopupOptionPlugin extends Plugin {
     relocatePopup(editingElement) {
         const popupEl = editingElement.closest(".s_popup");
         if (popupEl.closest(SHARED_POPUPS_CONTAINER_SELECTOR)) {
+            return;
+        }
+        if (popupEl.closest(PRODUCT_SHARED_BLOCKS_SELECTOR)) {
+            const sharedBlocksEl = this.editable.querySelector(SHARED_POPUPS_CONTAINER_SELECTOR);
+            const allProductsOption = this.getResource("popup_show_on_options").find(
+                (showOnOption) => showOnOption.value === SHOW_ON_ALL_PRODUCTS_VALUE
+            );
+            if (sharedBlocksEl && allProductsOption) {
+                sharedBlocksEl.insertAdjacentElement("afterbegin", popupEl);
+                popupEl.dataset.showOn = allProductsOption.value;
+                if (allProductsOption.pageSelector) {
+                    popupEl.dataset.showOnSelector = allProductsOption.pageSelector;
+                } else {
+                    delete popupEl.dataset.showOnSelector;
+                }
+            }
             return;
         }
         const containerEl = getPopupContainerFromSelectors(
