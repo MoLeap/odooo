@@ -1,4 +1,4 @@
-import { onWillRender, useLayoutEffect, useState } from "@web/owl2/utils";
+import { onWillRender, useLayoutEffect, useRef, useState } from "@web/owl2/utils";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useTrackedAsync } from "@point_of_sale/app/hooks/hooks";
@@ -29,6 +29,7 @@ import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { OptionalProductPopup } from "@point_of_sale/app/components/popups/optional_products_popup/optional_products_popup";
 import { useRouterParamsChecker } from "@point_of_sale/app/hooks/pos_router_hook";
 import { debounce } from "@web/core/utils/timing";
+import { useSortable } from "@web/core/utils/sortable_owl";
 
 const { DateTime } = luxon;
 
@@ -125,13 +126,56 @@ export class ProductScreen extends Component {
             },
             () => [this.currentOrder, this.currentOrder.totalQuantity]
         );
+
+        useSortable({
+            ref: useRef("productsRoot"),
+            elements: ".product-sortable",
+            cursor: "move",
+            tolerance: 10,
+            connectGroups: false,
+            onDragStart: () => {
+                this.longPressHandlers.onMouseUp();
+                this.longPressHandlers.onTouchEnd();
+            },
+            onDrop: async (params) => this._sortDrop(params),
+        });
     }
 
-    onMouseDown(event, product) {
-        this.longPressHandlers.onMouseDown(event, product);
+    async _sortDrop({ element, previous, next }) {
+        const elementId = Number(element.dataset.productId);
+        let currentSeq = 0;
+        if (previous) {
+            if (previous.dataset.pos_sequence) {
+                const previousSeq = Number(previous.dataset.pos_sequence);
+                currentSeq = previousSeq + 1;
+            } else {
+                currentSeq = 1;
+            }
+        }
+
+        await this.pos.data.write("product.template", [elementId], { pos_sequence: currentSeq });
+
+        while (next) {
+            if (next == element) {
+                next = next.nextElementSibling;
+            }
+            const nextSeq = Number(next.dataset.pos_sequence);
+            if (nextSeq > currentSeq) {
+                break;
+            }
+            currentSeq += 1;
+            await this.pos.data.write("product.template", [Number(next.dataset.productId)], {
+                pos_sequence: currentSeq,
+            });
+            next = next.nextElementSibling;
+        }
     }
 
-    onTouchStart(product) {
+    onPointerDown(event, product) {
+        if (event.pointerType == "mouse") {
+            this.longPressHandlers.onMouseDown(event, product);
+            return;
+        }
         this.longPressHandlers.onTouchStart(product);
     }
 
