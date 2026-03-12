@@ -217,3 +217,36 @@
 .o-mail-Composer-suggestionPartner-name.o-has-email {
     max-width: 70%;
 }
+
+/* Global mobile optimization for composer */
+.o-mail-Composer.o-isUiSmall {
+    .o-mail-Composer-inputStyle, .o-mail-Composer-html {
+        font-size: 1.1rem;
+    }
+    .o-mail-Composer-actions {
+        padding: 2px;
+        gap: 6px;
+        button {
+            width: 44px;
+            height: 44px;
+            padding: 0 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50% !important;
+
+            i {
+                font-size: 1.5rem !important; /* Force icons to be large */
+                scale: 1 !important; /* Undo any default Odoo shrinking */
+            }
+        }
+    }
+    .o-mail-Composer-send.btn-link {
+        width: 44px;
+        height: 44px;
+        i.fa-paper-plane-o {
+            font-size: 1.4rem !important;
+            transform: translateX(-1px); /* Optical alignment for the plane */
+        }
+    }
+}
