@@ -1,0 +1,37 @@
+.o_text_shadow_popover {
+    min-width: unset;
+    width: 300px;
+    overflow-y: auto;
+}
+
+.o-hb-text-shadow-text {
+    flex: 1;
+}
+
+.o-hb-text-shadow-button {
+    border-width: 0;
+    padding: 0;
+    &::before {
+        color: #{$o-we-color-global};
+    }
+
+    &:hover::before {
+        color: lighten($o-we-color-global, 50%);
+    }
+}
+
+.dropdown-toggle .o-hb-text-shadow-button {
+    display: none;
+}
+
+.o-hb-text-effect-presets {
+    button.btn.o-hb-btn {
+        width: 100%;
+        background-color: white;
+        border-color: transparent;
+
+        &:hover {
+            background-color: #{$o-brand-lightsecondary};
+        }
+    }
+}
