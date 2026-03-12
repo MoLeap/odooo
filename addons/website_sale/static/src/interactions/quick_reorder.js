@@ -137,29 +137,61 @@ export class QuickReorder extends Interaction {
         const data = await this.waitFor(rpc('/shop/cart/quick_add', {
             product_template_id: productTemplateId,
             product_id: productId,
-            quantity: quantity,
+            quantity,
             ...(isCombo && { linked_products: linkedProducts }),
         }));
 
-        data['website_sale.shorter_cart_summary'] = markup(
-            data['website_sale.shorter_cart_summary']
+        data['website_sale.quick_reorder_history'] = markup(
+            data['website_sale.quick_reorder_history']
         );
-        data['website_sale.cart_lines'] = markup(data['website_sale.cart_lines']);
+        data['website_sale.suggested_products_list'] = markup(
+            data['website_sale.suggested_products_list']
+        );
 
-        // Add the product to the cart and update the DOM.
-        const cart = this.el.closest('#shop_cart');
-        const cartSummary = document.querySelector('.o_wsale_shorter_cart_summary');
-        // `updateCartNavBar` regenerates the cart lines and `updateQuickReorderSidebar` regenerates
-        // the quick reorder products, so we need to stop and start interactions to make sure the
-        // regenerated cart lines and reorder products are properly handled.
-        this.services['public.interactions'].stopInteractions(cart);
-        this.services['public.interactions'].stopInteractions(cartSummary);
-        wSaleUtils.updateCartNavBar(data);
-        wSaleUtils.updateQuickReorderSidebar(data);
-        this.services['public.interactions'].startInteractions(cart);
-        this.services['public.interactions'].startInteractions(cartSummary);
+        const suggestedProductsSelector = 'div#cart_suggested_products'
 
-        // Move the focus to the next quantity input.
+        // `updateQuickReorderSidebar` and `updateCartSummary` regenerates the quick reorder
+        // products and cart summary, so we need to stop and start interactions to make sure the
+        // regenerated reorder products and cart summary are properly handled.
+        if (!data.old_cart_quantity) {
+            // Update cart summary too if the cart was empty
+            const cartSummary = document.querySelector('.o_wsale_shorter_cart_summary');
+            data['website_sale.shorter_cart_summary'] = markup(
+                data['website_sale.shorter_cart_summary']
+            );
+
+            // Stop interactions before DOM regeneration
+            this.services['public.interactions'].stopInteractions(this.el);
+            this.services['public.interactions'].stopInteractions(cartSummary);
+            this.services['public.interactions'].stopInteractions(document.querySelector(suggestedProductsSelector));
+
+            wSaleUtils.updateCartSummary(data);
+            wSaleUtils.updateCartAccessories(data);
+            wSaleUtils.updateQuickReorderSidebar(data);
+
+            // we just need to start interactions on the cart totals
+            // rest would be handled by component itself
+            const cartTotals = document.querySelector('div.o_cart_total');
+            this.services['public.interactions'].startInteractions(cartTotals);
+            this.services['public.interactions'].startInteractions(document.querySelector(suggestedProductsSelector));
+            this.services['public.interactions'].startInteractions(cartSummary);
+            this.services['public.interactions'].startInteractions(this.el);
+        } else {
+            // Only quick reorder sidebar is regenerated
+            this.services['public.interactions'].stopInteractions(this.el);
+            this.services['public.interactions'].stopInteractions(document.querySelector(suggestedProductsSelector));
+            wSaleUtils.updateCartAccessories(data);
+            wSaleUtils.updateQuickReorderSidebar(data);
+            this.services['public.interactions'].startInteractions(document.querySelector(suggestedProductsSelector));
+            this.services['public.interactions'].startInteractions(this.el);
+        }
+
+        wSaleUtils.updateCartIcon(data.cart_quantity);
+
+        // Update cart lines and totals
+        await this.services.cart.bus.trigger('cart_update');
+
+        // Move the focus to the next quantity input
         this._focusNextQuantityInput(currentButtonIndex);
     }
 

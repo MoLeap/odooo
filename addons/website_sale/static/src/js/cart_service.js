@@ -1,4 +1,5 @@
-import { reactive } from "@web/owl2/utils";
+import { EventBus, markup } from '@odoo/owl';
+import { reactive } from '@web/owl2/utils';
 import {
     ComboConfiguratorDialog
 } from '@sale/js/combo_configurator_dialog/combo_configurator_dialog';
@@ -16,6 +17,7 @@ import { session } from '@web/session';
 import {
     CartNotificationContainer
 } from '@website_sale/js/cart_notification/cart_notification_container/cart_notification_container';
+import wSaleUtils from '@website_sale/js/website_sale_utils';
 
 const { DateTime } = luxon;
 const AUTOCLOSE_NOTIFICATION_DELAY = 4000;
@@ -40,7 +42,7 @@ const AUTOCLOSE_NOTIFICATION_DELAY = 4000;
  * provide relevant information when adding a product to the cart.
  */
 export class CartService {
-    static dependencies = ['dialog'];
+    static dependencies = ['dialog', 'public.interactions'];
 
     /**
      * Creates an instance of the service and initializes it using the {@link setup} method.
@@ -67,8 +69,10 @@ export class CartService {
      */
     setup(_env, services) {
         this.dialog = services.dialog;
+        this.interactions = services['public.interactions'];
         this.rpc = rpc;  // To be overridable in tests.
         this.notifications = reactive(new Set());
+        this.bus = new EventBus();
 
         // Register the notification container
         registry.category('main_components').add('CartNotificationContainer',
@@ -78,9 +82,10 @@ export class CartService {
             }
         );
 
-        // Only expose `add` in the service registry.
         return {
+            bus: this.bus,
             add: (...args) => this.add(...args),
+            update: (...args) => this.update(...args),
             showWarning: (...args) => this.showWarning(...args),
         };
     }
@@ -237,6 +242,37 @@ export class CartService {
             shouldRedirectToCart: isBuyNow,
             ...rest
         });
+    }
+
+    async update(lineId, productId = undefined, quantity, onCartPage = false) {
+        const data = await this.rpc('/shop/cart/update', {
+            line_id: lineId,
+            product_id: productId,
+            quantity: quantity,
+        });
+
+        if (onCartPage & !data.cart_quantity) {
+            return redirect('/shop/cart');
+        }
+
+        wSaleUtils.updateCartIcon(data.cart_quantity);
+        this.bus.trigger('cart_update');
+        this.bus.trigger('cart_amount_changed', [data.amount, data.minor_amount]);
+
+        // Why are you making cart_service ugly? :(
+        data['website_sale.suggested_products_list'] = markup(data['website_sale.suggested_products_list']);
+        data['website_sale.quick_reorder_history'] = markup(data['website_sale.quick_reorder_history']);
+
+        const reorderSideBarSelector = '#quick_reorder_sidebar'
+        const suggestedProductsSelector = 'div#cart_suggested_products'
+        this.interactions.stopInteractions(document.querySelector(suggestedProductsSelector));
+        this.interactions.stopInteractions(document.querySelector(reorderSideBarSelector));
+        wSaleUtils.updateCartAccessories(data);
+        wSaleUtils.updateQuickReorderSidebar(data);
+        this.interactions.startInteractions(document.querySelector(reorderSideBarSelector));
+        this.interactions.startInteractions(document.querySelector(suggestedProductsSelector));
+
+        wSaleUtils.showWarning(data.warning);
     }
 
     /**
@@ -494,7 +530,7 @@ export class CartService {
         if (data.cart_quantity && (
             data.cart_quantity !== browser.sessionStorage.getItem('website_sale_cart_quantity')
         )) {
-            this._updateCartIcon(data.cart_quantity);
+            wSaleUtils.updateCartIcon(data.cart_quantity);
         };
         for (const notification of data.notifications) {
             this._showCartNotification(notification);
@@ -503,33 +539,6 @@ export class CartService {
             this._trackProducts(data.tracking_info);
         }
         return data.quantity;
-    }
-
-    /**
-     * Update the quantity on the cart icon in the navbar.
-     *
-     * @param {Number} cartQuantity - The number of items currently in the cart.
-     *
-     * @returns {void}
-     */
-    _updateCartIcon(cartQuantity) {
-        browser.sessionStorage.setItem('website_sale_cart_quantity', cartQuantity);
-        // Mobile and Desktop elements have to be updated.
-        const cartQuantityElements = document.querySelectorAll('.my_cart_quantity');
-        for(const cartQuantityElement of cartQuantityElements) {
-            if (cartQuantity === 0) {
-                cartQuantityElement.classList.add('d-none');
-            } else {
-                const cartIconElement = document.querySelector('li.o_wsale_my_cart');
-                cartIconElement.classList.remove('d-none');
-                cartQuantityElement.classList.remove('d-none');
-                cartQuantityElement.classList.add('o_mycart_zoom_animation');
-                setTimeout(() => {
-                    cartQuantityElement.textContent = cartQuantity;
-                    cartQuantityElement.classList.remove('o_mycart_zoom_animation');
-                }, 300);
-            }
-        }
     }
 
     /**
@@ -560,7 +569,7 @@ export class CartService {
 
 export const cartService = {
     dependencies: CartService.dependencies,
-    async: ['add'],
+    async: ['add', 'update'],
     start(env, dependencies) {
         return new CartService(env, dependencies);
     },

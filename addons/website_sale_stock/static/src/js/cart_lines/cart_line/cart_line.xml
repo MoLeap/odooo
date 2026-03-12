@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates>
+    <t t-inherit="website_sale.CartLinesQuantity" t-inherit-mode="extension">
+        <button name="add_quantity" position="attributes">
+            <attribute name="t-on-click">
+                props.maxQuantity == props.displayedQuantity ? () => {} : () => this.updateQuantity(state.quantity + 1)
+            </attribute>
+        </button>
+    </t>
+</templates>
