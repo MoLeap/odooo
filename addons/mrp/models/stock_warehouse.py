@@ -3,6 +3,7 @@
 
 from odoo import api, Command, fields, models, _
 from odoo.exceptions import ValidationError, UserError
+from odoo.osv.expression import Domain
 from odoo.tools import split_every
 
 
@@ -44,17 +45,25 @@ class StockWarehouse(models.Model):
 
     def _compute_manufacture_to_resupply(self):
         for warehouse in self:
-            manufacture_route = warehouse.manufacture_pull_id.route_id
-            warehouse.manufacture_to_resupply = warehouse.id in manufacture_route.warehouse_ids.ids
+            warehouse.manufacture_to_resupply = bool(self.env['stock.rule'].search_count([
+                ('action', '=', 'manufacture'),
+                ('warehouse_id', '=', warehouse.id),
+                ('route_id.warehouse_selectable', '=', True),
+                ('route_id.warehouse_ids', 'in', warehouse.id),
+            ], limit=1))
 
     def _inverse_manufacture_to_resupply(self):
         for warehouse in self:
-            manufacture_route = warehouse.manufacture_pull_id.route_id
-            if not manufacture_route:
-                manufacture_route = self.env['stock.rule'].search([
-                    ('action', '=', 'manufacture'), ('warehouse_id', '=', warehouse.id)]).route_id
-            if not manufacture_route:
-                continue
+            rules_domain = Domain([
+                ('action', '=', 'manufacture'),
+                ('warehouse_id', 'in', warehouse.id),
+                ('route_id.warehouse_selectable', '=', True),
+            ])
+            if not warehouse.manufacture_to_resupply:
+                rules_domain += Domain([('route_id.warehouse_ids', 'in', warehouse.id)])
+            manufacture_routes = self.env['stock.rule'].search(rules_domain).route_id
+            if not manufacture_routes and warehouse.manufacture_to_resupply:
+                raise UserError(self.env._('There is no existing configuration for manufacturing in this warehouse. Please set up the routes and rules before activating this option.'))
             if warehouse.manufacture_to_resupply:
                 manufacture_route.warehouse_ids = [Command.link(warehouse.id)]
             else:
