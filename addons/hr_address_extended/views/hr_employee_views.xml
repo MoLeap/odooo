@@ -15,7 +15,9 @@
                         class="o_address_city"
                         invisible="not private_country_enforce_cities"
                         options='{"no_open": True, "no_create": True}'
-                        domain="[('country_id', '=?', private_country_id), ('state_id', '=?', private_state_id)]"
+                        domain="[('country_id', '=?', private_country_id),
+                                 ('state_id', '=?', private_state_id if not (private_country_enforce_cities and private_zip) else False),
+                                 ('zipcode', '=?', private_zip if private_country_enforce_cities else False)]"
                         context="{'show_state': True}"/>
                 </xpath>
             </field>
