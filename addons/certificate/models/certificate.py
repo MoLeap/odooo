@@ -177,6 +177,9 @@ class CertificateCertificate(models.Model):
                     certificate.date_end = None
                     certificate.serial_number = None
                     certificate.loading_error = _("This certificate could not be loaded. Either the content or the password is erroneous.")
+                    if not certificate.pkcs12_password:
+                        # Don't show a loading error if no password are included
+                        certificate.loading_error = ""
                     continue
 
                 try:
@@ -220,6 +223,15 @@ class CertificateCertificate(models.Model):
             ('date_end', '>=', now),
             ('loading_error', '=', '')
         ]
+
+    @api.constrains('content', 'pem_certificate')
+    def _constrains_certificate_loaded(self):
+        for certificate in self:
+            if certificate.content and not certificate.pem_certificate:
+                raise UserError(
+                    certificate.loading_error
+                    or _("This certificate could not be loaded. Either the content or the password is erroneous.")
+                )
 
     @api.constrains('pem_certificate', 'private_key_id', 'public_key_id')
     def _constrains_certificate_key_compatibility(self):

@@ -30,6 +30,7 @@ class CrmIapLeadHelpers(models.Model):
 
     @api.model
     def lead_vals_from_response(self, lead_type, team_id, tag_ids, user_id, company_data, people_data):
+        # We have to keep the `people_data` for Clearbit, used in website lead generation, even thought D&B does not use it at all
         country_id = company_data.get('country_id')
         if not country_id:
             country_id = self.env['res.country'].search([('code', '=', company_data['country_code'])]).id
