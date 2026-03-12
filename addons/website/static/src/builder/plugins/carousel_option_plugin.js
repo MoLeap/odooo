@@ -52,6 +52,9 @@ export class CarouselOptionPlugin extends Plugin {
             SlideCarouselAction,
             ToggleControllersAction,
             ToggleCardImgAction,
+            SetCarouselTypeAction,
+            SetCarouselTimespanAction,
+            SetCarouselDurationAction,
         },
         on_cloned_handlers: this.onCloned.bind(this),
         on_snippet_dropped_handlers: this.onSnippetDropped.bind(this),
@@ -362,6 +365,94 @@ export class ToggleCardImgAction extends BuilderAction {
         const carouselEl = editingElement.closest(".carousel");
         const cardImgEl = carouselEl.querySelector(".o_card_img_wrapper");
         return !!cardImgEl;
+    }
+}
+
+const getTransitionDuration = (w, el) => {
+    const carouselItemEl = el.querySelector(".carousel-item");
+    return (
+        parseInt(el.style.getPropertyValue("--transition-duration")) ||
+        parseFloat(w.getComputedStyle(carouselItemEl).transitionDuration) * 1000 ||
+        600
+    );
+};
+
+const updateCarouselType = (el, typeClass) => {
+    el.classList.add("slide");
+    el.classList.remove("carousel-fade", "carousel-instant");
+    if (typeClass) {
+        el.classList.add(typeClass);
+    }
+};
+
+export class SetCarouselTypeAction extends BuilderAction {
+    static id = "setCarouselType";
+    isApplied({ editingElement, params: { mainParam: carouselTypeClass } }) {
+        if (carouselTypeClass) {
+            return editingElement.classList.contains(carouselTypeClass);
+        }
+        return !(
+            editingElement.classList.contains("carousel-fade") ||
+            editingElement.classList.contains("carousel-instant")
+        );
+    }
+    apply({ editingElement, params: { mainParam: carouselTypeClass } }) {
+        const wasCarouselInstant = editingElement.classList.contains("carousel-instant");
+        const isCarouselInstant = carouselTypeClass == "carousel-instant";
+
+        if (wasCarouselInstant == isCarouselInstant) {
+            updateCarouselType(editingElement, carouselTypeClass);
+            return;
+        }
+
+        if (wasCarouselInstant) {
+            // Remove the class "carousel-instant" before to compute the
+            // duration (otherwise transition-duration equals 0s)
+            updateCarouselType(editingElement, carouselTypeClass);
+        }
+        const duration = getTransitionDuration(this.window, editingElement);
+        const timespan = parseInt(editingElement.dataset.bsInterval, 10);
+        editingElement.dataset.bsInterval = timespan + (isCarouselInstant ? -duration : duration);
+        if (isCarouselInstant) {
+            // Add the class "carousel-instant" after to compute the
+            // duration (otherwise transition-duration equals 0s)
+            updateCarouselType(editingElement, carouselTypeClass);
+        }
+    }
+}
+
+export class SetCarouselTimespanAction extends BuilderAction {
+    static id = "setCarouselTimespan";
+    setup() {
+        this.preview = false;
+    }
+    apply({ editingElement, value }) {
+        const duration = getTransitionDuration(this.window, editingElement);
+        const timespan = parseInt(value);
+        editingElement.dataset.bsInterval = timespan + duration;
+    }
+    getValue({ editingElement }) {
+        const duration = getTransitionDuration(this.window, editingElement);
+        const timespan = parseInt(editingElement.dataset.bsInterval);
+        return timespan - duration;
+    }
+}
+
+export class SetCarouselDurationAction extends BuilderAction {
+    static id = "setCarouselDuration";
+    setup() {
+        this.preview = false;
+    }
+    apply({ editingElement, value }) {
+        const duration = getTransitionDuration(this.window, editingElement);
+        const timespan = parseInt(editingElement.dataset.bsInterval);
+        const newDuration = parseInt(value);
+        editingElement.dataset.bsInterval = timespan + (newDuration - duration);
+        editingElement.style.setProperty("--transition-duration", value);
+    }
+    getValue({ editingElement }) {
+        const duration = getTransitionDuration(this.window, editingElement);
+        return duration;
     }
 }
 

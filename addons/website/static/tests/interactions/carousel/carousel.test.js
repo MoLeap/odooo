@@ -73,9 +73,7 @@ const imageGalleryCarouselStyleSnippet = (bsRide, bsInterval) => `
         </div>
     </section>`;
 
-// TODO : Fix this test
-// -> It seems like the first slide of the carousel happen after more than 3s
-test.skip("Carousel - Autoplay: Always - 3s - s_carousel", async () => {
+test("Carousel - Autoplay: Always - 3s - s_carousel", async () => {
     const { core } = await startInteractions(defaultCarouselStyleSnippet("carousel", "3000"));
     expect(core.interactions).toHaveLength(1);
     expect(".carousel .carousel-item:nth-child(1)").toHaveClass("active");
@@ -90,9 +88,7 @@ test.skip("Carousel - Autoplay: Always - 3s - s_carousel", async () => {
     expect(".carousel .carousel-item:nth-child(3)").not.toHaveClass("active");
 });
 
-// TODO : Fix this test
-// -> It seems like the first slide of the carousel happen after more than 3s
-test.skip("Carousel - Autoplay: Always - 3s - s_image_gallery", async () => {
+test("Carousel - Autoplay: Always - 3s - s_image_gallery", async () => {
     const { core } = await startInteractions(imageGalleryCarouselStyleSnippet("carousel", "3000"));
     expect(core.interactions).toHaveLength(1);
     expect(".carousel .carousel-item:nth-child(1)").toHaveClass("active");
