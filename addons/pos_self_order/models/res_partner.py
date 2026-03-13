@@ -12,6 +12,6 @@ class ResPartner(models.Model):
     @api.model
     def _load_pos_self_data_read(self, records, config):
         """ Read specific fields from the given records """
-        fields = ['id', 'name', 'write_date', 'property_product_pricelist']
+        fields = ['id', 'name', 'phone', 'street', 'city', 'zip', 'write_date', 'property_product_pricelist']
         records = records.read(fields, load=False)
         return records or []
