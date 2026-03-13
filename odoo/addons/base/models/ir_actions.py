@@ -70,7 +70,7 @@ class IrActionsActions(models.Model):
     help = fields.Html(string='Action Description',
                        help='Optional help text for the users with a description of the target view, such as its usage and purpose.',
                        translate=True)
-    explication = fields.Text(string='Explication')
+    explication = fields.Text(string='AI Explication', help='Verbose, LLM-targeted description of what this action actually does.')
     binding_model_id = fields.Many2one('ir.model', ondelete='cascade',
                                        help="Setting a value makes this action available in the sidebar for the given model.")
     binding_type = fields.Selection([('action', 'Action'),
