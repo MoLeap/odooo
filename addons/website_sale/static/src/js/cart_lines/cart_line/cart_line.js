@@ -1,11 +1,11 @@
-import { Component, useState } from '@odoo/owl';
-import { formatCurrency } from '@web/core/currency';
-import { useDebounced } from '@web/core/utils/timing';
+import { Component, useState } from "@odoo/owl";
+import { formatCurrency } from "@web/core/currency";
+import { useDebounced } from "@web/core/utils/timing";
 
 export const DELAY = 200;
 
 export class CartLine extends Component {
-	static template = 'website_sale.CartLine';
+    static template = "website_sale.CartLine";
     static props = {
         id: Number,
         websiteUrl: String,
@@ -33,14 +33,15 @@ export class CartLine extends Component {
         isWishlistViewActive: Boolean,
         currencyId: Number,
         isUomFeatureEnabled: Boolean,
+        templateData: Object,
         update: Function,
         addToWishlist: Function,
-    }
+    };
 
     setup() {
         this.state = useState({
             quantity: this.props.displayedQuantity,
-        })
+        });
         this.updateQuantityDebounced = useDebounced(() => {
             this.props.update(parseInt(this.props.id), this.props.productId, this.state.quantity);
         }, DELAY);

@@ -1,18 +1,18 @@
-import { Component, onWillStart, useState } from '@odoo/owl';
-import { useService, useBus } from '@web/core/utils/hooks';
-import { rpc } from '@web/core/network/rpc';
-import { CartLine } from './cart_line/cart_line';
-import wishlistUtils from '@website_sale/js/wishlist_utils';
+import { Component, onWillStart, useState } from "@odoo/owl";
+import { useService, useBus } from "@web/core/utils/hooks";
+import { rpc } from "@web/core/network/rpc";
+import { CartLine } from "./cart_line/cart_line";
+import wishlistUtils from "@website_sale/js/wishlist_utils";
 
 export class CartLines extends Component {
-    static template = 'website_sale.CartLines';
-    static props = {};
+    static template = "website_sale.CartLines";
+    static props = { templateData: Object };
     static components = { CartLine };
 
     setup() {
-        this.cartService = useService('cart');
+        this.cartService = useService("cart");
         this.state = useState({
-            shopWarning: '',
+            shopWarning: "",
             currencyId: null,
             cartLines: [],
             isQuantityViewActive: false,
@@ -23,19 +23,19 @@ export class CartLines extends Component {
             await this.updateLines();
         });
 
-        useBus(this.cartService.bus, 'cart_update', async () => {
+        useBus(this.cartService.bus, "cart_update", async () => {
             await this.updateLines();
         });
     }
 
     async updateLines() {
-        const data = await rpc('/shop/cart/lines');
-        this.state.cartLines = data['cart_lines'];
-        this.state.shopWarning = data['shop_warning'];
-        this.state.isQuantityViewActive = data['is_quantity_view_active'];
-        this.state.isWishlistViewActive = data['is_wishlist_view_active'];
-        this.state.isUomFeatureEnabled = data['is_uom_feature_enabled'];
-        this.state.currencyId = data['currency_id'];
+        const data = await rpc("/shop/cart/lines");
+        this.state.cartLines = data["cart_lines"];
+        this.state.shopWarning = data["shop_warning"];
+        this.state.isQuantityViewActive = data["is_quantity_view_active"];
+        this.state.isWishlistViewActive = data["is_wishlist_view_active"];
+        this.state.isUomFeatureEnabled = data["is_uom_feature_enabled"];
+        this.state.currencyId = data["currency_id"];
     }
 
     async updateLine(lineId, productId, quantity) {
@@ -43,7 +43,7 @@ export class CartLines extends Component {
     }
 
     async addToWishlist(lineId, productId) {
-        await rpc('/shop/wishlist/add', { product_id: productId });
+        await rpc("/shop/wishlist/add", { product_id: productId });
         wishlistUtils.addWishlistProduct(productId);
         wishlistUtils.updateWishlistNavBar();
         await this.updateLine(lineId, productId, 0);
@@ -77,6 +77,7 @@ export class CartLines extends Component {
             isWishlistViewActive: this.state.isWishlistViewActive,
             currencyId: this.state.currencyId,
             isUomFeatureEnabled: this.state.isUomFeatureEnabled,
+            templateData: this.props.templateData,
             update: this.updateLine.bind(this),
             addToWishlist: this.addToWishlist.bind(this),
         };
