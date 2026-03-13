@@ -8,11 +8,12 @@ import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { ActionpadWidget } from "@point_of_sale/app/screens/product_screen/action_pad/action_pad";
 import { BackButton } from "@point_of_sale/app/screens/product_screen/action_pad/back_button/back_button";
 import { InvoiceButton } from "@point_of_sale/app/screens/ticket_screen/invoice_button/invoice_button";
+import { OrderDetailsDialog } from "@point_of_sale/app/screens/ticket_screen/order_details_dialog/order_details_dialog";
 import { Orderline } from "@point_of_sale/app/components/orderline/orderline";
 import { CenteredIcon } from "@point_of_sale/app/components/centered_icon/centered_icon";
 import { SearchBar } from "@point_of_sale/app/screens/ticket_screen/search_bar/search_bar";
 import { usePos } from "@point_of_sale/app/hooks/pos_hook";
-import { Component, onMounted, onWillStart } from "@odoo/owl";
+import { Component, onMounted, onWillStart, onWillUnmount } from "@odoo/owl";
 import {
     BACKSPACE,
     Numpad,
@@ -29,6 +30,7 @@ import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { NumberPopup } from "@point_of_sale/app/components/popups/number_popup/number_popup";
 import { ConnectionLostError } from "@web/core/network/rpc";
 import { TipCell } from "@point_of_sale/app/screens/ticket_screen/tip_cell/tip_cell";
+import { ProgressBar } from "@point_of_sale/app/screens/ticket_screen/progress_bar/progress_bar";
 import { logPosMessage } from "@point_of_sale/app/utils/pretty_console_log";
 
 const { DateTime } = luxon;
@@ -48,6 +50,7 @@ export class TicketScreen extends Component {
         BackButton,
         BarcodeVideoScanner,
         TipCell,
+        ProgressBar,
     };
     static props = {
         reuseSavedUIState: { type: Boolean, optional: true },
@@ -84,7 +87,36 @@ export class TicketScreen extends Component {
         });
         Object.assign(this.state, this.props.stateOverride || {});
 
-        onMounted(this.onMounted);
+        this.orderTimers = useState({});
+
+        this._updateOrderTimers = () => {
+            for (const order of this.pos.models["pos.order"].filter(
+                (o) => o.config_id?.id === this.pos.config.id
+            )) {
+                if (order.preset_time) {
+                    if (this.orderTimers[order.uuid] === undefined) {
+                        if (order.preset_time > DateTime.now()) {
+                            this.orderTimers[order.uuid] = Math.ceil(
+                                order.preset_time.diff(DateTime.now(), "minutes").minutes
+                            );
+                        } else {
+                            this.orderTimers[order.uuid] = 0;
+                        }
+                    } else if (this.orderTimers[order.uuid] > 0) {
+                        this.orderTimers[order.uuid] -= 1;
+                    }
+                }
+            }
+        };
+
+        onMounted(() => {
+            this._updateOrderTimers();
+            this._timersInterval = setInterval(this._updateOrderTimers, 60_000);
+            this.onMounted();
+        });
+
+        onWillUnmount(() => clearInterval(this._timersInterval));
+
         onWillStart(() => {
             if (!this.pos.loadingOrderState) {
                 this.pos.loadingOrderState = true;
@@ -146,6 +178,8 @@ export class TicketScreen extends Component {
         if (this.state.filter == "SYNCED") {
             await this._fetchSyncedOrders();
         }
+
+        this._updateOrderTimers();
     }
     getNumpadButtons() {
         return getButtons(
@@ -202,6 +236,13 @@ export class TicketScreen extends Component {
         if (!order.finalized) {
             this.setOrder(order);
         }
+    }
+
+    _onInfoOrder(order) {
+        this.dialog.add(OrderDetailsDialog, {
+            order,
+            editPayment: () => this.pos.editPayment(order),
+        });
     }
     async onClickReprintAll(order) {
         const printingChanges = order.uiState?.lastPrints;
@@ -499,6 +540,24 @@ export class TicketScreen extends Component {
                     return ascending ? nameA - nameB : nameB - nameA;
                 }
             });
+
+        if (this.state.selectedPreset?.use_timing) {
+            const sortedByTimer = orders.sort((a, b) => {
+                const timerA = this.orderTimers[a.uuid] ?? 0;
+                const timerB = this.orderTimers[b.uuid] ?? 0;
+                const finishedA = timerA <= 0;
+                const finishedB = timerB <= 0;
+                if (finishedA !== finishedB) {
+                    return finishedA ? 1 : -1;
+                }
+                return timerA - timerB;
+            });
+            this.pos.screenState.ticketSCreen.totalCount = sortedByTimer.length;
+            return sortedByTimer.slice(
+                (this.state.page - 1) * this.state.nbrByPage,
+                this.state.page * this.state.nbrByPage
+            );
+        }
 
         if (this.state.filter === "SYNCED") {
             return sortOrders(orders).slice(
@@ -970,6 +1029,19 @@ export class TicketScreen extends Component {
         }
 
         await Promise.all(promises);
+    }
+
+    getCurrentTimePreset(order) {
+        console.log(this.orderTimers[order.uuid] ?? 0);
+        return this.orderTimers[order.uuid] ?? 0;
+    }
+
+    getMaxTimePreset(order) {
+        return order.preset_id?.interval_time;
+    }
+
+    timerIsFinished(order) {
+        return this.getCurrentTimePreset(order) <= 0;
     }
 }
 

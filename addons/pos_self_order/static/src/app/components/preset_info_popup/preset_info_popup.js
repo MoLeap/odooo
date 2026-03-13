@@ -58,11 +58,9 @@ export class PresetInfoPopup extends Component {
             this.selfOrder.data.synchronizeServerDataInIndexedDB(result);
 
             const partner = this.selfOrder.models.connectNewData(result);
-            this.selfOrder.currentOrder.floating_order_name = `${this.preset.name} - ${partner["res.partner"][0].name}`;
             this.selfOrder.currentOrder.partner_id = partner["res.partner"][0];
-        } else {
-            this.selfOrder.currentOrder.floating_order_name = this.state.name;
         }
+        this.selfOrder.currentOrder.floating_order_name = this.state.name;
         this.props.getPayload(this.state);
         this.props.close();
     }

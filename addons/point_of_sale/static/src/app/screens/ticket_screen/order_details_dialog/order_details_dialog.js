@@ -42,6 +42,17 @@ export class OrderDetailsDialog extends Component {
                 ],
             },
         ];
+        if (this.order.partner_id || this.order.mobile) {
+            const customerFields = this.getCustomerFields();
+            if (customerFields.some((f) => f.value)) {
+                this.orderDetails.push({
+                    title: _t("Customer Info"),
+                    icon: "fa-user",
+                    fields: customerFields,
+                    buttons: [],
+                });
+            }
+        }
         if (this.order.payment_ids.length) {
             const orderCurrecy = this.order.currency_id;
             this.orderDetails.push({
@@ -80,6 +91,21 @@ export class OrderDetailsDialog extends Component {
             { label: _t("Receipt Number"), value: this.order.pos_reference },
             { label: _t("Served By"), value: this.order.user_id?.name },
             { label: _t("Customer"), value: this.order.partner_id?.name },
+        ];
+    }
+
+    getCustomerFields() {
+        const partner = this.order?.partner_id;
+        const addressParts = [
+            partner.street,
+            partner.zip && partner.city,
+            partner.country_id?.name,
+        ].filter(Boolean);
+        return [
+            { label: _t("Name"), value: partner.name || this.order.floatingOrderName },
+            { label: _t("Email"), value: this.order.email || partner.email },
+            { label: _t("Phone"), value: this.order.mobile || partner.phone },
+            { label: _t("Address"), value: addressParts.join(", ") || false },
         ];
     }
 }
