@@ -70,6 +70,7 @@ class Cart(PaymentPortal):
             ).unlink()
             values["suggested_products"] = order_sudo._cart_accessories()
             values.update(self._get_express_shop_payment_values(order_sudo))
+            values["cart_tracking_info"] = self._get_cart_tracking_info(order_sudo)
 
         values.update(request.website._get_checkout_step_values())
         values.update(self._cart_values(**post))
@@ -334,7 +335,30 @@ class Cart(PaymentPortal):
                 :1
             ].id
 
+        original_line = order_sudo.order_line.filtered(lambda line: line.id == line_id)
+        old_qty = original_line.product_uom_qty if original_line else 0
+
+        tracking_info_before = (
+            self._get_tracking_information(
+                order_sudo,
+                [line_id] if line_id else [],
+                added_qty_per_line={line_id: -old_qty},
+                extra_lines=original_line,
+            )
+            if quantity == 0
+            else None
+        )
+
         values = order_sudo._cart_update_line_quantity(line_id, quantity, **kwargs)
+
+        delta = quantity - old_qty
+        values["tracking_info"] = (
+            tracking_info_before
+            if quantity == 0
+            else self._get_tracking_information(
+                order_sudo, [line_id] if line_id else [], added_qty_per_line={line_id: delta}
+            )
+        )
 
         values["cart_quantity"] = order_sudo.cart_quantity
         values["cart_ready"] = order_sudo._is_cart_ready()
@@ -496,29 +520,64 @@ class Cart(PaymentPortal):
             ],
         }
 
-    def _get_tracking_information(self, order_sudo, line_ids):
+    def _get_tracking_information(
+        self, order_sudo, line_ids, added_qty_per_line=None, extra_lines=None
+    ):
         """Get the tracking information about the sales order lines.
 
-        :param sale.order order: The sales order.
+        :param sale.order order_sudo: The sales order.
         :param list[int] line_ids: The ids of the lines to track.
-        :rtype: dict
+        :param dict added_qty_per_line: Delta quantities per line id (can be negative).
+        :param recordset extra_lines: Extra lines to include (e.g deleted lines no longer in order).
+        :rtype: list[dict]
         :return: The tracking information.
         """
-        lines = order_sudo.order_line.filtered(lambda line: line.id in line_ids).with_context(
-            display_default_code=False
+        added_qty_per_line = added_qty_per_line or {}
+        tracking_line_ids = set(order_sudo._get_order_tracking_lines().ids)
+        lines = order_sudo.order_line.filtered(
+            lambda line: (
+                line.id in set(line_ids) and line.id in tracking_line_ids and line.product_id
+            )
         )
-        return [
-            {
-                "item_id": line.product_id.barcode or line.product_id.id,
-                "item_name": line.product_id.display_name,
-                "item_category": line.product_id.categ_id.name,
-                "currency": line.currency_id.name,
-                "price": line.price_reduce_taxexcl,
-                "discount": line.price_unit - line.price_reduce_taxexcl,
-                "quantity": line.product_uom_qty,
-            }
-            for line in lines
-        ]
+        if extra_lines:
+            lines |= extra_lines.filtered(lambda line: line.product_id)
+        lines = lines.with_context(display_default_code=False)
+
+        show_tax = order_sudo.website_id.show_line_subtotals_tax_selection == "tax_included"
+        result = []
+        for line in lines:
+            delta = added_qty_per_line.get(line.id, line.product_uom_qty)
+            if not delta:
+                continue
+            tracking_data = line.product_id.product_tmpl_id._get_google_analytics_data(
+                line.product_id,
+                {
+                    "display_name": line.product_id.display_name,
+                    "currency": line.currency_id,
+                    "list_price": line.product_id.list_price,
+                },
+            )
+            price = line.price_reduce_taxinc if show_tax else line.price_reduce_taxexcl
+            result.append({
+                **tracking_data,
+                "price": price,
+                "discount": round(line.price_unit - price, 2),
+                "quantity": abs(delta),
+                "delta_quantity": delta,
+            })
+        return result
+
+    def _get_cart_tracking_info(self, order):
+        """Return GA4 tracking data for the begin_checkout event.
+
+        :param sale.order order: The sales order.
+        :rtype: dict
+        """
+        return {
+            "currency": order.currency_id.name,
+            "value": order._get_order_tracking_value(),
+            "items": order._get_order_tracking_items(),
+        }
 
     def _get_additional_cart_update_values(self, data):
         """Look for extra information in a given dictionary to be included in a `_cart_add` call.

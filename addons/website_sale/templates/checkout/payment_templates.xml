@@ -29,6 +29,8 @@
             </div>
             <div class="oe_structure clearfix" id="oe_structure_website_sale_payment_1"/>
 
+            <div id="payment_tracking_info" t-att-data-payment-tracking-info="json.dumps(payment_tracking_info)" style="display:none;"/>
+
             <div t-if="not errors and website_sale_order.amount_total" name="website_sale_non_free_cart">
                 <div id="payment_method" class="o_not_editable mb-3">
                     <t t-call="payment.form"/>
@@ -44,14 +46,14 @@
     </template>
 
     <template id="website_sale.submit_button" inherit_id="payment.submit_button">
-        <div name="o_payment_default_submit_labels" position="replace">    
+        <div name="o_payment_default_submit_labels" position="replace">
             <t t-if="website_sale_order and not website_sale_order.amount_total">
                 <span name="o_free_order_label" t-field="res_company.free_order_label"/>
             </t>
-            <t t-else=""> 
+            <t t-else="">
                 <t>$0</t>
             </t>
         </div>
     </template>
-    
+
 </odoo>

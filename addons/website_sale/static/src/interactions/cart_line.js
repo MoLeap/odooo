@@ -65,6 +65,12 @@ export class CartLine extends Interaction {
 
         data['website_sale.cart_lines'] = markup(data['website_sale.cart_lines']);
 
+        if (data.tracking_info?.length) {
+            document.querySelector('.oe_website_sale')?.dispatchEvent(
+                new CustomEvent('update_cart_event', { detail: data.tracking_info }),
+            );
+        }
+
         if (!data.cart_quantity) {
             // Ensure the last cart removal is recorded.
             browser.sessionStorage.setItem('website_sale_cart_quantity', 0);
