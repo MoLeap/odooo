@@ -12,6 +12,7 @@ import {
     rewriteNConsecutiveChildren,
     TRUE_TREE,
 } from "./condition_tree";
+import { parseRelativeValue } from "./utils";
 
 function splitPath(path, is_property) {
     if (typeof path !== "string" || path === "") {
@@ -118,14 +119,10 @@ function isSimpleAnd(c) {
 }
 
 function isBetween(c) {
-    if (isSimpleAnd(c)) {
-        const [
-            { path: p1, operator: op1, value: value1 },
-            { path: p2, operator: op2, value: value2 },
-        ] = c.children;
-        if (p1 === p2 && op1 === ">=" && op2 === "<=") {
-            return { path: p1, value1, value2 };
-        }
+    const [{ path: p1, operator: op1, value: value1 }, { path: p2, operator: op2, value: value2 }] =
+        c.children;
+    if (p1 === p2 && op1 === ">=" && op2 === "<=") {
+        return { path: p1, value1, value2 };
     }
     return false;
 }
@@ -138,14 +135,10 @@ function makeBetween(path, value1, value2, isProperty) {
 }
 
 function isStrictBetween(c) {
-    if (isSimpleAnd(c)) {
-        const [
-            { path: p1, operator: op1, value: value1 },
-            { path: p2, operator: op2, value: value2 },
-        ] = c.children;
-        if (p1 === p2 && op1 === ">=" && op2 === "<") {
-            return { path: p1, value1, value2 };
-        }
+    const [{ path: p1, operator: op1, value: value1 }, { path: p2, operator: op2, value: value2 }] =
+        c.children;
+    if (p1 === p2 && op1 === ">=" && op2 === "<") {
+        return { path: p1, value1, value2 };
     }
     return false;
 }
@@ -157,21 +150,110 @@ function makeStrictBetween(path, value1, value2, isProperty) {
     ]);
 }
 
-function boundDate(delta) {
-    if (!delta) {
-        return expression(`context_today().strftime("%Y-%m-%d")`);
+/**
+ * Returns the relative range the domain matches (by checking if the range is today +/- xxx d/w/m/y)
+ * PAST relativity: PATH >= "today -Xd" AND < "today" OR Future relativity: PATH > "today + 1d" AND <= "today +Xd"
+ * Future relativity can also be in the form of PATH > "today + 1d" AND <= "today +X w/m/y + 1d"
+ * @param {Condition} c
+ * @returns {boolean|Object} returns false if not a relative range compared to today
+ */
+function isRelativeBetween(c) {
+    const [c1, c2] = c.children;
+    const p1 = parseRelativeValue(c1.value);
+    const p2 = parseRelativeValue(c2.value);
+
+    if (c1.path !== c2.path || !p1 || !p2) {
+        return false;
     }
-    return expression(`(context_today() + relativedelta(${delta})).strftime('%Y-%m-%d')`);
+
+    const items = [
+        { operator: c1.operator, diff: p1.diff, unit: p1.unit, offset: p1.offset },
+        { operator: c2.operator, diff: p2.diff, unit: p2.unit, offset: p2.offset },
+    ];
+
+    // Sort by absolute difference. The one closest to 0 (today) becomes the first item.
+    items.sort((a, b) => Math.abs(a.diff) - Math.abs(b.diff));
+    const [today, other] = items;
+
+    let supported = today.unit === "day" && !today.offset;
+    if (today.operator === "<" && other.operator === ">=" && other.diff < 0) {
+        supported = supported && today.diff === 0 && other.offset === 0;
+        return supported ? { diff: other.diff, unit: other.unit } : false;
+    } else if (today.operator === ">" && other.operator === "<=" && other.diff >= 0) {
+        supported = supported && today.diff === 1;
+        if (other.unit === "day") {
+            supported = supported && !other.offset;
+            return supported ? { diff: other.diff - 1, unit: other.unit } : false;
+        } else {
+            supported = supported && other.offset; // ie. today +X w/m/y without + 1d at the end not accepted;
+            return supported ? { diff: other.diff, unit: other.unit } : false;
+        }
+    }
+    return false;
 }
 
-function boundDatetime(delta) {
-    if (!delta) {
+function makeRelativeBetween(path, value1, value2, isProperty, smartDates, fieldType) {
+    const isFuture = value1 > 0;
+    const absVal = Math.abs(value1);
+    let leftBound, rightBound;
+
+    if (smartDates) {
+        const unit = { week: "w", month: "m", year: "y" }[value2] || "d";
+        const futureOffset = unit === "d" ? `${absVal + 1}${unit}` : `${absVal}${unit} +1d`;
+        leftBound = isFuture ? "today +1d" : `today -${absVal}${unit}`;
+        rightBound = isFuture ? `today +${futureOffset}` : "today";
+        if (!isFuture && absVal === 0) {
+            // Edge case 0 relativity so that it is the same as today smart date
+            leftBound = "today";
+            rightBound = "today +1d";
+        }
+    } else {
+        const boundFn = fieldType === "date" ? boundDate : boundDatetime;
+        const unit = `${value2}s`; // converts "day" to "days" for relativedelta
+        const future = unit === "days" ? [`days=${absVal + 1}${unit}`] : [`${unit}=${absVal}`, "days=1"];
+        leftBound = isFuture ? boundFn(["days=1"]) : boundFn([`${unit} = -${absVal}`]);
+        rightBound = isFuture ? boundFn(future) : boundFn([]);
+        if (!isFuture && absVal === 0) {
+            // Edge case 0 relativity so that it is the same as today smart date
+            leftBound = boundFn([]);
+            rightBound = boundFn(["days=1"]);
+        }
+    }
+    return connector("&", [
+        condition(path, isFuture ? ">" : ">=", leftBound, false, isProperty),
+        condition(path, isFuture ? "<=" : "<", rightBound, false, isProperty),
+    ]);
+}
+
+/**
+ * Helper to build the chained relativedelta string
+ * e.g. ["months=1", "days=1"] -> "relativedelta(months=1) + relativedelta(days=1)"
+ */
+function buildDeltaExpr(deltas) {
+    const arr = Array.isArray(deltas) ? deltas : deltas ? [deltas] : [];
+    if (arr.length === 0) {
+        return null;
+    }
+    return arr.map((d) => `relativedelta(${d})`).join(" + ");
+}
+
+export function boundDate(deltas) {
+    const deltaExpr = buildDeltaExpr(deltas);
+    if (!deltaExpr) {
+        return expression(`context_today().strftime("%Y-%m-%d")`);
+    }
+    return expression(`(context_today() + ${deltaExpr}).strftime('%Y-%m-%d')`);
+}
+
+export function boundDatetime(deltas) {
+    const deltaExpr = buildDeltaExpr(deltas);
+    if (!deltaExpr) {
         return expression(
             `datetime.datetime.combine(context_today(), datetime.time(0, 0, 0)).to_utc().strftime("%Y-%m-%d %H:%M:%S")`
         );
     }
     return expression(
-        `datetime.datetime.combine(context_today() + relativedelta(${delta}), datetime.time(0, 0, 0)).to_utc().strftime("%Y-%m-%d %H:%M:%S")`
+        `datetime.datetime.combine(context_today() + ${deltaExpr}, datetime.time(0, 0, 0)).to_utc().strftime("%Y-%m-%d %H:%M:%S")`
     );
 }
 
@@ -206,55 +288,55 @@ function getBounds(generateSmartDates, fieldType) {
 
 function introduceInRangeOperators(tree, options = {}) {
     function _introduceInRangeOperator(c, options) {
-        const res1 = isStrictBetween(c);
-        if (res1) {
-            const generateSmartDates =
-                "generateSmartDates" in options ? options.generateSmartDates : true;
-            // @ts-ignore
-            const { path, value1, value2 } = res1;
-            const fieldDef = options.getFieldDef?.(path);
-            const fieldType = fieldDef?.type;
-            const isProperty = fieldDef?.is_property;
-            if (["date", "datetime"].includes(fieldType) && isSimplePath(path, isProperty)) {
-                const bounds = getBounds(generateSmartDates, fieldType);
-                for (const [valueType, leftBound, rightBound] of bounds) {
-                    if (
-                        generateSmartDates
-                            ? value1 === leftBound && value2 === rightBound
-                            : value1._expr === leftBound._expr && value2._expr === rightBound._expr
-                    ) {
-                        return condition(
-                            path,
-                            "in range",
-                            [fieldType, valueType, false, false],
-                            false,
-                            isProperty
-                        );
-                    }
+        const path = c.children[0].path;
+        const fieldType = options.getFieldDef?.(path)?.type;
+        const isProperty = c.children[0].isProperty;
+        const isDate = ["date", "datetime"].includes(fieldType);
+        if (!isSimpleAnd(c) || !isDate || !isSimplePath(c.children[0].path, isProperty)) {
+            return;
+        }
+        const generateSmartDates = options.generateSmartDates ?? true;
+        let res = isStrictBetween(c);
+        if (res) {
+            const bounds = getBounds(generateSmartDates, fieldType);
+            for (const [valueType, leftBound, rightBound] of bounds) {
+                if (
+                    generateSmartDates
+                        ? res.value1 === leftBound && res.value2 === rightBound
+                        : res.value1._expr === leftBound._expr &&
+                          res.value2._expr === rightBound._expr
+                ) {
+                    return condition(
+                        path,
+                        "in range",
+                        [fieldType, valueType, false, false],
+                        false,
+                        isProperty
+                    );
                 }
             }
         }
-        const res2 = isBetween(c);
-        if (res2) {
-            // @ts-ignore
-            const { path, value1, value2 } = res2;
-            const fieldDef = options.getFieldDef?.(path);
-            const fieldType = fieldDef?.type;
-            const isProperty = fieldDef?.is_property;
-            if (["date", "datetime"].includes(fieldType) && isSimplePath(path, isProperty)) {
-                return condition(
-                    path,
-                    "in range",
-                    [
-                        fieldType,
-                        "dateRange",
-                        // @ts-ignore
-                        ...normalizeValue([value1, value2]),
-                    ],
-                    false,
-                    isProperty
-                );
-            }
+
+        res = isRelativeBetween(c);
+        if (res) {
+            const value = [fieldType, "relativeRange", res.diff, res.unit];
+            return condition(path, "in range", value);
+        }
+        res = isBetween(c);
+        if (res) {
+            const { path, value1, value2 } = res;
+            return condition(
+                path,
+                "in range",
+                [
+                    fieldType,
+                    "dateRange",
+                    // @ts-ignore
+                    ...normalizeValue([value1, value2]),
+                ],
+                false,
+                isProperty
+            );
         }
     }
     return operate(
@@ -274,13 +356,14 @@ function eliminateInRangeOperators(tree, options = {}) {
         }
         const { initialPath, lastPart } = splitPath(path, isProperty);
         const [fieldType, valueType, value1, value2] = value;
+        const smartDates = options.generateSmartDates ?? true;
         let tree;
         if (valueType === "dateRange") {
             tree = makeBetween(lastPart, value1, value2, isProperty);
+        } else if (valueType === "relativeRange") {
+            tree = makeRelativeBetween(lastPart, value1, value2, isProperty, smartDates, fieldType);
         } else {
-            const generateSmartDates =
-                "generateSmartDates" in options ? options.generateSmartDates : true;
-            const bounds = getBounds(generateSmartDates, fieldType);
+            const bounds = getBounds(smartDates, fieldType);
             const [, leftBound, rightBound] = bounds.find(([v]) => v === valueType);
             tree = makeStrictBetween(lastPart, leftBound, rightBound, isProperty);
         }
