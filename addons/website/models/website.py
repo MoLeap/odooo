@@ -755,16 +755,9 @@ class Website(models.CachedModel):
         logo_attachment_id = kwargs.get('logo_attachment_id')
         company = website.company_id
         if logo_attachment_id:
-            attachment = self.env['ir.attachment'].browse(logo_attachment_id).exists()
-            if attachment:
-                website.logo = attachment.raw
-                website_logo_attachments = self.env['ir.attachment'].search([
-                    ('res_model', '=', 'website'),
-                    ('res_field', '=', 'logo'),
-                    ('res_id', '=', website.id),
-                ], order='id')
-                website_logo_attachments[1:].unlink()
-                attachment.unlink()
+            attachment = self.env['ir.attachment'].browse(logo_attachment_id)
+            website.logo = attachment.raw
+            attachment.unlink()
         elif not logo_attachment_id and not company.uses_default_logo:
             website.logo = company.logo.decode('utf-8')
 
