@@ -33,7 +33,7 @@ class StockReturnPickingLine(models.TransientModel):
             'date': fields.Datetime.now(),
             'location_id': picking.location_id.id or self.move_id.location_dest_id.id,
             'location_dest_id': picking.location_dest_id.id or self.move_id.location_id.id,
-            'location_final_id': False,
+            'forecasted_location_id': False,
             'picking_type_id': picking.picking_type_id.id,
             'warehouse_id': picking.picking_type_id.warehouse_id.id,
             'origin_returned_move_id': self.move_id.id,
@@ -268,6 +268,6 @@ class StockReturnPicking(models.TransientModel):
             'date_planned': line.move_id.date or fields.Datetime.now(),
             'warehouse_id': self.picking_id.picking_type_id.warehouse_id,
             'partner_id': self.picking_id.partner_id.id,
-            'location_final_id': line.move_id.location_final_id or self.picking_id.location_dest_id,
+            'forecasted_location_id': line.move_id.forecasted_location_id or self.picking_id.location_dest_id,
             'company_id': self.picking_id.company_id,
         }
