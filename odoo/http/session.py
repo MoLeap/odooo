@@ -126,6 +126,8 @@ class Session(MutableMapping):
     #
     # Session properties
     #
+    static_sid = property(lambda self: self.sid[STORED_SESSION_BYTES:])
+
     @property
     def uid(self):
         return self.get('uid')

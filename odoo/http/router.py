@@ -241,6 +241,7 @@ class Application:
         current_thread.query_time = 0
         current_thread.perf_t0 = real_time()
         current_thread.cursor_mode = None
+        current_thread.session_identifier = None
         if hasattr(current_thread, 'dbname'):
             del current_thread.dbname
         if hasattr(current_thread, 'uid'):
@@ -262,6 +263,7 @@ class Application:
 
             try:
                 request._post_init()
+                current_thread.session_identifier = request.session.static_sid
                 current_thread.url = httprequest.url
 
                 if self.get_static_file(httprequest.path):
