@@ -74,3 +74,12 @@ class CrmLead(models.Model):
                 'context': self._get_project_create_from_lead_context(),
             }
         return action
+
+    def action_sale_quotations_new(self):
+        action = super().action_sale_quotations_new()
+        action['context'] = {
+            **action.get('context', {}),
+            'is_sale_order': True,
+            'default_project_id': self.project_ids[-1].id if self.project_ids else False,
+        }
+        return action
