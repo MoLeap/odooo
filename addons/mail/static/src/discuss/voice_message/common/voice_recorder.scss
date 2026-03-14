@@ -2,6 +2,11 @@
     background-color: $gray-200;
 }
 
+.o-mail-VoiceRecorder-button {
+    width: 24px;
+    height: 24px;
+}
+
 .o-mail-VoiceRecorder-dot {
     animation: flash 2s ease infinite;
     animation-iteration-count: 2;

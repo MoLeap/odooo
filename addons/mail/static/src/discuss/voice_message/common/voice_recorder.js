@@ -40,6 +40,12 @@ export function useVoiceRecorder() {
                 startRecording();
             }
         },
+        cancel() {
+            if (state.recording) {
+                notification.add(_t("Voice recording cancelled"), { type: "info" });
+                cleanUp();
+            }
+        }
     });
     /** @type {ReturnType<typeof import("@web/core/notifications/notification_service").notificationService.start>} */
     const dialog = useService("dialog");
