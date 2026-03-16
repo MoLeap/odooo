@@ -404,6 +404,41 @@
 
     <!-- Called in `website_sale.checkout_layout`. -->
     <template id="total">
+        <div
+            t-if="website_sale_order and website_sale_order.website_order_line"
+            t-attf-class="css_non_editable_mode_hidden #{_cart_total_classes}"
+            id="cart_total_edit_mode"
+        >
+            <table class="table mb-0">
+                <tr
+                    t-if="website_sale_order._has_deliverable_products()"
+                    name="o_order_delivery"
+                >
+                    <td class="ps-0 pt-0 pb-2 border-0 text-muted" colspan="2">
+                        Delivery
+                    </td>
+                    <td class="text-end pe-0 pt-0 pb-2 border-0">
+                        <span t-out="5.00" style="white-space: nowrap;"/>
+                    </td>
+                </tr>
+                <tr name="o_order_total_untaxed">
+                    <td class="border-0 pb-2 ps-0 pt-0 text-start text-muted" colspan="2">
+                        Subtotal
+                    </td>
+                    <td class="text-end border-0 pb-2 pe-0 pt-0">
+                        <span t-out="40.00"/>
+                    </td>
+                </tr>
+                <tr name="o_order_total" class="border-top">
+                    <td colspan="2" class="border-0 ps-0 pt-2">
+                        <strong>Total</strong>
+                    </td>
+                    <td class="text-end border-0 px-0 pt-2">
+                        <strong t-out="45.00" class="text-end p-0"/>
+                    </td>
+                </tr>
+            </table>
+        </div>
         <!-- Layout customization parameters:
             - _cart_total_classes: CSS classes to append on the root div of the total template;
                                    default `None`.

@@ -2,12 +2,14 @@ import { Component, onWillStart, useState } from "@odoo/owl";
 import { useService, useBus } from "@web/core/utils/hooks";
 import { rpc } from "@web/core/network/rpc";
 import { CartLine } from "./cart_line/cart_line";
+import { CartAccessories } from "./cart_accessories/cart_accessories";
 import wishlistUtils from "@website_sale/js/wishlist_utils";
+import { useSubEnv } from "@web/owl2/utils";
 
 export class CartLines extends Component {
     static template = "website_sale.CartLines";
     static props = { templateData: Object };
-    static components = { CartLine };
+    static components = { CartLine, CartAccessories };
 
     setup() {
         this.cartService = useService("cart");
@@ -17,6 +19,8 @@ export class CartLines extends Component {
             cartLines: [],
             isQuantityViewActive: false,
             isWishlistViewActive: false,
+            isUomFeatureEnabled: false,
+            isAccessoriesViewActive: false,
         });
 
         onWillStart(async () => {
@@ -25,6 +29,16 @@ export class CartLines extends Component {
 
         useBus(this.cartService.bus, "cart_update", async () => {
             await this.updateLines();
+        });
+
+        useSubEnv({
+            updateLine: this.updateLine.bind(this),
+            addToWishlist: this.addToWishlist.bind(this),
+            isQuantityViewActive: this.state.isQuantityViewActive,
+            isWishlistViewActive: this.state.isWishlistViewActive,
+            currencyId: this.state.currencyId,
+            isUomFeatureEnabled: this.state.isUomFeatureEnabled,
+            isAccessoriesViewActive: this.state.isAccessoriesViewActive,
         });
     }
 
@@ -35,6 +49,7 @@ export class CartLines extends Component {
         this.state.isQuantityViewActive = data["is_quantity_view_active"];
         this.state.isWishlistViewActive = data["is_wishlist_view_active"];
         this.state.isUomFeatureEnabled = data["is_uom_feature_enabled"];
+        this.state.isAccessoriesViewActive = data["is_accessories_view_active"];
         this.state.currencyId = data["currency_id"];
     }
 
@@ -73,13 +88,7 @@ export class CartLines extends Component {
             descriptionLines: line.description_lines,
             shopWarning: line.shop_warning,
             comboItemLines: line.combo_item_lines,
-            isQuantityViewActive: this.state.isQuantityViewActive,
-            isWishlistViewActive: this.state.isWishlistViewActive,
-            currencyId: this.state.currencyId,
-            isUomFeatureEnabled: this.state.isUomFeatureEnabled,
             templateData: this.props.templateData,
-            update: this.updateLine.bind(this),
-            addToWishlist: this.addToWishlist.bind(this),
         };
     }
 }

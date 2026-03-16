@@ -5,7 +5,7 @@
         <t t-set="showTaxLines" t-value="true"/>
         <table class="table mb-0">
             <tr
-                t-if="state.has_deliverable_products"
+                t-if="this.state.has_deliverable_products"
                 name="o_order_delivery"
             >
                 <td class="ps-0 pt-0 pb-2 border-0 text-muted" colspan="2">
@@ -14,14 +14,14 @@
                 <td class="text-end pe-0 pt-0 pb-2 border-0">
                     <span
                         name="o_message_no_dm_set"
-                        t-att-class="state.has_carrier ? 'd-none' : ''"
+                        t-att-class="this.state.has_carrier ? 'd-none' : ''"
                         title="Price will be updated after choosing a delivery method"
                     >
                         -
                     </span>
                     <span
-                        t-out="formatPrice(state.amount_delivery)"
-                        t-att-class="'monetary_field' + (state.has_carrier ? '' : ' d-none')"
+                        t-out="this.formatPrice(this.state.amount_delivery)"
+                        t-att-class="'monetary_field' + (this.state.has_carrier ? '' : ' d-none')"
                         style="white-space: nowrap;"
                     />
                 </td>
@@ -34,7 +34,7 @@
                 </td>
                 <td class="text-end border-0 pb-2 pe-0 pt-0">
                     <span
-                        t-out="formatPrice(state.amount_untaxed)"
+                        t-out="this.formatPrice(this.state.amount_untaxed)"
                         class="monetary_field"
                         style="white-space: nowrap;"
                     />
@@ -45,7 +45,7 @@
                 <td colspan="2" class="border-0 p-0 pe-3 pb-2 fw-bold">Total</td>
                 <td class="text-end border-0 ps-3 pb-2">
                     <span
-                        t-out="formatPrice(state.amount_total)"
+                        t-out="this.formatPrice(this.state.amount_total)"
                         class="monetary_field fw-bold"
                         style="white-space: nowrap;"
                     />
@@ -56,8 +56,8 @@
 
     <t t-name="website_sale.OrderTaxLines">
         <tbody id="order_tax_lines_container">
-            <t t-if="state.tax_subtotals">
-                <t t-foreach="state.tax_subtotals" t-as="line" t-key="line.id">
+            <t t-if="this.state.tax_subtotals">
+                <t t-foreach="this.state.tax_subtotals" t-as="line" t-key="line.id">
                     <t t-foreach="line['tax_groups']" t-as="tax_line" t-key="tax_line.id">
                         <tr name="o_order_total_taxes">
                             <td colspan="2" class="text-muted border-0 p-0 pe-3 pb-2">
@@ -65,7 +65,7 @@
                             </td>
                             <td class="text-end border-0 p-0 ps-3 pb-2">
                                 <span
-                                    t-out="formatPrice(tax_line['tax_amount_currency'])"
+                                    t-out="this.formatPrice(tax_line['tax_amount_currency'])"
                                     class="monetary_field"
                                     style="white-space: nowrap;"
                                 />

@@ -253,10 +253,6 @@ class Cart(PaymentPortal):
         values = self.add_to_cart(product_template_id, product_id, quantity=quantity, **kwargs)
 
         IrUiView = request.env["ir.ui.view"]
-        values["website_sale.suggested_products_list"] = IrUiView._render_template(
-            "website_sale.suggested_products_list",
-            {"suggested_products": order_sudo._cart_accessories()},
-        )
         values["website_sale.quick_reorder_history"] = IrUiView._render_template(
             "website_sale.quick_reorder_history",
             {"website_sale_order": order_sudo, **self._prepare_order_history()},
@@ -349,10 +345,6 @@ class Cart(PaymentPortal):
         values["website_sale.quick_reorder_history"] = IrUiView._render_template(
             "website_sale.quick_reorder_history",
             {"website_sale_order": order_sudo, **self._prepare_order_history()},
-        )
-        values["website_sale.suggested_products_list"] = IrUiView._render_template(
-            "website_sale.suggested_products_list",
-            {"suggested_products": order_sudo._cart_accessories()},
         )
         return values
 
@@ -561,6 +553,9 @@ class Cart(PaymentPortal):
             "is_uom_feature_enabled": request.env["res.groups"]._is_feature_enabled(
                 "product.group_show_uom_price"
             ),
+            "is_accessories_view_active": request.env["website"].is_view_active(
+                "website_sale.suggested_products_list"
+            ),
             "shop_warning": order_sudo._get_shop_warning() if order_sudo else "",
         }
 
@@ -630,3 +625,23 @@ class Cart(PaymentPortal):
             else False,
             "amount_total": order_sudo.amount_total,
         }
+
+    @route(route="/shop/cart/accessories", type="jsonrpc", auth="public", website=True)
+    def cart_accessories(self):
+        order_sudo = request.cart
+        accessories = order_sudo._cart_accessories()
+
+        return [
+            {
+                "id": accessory.id,
+                "product_tmpl_id": accessory.product_tmpl_id.id,
+                "type": accessory.type,
+                "display_name": accessory.with_context(display_default_code=False).display_name,
+                "website_url": accessory.website_url,
+                "website_published": accessory.website_published,
+                "image_uri": image_data_uri(accessory.image_128) if accessory.image_128 else False,
+                "description_sale": accessory.description_sale,
+                "combination_info": accessory._get_combination_info_variant(),
+            }
+            for accessory in accessories
+        ]

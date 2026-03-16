@@ -78,21 +78,6 @@ function updateCartSummary(data) {
 }
 
 /**
- * Update the cart accessories.
- *
- * @param {Object} data
- */
-function updateCartAccessories(data) {
-    const suggestedProductsElement = document.getElementById('cart_suggested_products');
-    if (data['website_sale.suggested_products_list'] && suggestedProductsElement) {
-        const newSuggestedProductsElement = createElementWithContent(
-            'div', data['website_sale.suggested_products_list']
-        )
-        suggestedProductsElement.replaceWith(...newSuggestedProductsElement.childNodes);
-    }
-}
-
-/**
  * Update the quantity on the cart icon in the navbar.
  *
  * @param {Number} cartQuantity - The number of items currently in the cart.
@@ -123,7 +108,6 @@ export default {
     showWarning: showWarning,
     getSelectedAttributeValues: getSelectedAttributeValues,
     updateQuickReorderSidebar: updateQuickReorderSidebar,
-    updateCartAccessories: updateCartAccessories,
     updateCartSummary: updateCartSummary,
     updateCartIcon: updateCartIcon,
 };

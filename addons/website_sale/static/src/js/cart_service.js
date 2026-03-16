@@ -245,33 +245,28 @@ export class CartService {
     }
 
     async update(lineId, productId = undefined, quantity, onCartPage = false) {
-        const data = await this.rpc('/shop/cart/update', {
+        const data = await this.rpc("/shop/cart/update", {
             line_id: lineId,
             product_id: productId,
             quantity: quantity,
         });
 
         if (onCartPage & !data.cart_quantity) {
-            return redirect('/shop/cart');
+            return redirect("/shop/cart");
         }
 
         wSaleUtils.updateCartIcon(data.cart_quantity);
-        this.bus.trigger('cart_update');
-        this.bus.trigger('cart_amount_changed', [data.amount, data.minor_amount]);
+        this.bus.trigger("cart_update");
+        this.bus.trigger("cart_amount_changed", [data.amount, data.minor_amount]);
 
-        // Why are you making cart_service ugly? :(
-        data['website_sale.suggested_products_list'] = markup(data['website_sale.suggested_products_list']);
-        data['website_sale.quick_reorder_history'] = markup(data['website_sale.quick_reorder_history']);
+        data["website_sale.quick_reorder_history"] = markup(
+            data["website_sale.quick_reorder_history"]
+        );
 
-        const reorderSideBarSelector = '#quick_reorder_sidebar'
-        const suggestedProductsSelector = 'div#cart_suggested_products'
-        this.interactions.stopInteractions(document.querySelector(suggestedProductsSelector));
+        const reorderSideBarSelector = "#quick_reorder_sidebar";
         this.interactions.stopInteractions(document.querySelector(reorderSideBarSelector));
-        wSaleUtils.updateCartAccessories(data);
         wSaleUtils.updateQuickReorderSidebar(data);
         this.interactions.startInteractions(document.querySelector(reorderSideBarSelector));
-        this.interactions.startInteractions(document.querySelector(suggestedProductsSelector));
-
         wSaleUtils.showWarning(data.warning);
     }
 
