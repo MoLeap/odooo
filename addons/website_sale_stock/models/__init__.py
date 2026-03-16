@@ -5,6 +5,7 @@ from . import (
     product_feed,
     product_product,
     product_ribbon,
+    product_stock_notification,
     product_template,
     product_wishlist,
     res_config_settings,
