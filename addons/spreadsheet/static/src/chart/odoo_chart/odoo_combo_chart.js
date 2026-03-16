@@ -64,6 +64,7 @@ chartRegistry.add("odoo_combo", {
 function createOdooChartRuntime(chart, getters) {
     const { datasets, labels } = chart.dataSource.getData();
     const definition = chart.getDefinition();
+    const defaultBackground = getters.getSpreadsheetTheme().backgroundColor
 
     const trendDataSetsValues = datasets.map((dataset, index) => {
         const trend = definition.dataSets[index]?.trend;
@@ -77,6 +78,7 @@ function createOdooChartRuntime(chart, getters) {
         dataSetsValues: datasets.map((ds) => ({ data: ds.data, label: ds.label })),
         locale: getters.getLocale(),
         trendDataSetsValues,
+        background: definition.background || defaultBackground,
     };
 
     const config = {
@@ -97,7 +99,7 @@ function createOdooChartRuntime(chart, getters) {
                     changeTypeToSpreadsheetChart(definition),
                     chartData
                 ),
-                background: { color: chart.background },
+                background: { color: chartData.background },
             },
             onHover: onOdooChartItemHover(),
             onClick: onOdooChartItemClick(getters, chart),

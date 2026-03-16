@@ -54,6 +54,7 @@ function createOdooChartRuntime(chart, getters) {
     const { datasets, labels } = chart.dataSource.getData();
 
     const definition = chart.getDefinition();
+    const defaultBackground = getters.getSpreadsheetTheme().backgroundColor
     const locale = getters.getLocale();
 
     const trendDataSetsValues = datasets.map((dataset, index) => {
@@ -69,6 +70,7 @@ function createOdooChartRuntime(chart, getters) {
         locale,
         trendDataSetsValues,
         axisType: definition.axisType || "category",
+        background: definition.background || defaultBackground,
     };
 
     const config = {
@@ -89,7 +91,7 @@ function createOdooChartRuntime(chart, getters) {
                     changeTypeToSpreadsheetChart(definition),
                     chartData
                 ),
-                background: { color: chart.background },
+                background: { color: chartData.background },
             },
             onHover: onOdooChartItemHover(),
             onClick: onOdooChartItemClick(getters, chart),

@@ -59,6 +59,7 @@ chartRegistry.add("odoo_bar", {
 function createOdooChartRuntime(chart, getters) {
     const { datasets, labels } = chart.dataSource.getData();
     const definition = chart.getDefinition();
+    const defaultBackground = getters.getSpreadsheetTheme().backgroundColor
 
     const trendDataSetsValues = datasets.map((dataset, index) => {
         const trend = definition.dataSets[index]?.trend;
@@ -73,6 +74,7 @@ function createOdooChartRuntime(chart, getters) {
         locale: getters.getLocale(),
         trendDataSetsValues,
         topPadding: getTopPaddingForDashboard(definition, getters),
+        background: definition.background || defaultBackground,
     };
 
     const config = {
@@ -94,7 +96,7 @@ function createOdooChartRuntime(chart, getters) {
                     changeTypeToSpreadsheetChart(definition),
                     chartData
                 ),
-                background: { color: chart.background },
+                background: { color: chartData.background },
             },
             onHover: onOdooChartItemHover(),
             onClick: onOdooChartItemClick(getters, chart),

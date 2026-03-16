@@ -67,6 +67,7 @@ function createOdooChartRuntime(chart, getters) {
     datasets = computeCumulatedDatasets(chart, datasets);
 
     const definition = chart.getDefinition();
+    const defaultBackground = getters.getSpreadsheetTheme().backgroundColor
     const locale = getters.getLocale();
 
     const trendDataSetsValues = datasets.map((dataset, index) => {
@@ -83,6 +84,7 @@ function createOdooChartRuntime(chart, getters) {
         trendDataSetsValues,
         topPadding: getTopPaddingForDashboard(definition, getters),
         axisType: definition.axisType || "category",
+        background: definition.background || defaultBackground,
     };
 
     const chartJsDatasets = getLineChartDatasets(definition, chartData);
@@ -104,7 +106,7 @@ function createOdooChartRuntime(chart, getters) {
                     changeTypeToSpreadsheetChart(definition),
                     chartData
                 ),
-                background: { color: chart.background },
+                background: { color: chartData.background },
             },
             onHover: onOdooChartItemHover(),
             onClick: onOdooChartItemClick(getters, chart),
