@@ -2,17 +2,16 @@
 <templates>
 
     <t t-name="website_sale.CartLines">
-        <div t-if="state.shopWarning" class="alert alert-warning" role="alert">
+        <div t-if="this.state.shopWarning" class="alert alert-warning" role="alert">
             <strong>Warning!</strong>
-            <div t-out="state.shopWarning" class="text-prewrap"/>
+            <div t-out="this.state.shopWarning" class="text-prewrap"/>
         </div>
-
-        <div t-if="state.cartLines.length" class="d-flex flex-column mb32">
-            <t t-foreach="state.cartLines" t-as="line" t-key="line.id">
-                <CartLine t-props="getLineProps(line)"/>
+        <div t-if="this.state.cartLines.length" class="d-flex flex-column mb32">
+            <t t-foreach="this.state.cartLines" t-as="line" t-key="line.id">
+                <CartLine t-props="this.getCartLineProps(line)"/>
             </t>
+            <CartAccessories t-props="this.accessoriesProps"/>
         </div>
-
         <div t-else="" class="w-100">
             <div class="mt-5 mb-3">
                 <t t-call="website_sale.emptyCartSvg"/>
