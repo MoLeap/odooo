@@ -548,6 +548,8 @@ class IrHttp(models.AbstractModel):
 
     @classmethod
     def _get_error_html(cls, env, code, values):
+        if not env.context.get('website_id') and (website_id := request.env.context.get('fallback_website_id')):
+            env = env(context=dict(env.context, website_id=website_id))
         if code in ('page_404', 'protected_403'):
             return code.split('_')[1], env['ir.ui.view']._render_template('website.%s' % code, values)
         return super()._get_error_html(env, code, values)

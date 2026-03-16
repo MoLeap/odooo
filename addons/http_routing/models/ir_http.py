@@ -548,7 +548,6 @@ class IrHttp(models.AbstractModel):
                 code = 500
 
         values.update(
-            request=request,
             status_message=werkzeug.http.HTTP_STATUS_CODES.get(code, ''),
             status_code=code,
         )
@@ -562,12 +561,11 @@ class IrHttp(models.AbstractModel):
 
     @classmethod
     def _get_error_html(cls, env, code, values):
-        values['request'] = request
         try:
-            return code, env['ir.ui.view']._render_template('http_routing.%s' % code, values)
+            return code, self.env['ir.ui.view']._render_template('http_routing.%s' % code, values)
         except MissingError:
             if str(code)[0] == '4':
-                return code, env['ir.ui.view']._render_template('http_routing.4xx', values)
+                return code, self.env['ir.ui.view']._render_template('http_routing.4xx', values)
             raise
 
     @classmethod
@@ -604,7 +602,7 @@ class IrHttp(models.AbstractModel):
             code, html = cls._get_error_html(request.env, code, values)
         except Exception:
             _logger.exception("Couldn't render a template for http status %s", code)
-            code, html = 418, request.env['ir.ui.view']._render_template('http_routing.http_error', values)
+            code, html = 418, cls._get_error_html(request.env, 'http_error', values)[1]
 
         response = Response(html, status=code, content_type='text/html;charset=utf-8')
         cls._post_dispatch(response)
