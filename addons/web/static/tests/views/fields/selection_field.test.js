@@ -156,7 +156,7 @@ test("[Offline] SelectionField on many2one field", async () => {
     expect(".o_field_widget[name='product_id'] span").toHaveCount(1, {
         message: "field should be readonly",
     });
-    expect(".o_field_widget[name='product_id']").toHaveText("xphone");
+    expect(".o_field_widget[name='product_id'] input").toHaveValue("xphone");
 });
 
 test("unset selection field with string keys", async () => {

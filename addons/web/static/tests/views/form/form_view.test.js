@@ -438,6 +438,121 @@ test(`[Offline] save a form view offline (autosave when leaving)`, async () => {
     await expect.waitForSteps(["web_save"]);
 });
 
+test.tags("desktop");
+test(`[Offline] save offline many2x`, async () => {
+    expect.errors(2); // 2x ConnectionLostError
+    const setOffline = mockOffline();
+    onRpc("web_save", () => expect.step(`web_save`));
+    Partner._views = {
+        form: `
+            <form>
+              <field name="foo"/>
+              <field name="parent_id"/>
+              <field name="type_ids" widget="many2many_tags"/>
+            </form>`,
+        list: `<list><field name="foo"/></list>`,
+        search: `<search/>`,
+    };
+    defineActions([
+        {
+            id: 1,
+            name: "Partner",
+            res_model: "partner",
+            views: [
+                [false, "list"],
+                [false, "form"],
+            ],
+        },
+    ]);
+
+    await mountWithCleanup(WebClient);
+    await getService("action").doAction(1);
+    expect(`tbody tr`).toHaveCount(4);
+
+    // Put in cache the on_change and the many2x values
+    // Open a new record, and click on the many2one, and many2many
+    await contains(`button.o_list_button_add`).click();
+
+    await contains(".o_field_many2one input").click();
+    expect(queryAllTexts(`.o-autocomplete.dropdown li`)).toEqual([
+        "first record",
+        "second record",
+        "aaa",
+        "aaa",
+        "Search more...",
+    ]);
+
+    await contains(".o_field_many2many_selection input").click();
+    await runAllTimers();
+
+    expect(queryAllTexts(`.o-autocomplete.dropdown li`)).toEqual([
+        "gold",
+        "silver",
+        "Search more...",
+    ]);
+
+    await contains(`.o_back_button`).click();
+
+    await setOffline(true);
+    expect("button.o_list_button_add").not.toHaveClass("o_disabled_offline");
+
+    // Open the new record offline
+    await contains(`button.o_list_button_add`).click();
+    await contains(`.o_field_widget[name='foo'] input`).edit("test");
+
+    await contains(`.o_field_many2one[name="parent_id"] input`).click();
+    await contains(`.dropdown .dropdown-item:contains(first record)`).click();
+
+    await contains(".o_field_many2many_selection input").click();
+    await runAllTimers();
+    await contains(`.dropdown .dropdown-item:contains(silver)`).click();
+
+    await contains(".o_field_many2many_selection input").click();
+    await runAllTimers();
+    await contains(`.dropdown .dropdown-item:contains(gold)`).click();
+
+    //Go Back to the list, this will save the record
+    await contains(`.o_back_button`).click();
+
+    expect.verifyErrors([
+        `Error: Connection to "/web/dataset/call_kw/partner/onchange" couldn't be established or was interrupted`,
+        `Error: Connection to "/web/dataset/call_kw/partner/web_search_read" couldn't be established or was interrupted`,
+    ]);
+
+    // The created record will be save the next time we are online
+    await contains(`.o_menu_systray .o_nav_entry .fa-chain-broken`).click();
+    expect(queryAllTexts`.o-dropdown--menu .o_offline_systray_content div`).toEqual([
+        "PARTNER",
+        "Record",
+        "Created",
+        "",
+    ]);
+
+    // go online and save the record.
+    await setOffline(false);
+
+    expect(getService("offline").offline).toBe(false);
+    await expect.waitForSteps(["web_save"]); // We sync when the connection returns
+    //The current view is not updated when the offline is sync.
+    //In this case we don't see the newly created record, until the view is reloaded.
+    expect(`tbody tr`).toHaveCount(4, { message: "The new record is not showed in the list." });
+
+    //Reload the view
+    //The offline create record is there
+    await getService("action").doAction(1);
+    expect(`tbody tr`).toHaveCount(5);
+
+    expect(`tbody tr:eq(4) .o_data_cell`).toHaveText("test");
+    await contains(`tbody tr:eq(4) .o_data_cell`).click();
+
+    expect(`.o_field_widget[name=foo] input`).toHaveValue("test");
+    expect(`.o_field_widget[name=parent_id] input`).toHaveValue("first record");
+    expect(queryAllTexts(`.o_field_widget[name=type_ids] .o_field_tags .o_tag`)).toEqual([
+        "silver",
+        "gold",
+    ]);
+});
+
 test(`form rendering with class and style attributes`, async () => {
     await mountView({
         resModel: "partner",
