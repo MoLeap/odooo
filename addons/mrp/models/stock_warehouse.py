@@ -3,7 +3,6 @@
 
 from odoo import api, Command, fields, models, _
 from odoo.exceptions import ValidationError, UserError
-from odoo.osv.expression import Domain
 from odoo.tools import split_every
 
 
@@ -53,21 +52,7 @@ class StockWarehouse(models.Model):
             ], limit=1))
 
     def _inverse_manufacture_to_resupply(self):
-        for warehouse in self:
-            rules_domain = Domain([
-                ('action', '=', 'manufacture'),
-                ('warehouse_id', 'in', warehouse.id),
-                ('route_id.warehouse_selectable', '=', True),
-            ])
-            if not warehouse.manufacture_to_resupply:
-                rules_domain += Domain([('route_id.warehouse_ids', 'in', warehouse.id)])
-            manufacture_routes = self.env['stock.rule'].search(rules_domain).route_id
-            if not manufacture_routes and warehouse.manufacture_to_resupply:
-                raise UserError(self.env._('There is no existing configuration for manufacturing in this warehouse. Please set up the routes and rules before activating this option.'))
-            if warehouse.manufacture_to_resupply:
-                manufacture_route.warehouse_ids = [Command.link(warehouse.id)]
-            else:
-                manufacture_route.warehouse_ids = [Command.unlink(warehouse.id)]
+        pass
 
     def _create_or_update_route(self):
         manufacture_route = self._find_or_create_global_route('mrp.route_warehouse0_manufacture', _('Manufacture'))
