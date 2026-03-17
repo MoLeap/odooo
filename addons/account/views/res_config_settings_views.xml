@@ -72,7 +72,7 @@
                                 string = "EU Intra-community Distance Selling"
                                 documentation="/applications/finance/accounting/taxation/taxes/eu_distance_selling.html"
                                 help="Apply VAT of the EU country to which goods and services are delivered."
-                                invisible="not('EU' in company_country_group_codes or company_country_code in ('CH', 'UK'))">
+                                invisible="not('EU' in country_group_codes or country_code in ('CH', 'UK'))">
                                 <button type="object" name="action_eu_oss_tax_mapping" icon="fa-refresh" string="OSS Tax mapping" class="btn-link"/>
                             </setting>
                             <setting id="tax_exigibility" company_dependent="1" help="Allow to configure taxes using cash basis" title="Select this if the taxes should use cash basis, which will create an entry for such taxes on a given account during reconciliation."
@@ -131,7 +131,7 @@
                             </setting>
                             <setting id="intrastat_statistics" help="Collect information and produce statistics on the trade in goods in Europe with intrastat"
                                 documentation="/applications/finance/accounting/reporting/declarations/intrastat.html"
-                                invisible="'INTRASTAT' not in company_country_group_codes">
+                                invisible="'INTRASTAT' not in country_group_codes">
                                 <field name="module_account_intrastat" widget="upgrade_boolean"/>
                             </setting>
                             <setting id="default_incoterm" string="Default Incoterm" help="Default Incoterm of your company">
@@ -212,7 +212,7 @@
                             </setting>
                             <setting id="collect_customer_payment" title="If you check this box, you will be able to collect payments using SEPA Direct Debit mandates." string="SEPA Direct Debit (SDD)" company_dependent="1" help="Collect customer payments in one-click using Euro SEPA Service"
                                 documentation="/applications/finance/accounting/receivables/customer_payments/batch_sdd.html"
-                                invisible="'SEPA' not in company_country_group_codes">
+                                invisible="'SEPA' not in country_group_codes">
                                 <field name="module_account_sepa_direct_debit" class="oe_inline" widget="upgrade_boolean"/>
                                 <div class="content-group" invisible="not module_account_sepa_direct_debit">
                                     <div class="text-warning mt16 mb4">

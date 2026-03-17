@@ -27,6 +27,7 @@ class HrEmployee(models.Model):
         help='Select the user responsible for approving "Expenses" of this employee.\n'
              'If empty, the approval is done by an Administrator or Approver (determined in settings/users).',
     )
+    company_country_id = fields.Many2one(related='company_id.account_fiscal_country_id')
 
     filter_for_expense = fields.Boolean(store=False, search='_search_filter_for_expense', groups="hr.group_hr_user")
 
