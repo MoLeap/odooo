@@ -27,6 +27,7 @@ export class OdooBarChart extends OdooChart {
         super(definition, sheetId, getters);
         this.verticalAxisPosition = definition.verticalAxisPosition;
         this.stacked = definition.stacked;
+        this.showTotals = definition.showTotals;
         this.axesDesign = definition.axesDesign;
         this.horizontal = definition.horizontal;
         this.zoomable = definition.zoomable;
@@ -37,6 +38,7 @@ export class OdooBarChart extends OdooChart {
             ...super.getDefinition(),
             verticalAxisPosition: this.verticalAxisPosition,
             stacked: this.stacked,
+            showTotals: this.showTotals,
             axesDesign: this.axesDesign,
             trend: this.trend,
             horizontal: this.horizontal,

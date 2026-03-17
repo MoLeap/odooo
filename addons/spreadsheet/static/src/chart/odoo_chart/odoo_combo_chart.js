@@ -24,6 +24,7 @@ const {
 export class OdooComboChart extends OdooChart {
     constructor(definition, sheetId, getters) {
         super(definition, sheetId, getters);
+        this.showTotals = definition.showTotals;
         this.axesDesign = definition.axesDesign;
         this.hideDataMarkers = definition.hideDataMarkers;
         this.zoomable = definition.zoomable;
@@ -32,6 +33,7 @@ export class OdooComboChart extends OdooChart {
     getDefinition() {
         return {
             ...super.getDefinition(),
+            showTotals: this.showTotals,
             axesDesign: this.axesDesign,
             hideDataMarkers: this.hideDataMarkers,
             zoomable: this.zoomable,
