@@ -566,11 +566,6 @@ class AccountTax(models.Model):
                 name += ' (%s)' % record.country_code
             record.display_name = name
 
-    @api.onchange('amount')
-    def onchange_amount(self):
-        if self.amount_type in ('percent', 'division') and self.amount != 0.0 and not self.invoice_label:
-            self.invoice_label = "{0:.4g}%".format(self.amount)
-
     @api.onchange('amount_type')
     def onchange_amount_type(self):
         if self.amount_type != 'group':
