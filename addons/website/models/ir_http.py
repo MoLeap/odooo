@@ -469,6 +469,10 @@ class IrHttp(models.AbstractModel):
             return request.redirect(path, code=301)
 
         if page_info:
+            if not WebsitePage.env.context.get('website_id'):
+                website_id = page_info['website_id'] or request.env['website'].get_current_website(fallback=True).id
+                WebsitePage = WebsitePage.with_context(website_id=website_id)
+                request.update_context(website_id=website_id)
             return WebsitePage.browse(page_info['id'])._get_response(request)
 
         return False
@@ -546,13 +550,15 @@ class IrHttp(models.AbstractModel):
         values['editable'] = request.env.uid and request.env.user.has_group('website.group_website_designer')
         return values
 
-    @classmethod
-    def _get_error_html(cls, env, code, values):
-        if not env.context.get('website_id') and (website_id := request.env.context.get('fallback_website_id')):
-            env = env(context=dict(env.context, website_id=website_id))
+    @api.model
+    def _get_error_html(self, code, values):
+        irHttp = self
+        if not self.env.context.get('website_id') and (website_id := request.env.context.get('fallback_website_id')):
+            irHttp = self.with_context(self.env.context, website_id=website_id)
         if code in ('page_404', 'protected_403'):
-            return code.split('_')[1], env['ir.ui.view']._render_template('website.%s' % code, values)
-        return super()._get_error_html(env, code, values)
+            website = request.env["website"].get_current_website(fallback=True)
+            return code.split('_')[1], website._render_template('website.%s' % code, values)
+        return super(IrHttp, irHttp)._get_error_html(code, values)
 
     @api.model
     def get_frontend_session_info(self):

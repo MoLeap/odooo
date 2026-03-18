@@ -254,7 +254,7 @@ class Cart(PaymentPortal):
 
         website = self.env["website"].get_current_website()
         order_sudo = request.cart
-        values["website_sale.cart_lines"] = IrUiView._render_template(
+        values["website_sale.cart_lines"] = website._render_template(
             "website_sale.cart_lines",
             {
                 "website_sale_order": order_sudo,
@@ -262,7 +262,7 @@ class Cart(PaymentPortal):
                 "suggested_products": order_sudo._cart_accessories(),
             },
         )
-        values["website_sale.shorter_cart_summary"] = IrUiView._render_template(
+        values["website_sale.shorter_cart_summary"] = website._render_template(
             "website_sale.shorter_cart_summary",
             {
                 "website_sale_order": order_sudo,
@@ -271,7 +271,7 @@ class Cart(PaymentPortal):
                 **website._get_checkout_step_values(),
             },
         )
-        values["website_sale.quick_reorder_history"] = IrUiView._render_template(
+        values["website_sale.quick_reorder_history"] = website._render_template(
             "website_sale.quick_reorder_history",
             {"website_sale_order": order_sudo, **self._prepare_order_history()},
         )
@@ -347,7 +347,8 @@ class Cart(PaymentPortal):
                 order_sudo.amount_total, order_sudo.currency_id
             )
         ) or 0.0
-        values["website_sale.cart_lines"] = IrUiView._render_template(
+        website = self.env["website"].get_current_website()
+        values["website_sale.cart_lines"] = website._render_template(
             "website_sale.cart_lines",
             {
                 "website_sale_order": order_sudo,
@@ -355,10 +356,10 @@ class Cart(PaymentPortal):
                 "suggested_products": order_sudo._cart_accessories(),
             },
         )
-        values["website_sale.total"] = IrUiView._render_template(
+        values["website_sale.total"] = website._render_template(
             "website_sale.total", {"website_sale_order": order_sudo}
         )
-        values["website_sale.quick_reorder_history"] = IrUiView._render_template(
+        values["website_sale.quick_reorder_history"] = website._render_template(
             "website_sale.quick_reorder_history",
             {"website_sale_order": order_sudo, **self._prepare_order_history()},
         )
