@@ -28,10 +28,9 @@ import { fuzzyLevenshteinLookup } from "@web/core/utils/search";
 import { isBrowserSafari } from "@web/core/browser/feature_detection";
 
 export const ROUTES = {
-    descriptionScreen: 2,
-    paletteSelectionScreen: 3,
-    featuresSelectionScreen: 4,
-    themeSelectionScreen: 5,
+    descriptionScreen: 1,
+    themeSelectionScreen: 2,
+    setupStyleScreen: 3,
 };
 
 export const WEBSITE_TYPES = {
@@ -124,22 +123,6 @@ export class SkipButton extends Component {
     static props = {
         skip: Function,
     };
-}
-
-export class WelcomeScreen extends Component {
-    static template = "website.Configurator.WelcomeScreen";
-    static components = { SkipButton };
-    static props = {
-        skip: Function,
-        navigate: Function,
-    };
-    setup() {
-        this.state = useStore();
-    }
-
-    goToDescription() {
-        this.props.navigate(ROUTES.descriptionScreen);
-    }
 }
 
 export class DescriptionScreen extends Component {
@@ -352,7 +335,7 @@ export class DescriptionScreen extends Component {
                     unknown_industry: selectedIndustry.label,
                 });
             }
-            this.props.navigate(ROUTES.paletteSelectionScreen);
+            this.props.navigate(ROUTES.themeSelectionScreen);
         }
     }
     onConfiguratorScreenFocusin(ev) {
@@ -642,6 +625,7 @@ export class ThemeSelectionScreen extends ApplyConfiguratorScreen {
             this.extraThemeSVGPreviews.push(useRef(`ExtraThemePreview${i}`));
         }
         onWillStart(async () => {
+            this.state.selectPalette("default-light-1"); // TODO remove this draft code
             const themes = await getRecommendedThemes(this.orm, this.state);
             if (!themes.length) {
                 await this.applyConfigurator("theme_default");
@@ -722,8 +706,9 @@ export class ThemeSelectionScreen extends ApplyConfiguratorScreen {
         });
     }
 
-    async chooseTheme(themeName) {
-        await this.applyConfigurator(themeName);
+    chooseTheme(themeName) {
+        this.state.selectedTheme = themeName;
+        this.props.navigate(ROUTES.setupStyleScreen);
     }
 
     async getMoreThemes() {
@@ -745,6 +730,23 @@ export class ThemeSelectionScreen extends ApplyConfiguratorScreen {
 
     getExtraThemeName(idx) {
         return this.state.extraThemes.length > idx && this.state.extraThemes[idx].name;
+    }
+}
+
+export class SetupStyleScreen extends ApplyConfiguratorScreen {
+    static template = "website.Configurator.SetupStyleScreen";
+    setup() {
+        super.setup();
+        this.orm = useService("orm");
+        this.state = useStore();
+    }
+
+    changeTheme() {
+        this.props.navigate(ROUTES.themeSelectionScreen);
+    }
+
+    async startBuilding() {
+        await this.applyConfigurator(this.state.selectedTheme);
     }
 }
 
@@ -890,11 +892,9 @@ export function useStore() {
 
 export class Configurator extends Component {
     static components = {
-        WelcomeScreen,
         DescriptionScreen,
-        PaletteSelectionScreen,
-        FeaturesSelectionScreen,
         ThemeSelectionScreen,
+        SetupStyleScreen,
     };
     static template = "website.Configurator.Configurator";
     static props = { ...standardActionServiceProps };
@@ -963,16 +963,12 @@ export class Configurator extends Component {
     }
 
     get currentComponent() {
-        if (this.state.currentStep === ROUTES.descriptionScreen) {
-            return DescriptionScreen;
-        } else if (this.state.currentStep === ROUTES.paletteSelectionScreen) {
-            return PaletteSelectionScreen;
-        } else if (this.state.currentStep === ROUTES.featuresSelectionScreen) {
-            return FeaturesSelectionScreen;
-        } else if (this.state.currentStep === ROUTES.themeSelectionScreen) {
+        if (this.state.currentStep === ROUTES.themeSelectionScreen) {
             return ThemeSelectionScreen;
+        } else if (this.state.currentStep === ROUTES.setupStyleScreen) {
+            return SetupStyleScreen;
         }
-        return WelcomeScreen;
+        return DescriptionScreen;
     }
 
     get componentProps() {
@@ -980,7 +976,10 @@ export class Configurator extends Component {
             skip: this.skipConfigurator.bind(this),
             navigate: this.navigate.bind(this),
         };
-        if (this.state.currentStep === ROUTES.themeSelectionScreen) {
+        if (
+            this.state.currentStep === ROUTES.themeSelectionScreen ||
+            this.state.currentStep === ROUTES.setupStyleScreen
+        ) {
             props.clearStorage = this.clearStorage.bind(this);
         }
         return props;
@@ -1067,6 +1066,7 @@ export class Configurator extends Component {
             formerSelectedPurpose: undefined,
             selectedIndustry: undefined,
             selectedPalette: undefined,
+            selectedTheme: undefined,
             recommendedPalette: undefined,
             defaultColors: defaultColors,
             palettes: palettes,
@@ -1084,6 +1084,7 @@ export class Configurator extends Component {
             logoAttachmentId: state.logoAttachmentId,
             selectedIndustry: state.selectedIndustry,
             selectedPalette: state.selectedPalette,
+            selectedTheme: state.selectedTheme,
             selectedPurpose: state.selectedPurpose,
             formerSelectedPurpose: state.formerSelectedPurpose,
             selectedType: state.selectedType,
