@@ -9,9 +9,13 @@ const ChartEdit = (I) =>
         }
 
         start() {
-            super.start();
-            this.websiteEditService = this.services.website_edit;
-            this.websiteEditService.callShared("builderOverlay", "refreshOverlays");
+            // Prevent multiple start when multiple values of the dataset are
+            // changed quickly (on paste)
+            this.waitForAnimationFrame(() => {
+                super.start();
+                this.websiteEditService = this.services.website_edit;
+                this.websiteEditService.callShared("builderOverlay", "refreshOverlays");
+            });
         }
     };
 
