@@ -28,6 +28,11 @@ class PaymentTransaction(models.Model):
             "url_params": {"reference": self.reference},
         }
 
+    def _requires_communication_details(self):
+        """Show the communication details for wire transfer transactions."""
+        self.ensure_one()
+        return self.payment_method_code == 'wire_transfer'
+
     def _get_communication(self):
         """Return the communication the user should use for their transaction.
 
@@ -81,3 +86,20 @@ class PaymentTransaction(models.Model):
                 provider_name=self.provider_id.name,
             )
         return message
+
+    def _post_process(self):
+        """Confirm orders for postpaid providers."""
+        postpaid_pending_txs = self.filtered(
+            lambda tx: tx.state == 'pending' and tx.provider_id._is_postpaid()
+        )
+        postpaid_pending_txs.sale_order_ids.filtered(
+            lambda so: so.state in ['draft', 'sent']
+        ).with_context(send_email=True).action_confirm()
+        super()._post_process()
+
+    def _get_order_payment_status(self):
+        """Consider the order status is done for postpaid providers."""
+        self.ensure_one()
+        if self.state == 'pending' and self.provider_id._is_postpaid():
+            return 'done'
+        return self.state

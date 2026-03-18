@@ -7,7 +7,6 @@ from . import (
     ir_http,
     ir_module_module,
     payment_provider,
-    payment_transaction,
     product_category,
     res_partner,
     sale_order,

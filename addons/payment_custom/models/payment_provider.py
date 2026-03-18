@@ -19,7 +19,7 @@ class PaymentProvider(models.Model):
     )
     custom_mode = fields.Selection(
         string="Custom Mode",
-        selection=[("wire_transfer", "Wire Transfer")],
+        selection=[("pay_on_invoice", "Pay on Invoice"), ("wire_transfer", "Wire Transfer")],
         required_if_provider="custom",
     )
     qr_code = fields.Boolean(
@@ -37,9 +37,20 @@ class PaymentProvider(models.Model):
     def _get_default_payment_method_codes(self):
         """Override of `payment` to return the default payment method codes."""
         self.ensure_one()
-        if self.code != "custom" or self.custom_mode != "wire_transfer":
+        if self.code != "custom" or self.custom_mode not in ["pay_on_invoice", "wire_transfer"]:
             return super()._get_default_payment_method_codes()
         return const.DEFAULT_PAYMENT_METHOD_CODES
+
+    def _is_postpaid(self):
+        """Return whether the provider is postpaid."""
+        self.ensure_one()
+        return self.custom_mode == 'pay_on_invoice'
+
+    def _get_status_message(self, status):
+        self.ensure_one()
+        if status == 'pending' and self._is_postpaid():
+            return self.done_msg
+        return super()._get_status_message(status)
 
     # === ACTION METHODS ===#
 
