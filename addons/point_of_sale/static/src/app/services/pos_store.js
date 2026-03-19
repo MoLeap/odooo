@@ -57,7 +57,6 @@ export const CONSOLE_COLOR = "#F5B427";
 export class PosStore extends WithLazyGetterTrap {
     loadingSkipButtonIsShown = false;
     mainScreen = { name: null, component: null };
-<<<<<<< HEAD
     static excludedLazyGetters = [
         "defaultPage",
         "firstPage",
@@ -70,9 +69,6 @@ export class PosStore extends WithLazyGetterTrap {
         "printOptions",
         "showSaveOrderButton",
     ];
-=======
-    orderReceiptComponent = OrderReceipt;
->>>>>>> 32005469cbcb ([ADD] l10n_be_pos_blackbox: add support for the Belgian Blackbox v2)
 
     static serviceDependencies = [
         "bus_service",
@@ -91,6 +87,7 @@ export class PosStore extends WithLazyGetterTrap {
         "mail.sound_effects",
         "iot_longpolling",
     ];
+    orderReceiptComponent = OrderReceipt;
 
     constructor() {
         super({});
@@ -432,6 +429,9 @@ export class PosStore extends WithLazyGetterTrap {
 
         await this.deviceSync.readDataFromServer();
 
+        // Check cashier
+        this.checkPreviousLoggedCashier();
+
         // Add Payment Interface to Payment Method
         for (const pm of this.models["pos.payment.method"].getAll()) {
             const PaymentInterface = this.electronic_payment_interfaces[pm.use_payment_terminal];
@@ -705,9 +705,6 @@ export class PosStore extends WithLazyGetterTrap {
     }
 
     async afterProcessServerData() {
-        // Check cashier
-        this.checkPreviousLoggedCashier();
-
         // Adding the not synced paid orders to the pending orders
         const paidUnsyncedOrderIds = this.models["pos.order"]
             .filter((order) => order.isUnsyncedPaid)

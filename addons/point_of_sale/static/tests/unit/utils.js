@@ -29,18 +29,14 @@ export const setupPosEnv = async (opts = { setupCashier: true }) => {
 
     await makeDialogMockEnv();
     const store = getService("pos");
-<<<<<<< HEAD
-    store.setCashier(store.user);
+    if (opts.setupCashier) {
+        store.setCashier(store.user);
+    }
     patchWithCleanup(user, {
         // Needed for the allowProductCreation method
         checkAccessRight: (model, operation) =>
             operation === "create" && model === "product.product",
     });
-=======
-    if (opts.setupCashier) {
-        store.setCashier(store.user);
-    }
->>>>>>> 32005469cbcb ([ADD] l10n_be_pos_blackbox: add support for the Belgian Blackbox v2)
     return store;
 };
 

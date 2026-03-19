@@ -32,6 +32,7 @@ export class SelfOrder extends Reactive {
         super();
         this.ready = this.setup(...args).then(() => this);
     }
+    orderReceiptComponent = OrderReceipt;
 
     async setup(
         env,
