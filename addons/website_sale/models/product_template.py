@@ -521,12 +521,10 @@ class ProductTemplate(models.Model):
         if (
             product_or_template.type == "combo"
             and website.show_line_subtotals_tax_selection == "tax_included"
-            and not all(
-                tax.price_include
-                for tax in product_or_template.sudo().combo_ids.combo_item_ids.product_id.taxes_id
-            )
         ):
-            combination_info["tax_disclaimer"] = _("Taxes calculated at checkout.")
+            combination_info["tax_disclaimer"] = _(
+                "Final price may vary based on selected items and applicable taxes."
+            )
 
         return combination_info
 
@@ -594,7 +592,7 @@ class ProductTemplate(models.Model):
             self.env.company
         )
         taxes = self.env["account.tax"]
-        if product_taxes:
+        if product_taxes or product_or_template.type == "combo":
             taxes = request.fiscal_position.map_tax(product_taxes)
             # We do not apply taxes on the compare_list_price value because it's meant to be
             # a strict value displayed as is.
@@ -672,16 +670,37 @@ class ProductTemplate(models.Model):
         self, price, currency, product_taxes, taxes, product_or_template, website=None
     ):
         website = website or self.env["website"].get_current_website()
-        price = self.env["product.product"]._get_tax_included_unit_price_from_price(
+        base_price = self.env["product.product"]._get_tax_included_unit_price_from_price(
             price, product_taxes, product_taxes_after_fp=taxes
         )
         show_tax = website.show_line_subtotals_tax_selection
         tax_display = "total_excluded" if show_tax == "tax_excluded" else "total_included"
 
-        # The list_price is always the price of one.
-        return taxes.compute_all(price, currency, 1, product_or_template, self.env.user.partner_id)[
-            tax_display
-        ]
+        if product_or_template.type == "combo" and tax_display == "total_included":
+            # Heuristic: Pick the first combo item of each choice
+            assumed_combo_items = product_or_template.sudo().combo_ids.mapped(
+                lambda c: c.combo_item_ids[:1]
+            )
+
+            total_standard_price = sum(assumed_combo_items.mapped("product_id.lst_price"))
+            approx_price = 0.0
+            if total_standard_price > 0:
+                for item in assumed_combo_items:
+                    ratio = item.product_id.lst_price / total_standard_price
+                    prorated_base = (base_price * ratio) + item.extra_price
+                    item_taxes = item.product_id.taxes_id._filter_taxes_by_company(self.env.company)
+                    if item_taxes:
+                        approx_price += item_taxes.compute_all(
+                            prorated_base, currency, 1, item.product_id, self.env.user.partner_id
+                        )[tax_display]
+                    else:
+                        approx_price += prorated_base
+                return approx_price
+            return base_price + sum(assumed_combo_items.mapped("extra_price"))
+
+        return taxes.compute_all(
+            base_price, currency, 1, product_or_template, self.env.user.partner_id
+        )[tax_display]
 
     def create_product_variant(self, product_template_attribute_value_ids):
         """Create if necessary and possible and return the id of the product

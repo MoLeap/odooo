@@ -20,7 +20,7 @@ registry
             comboConfiguratorTourUtils.assertFooterButtonsEnabled(),
             {
                 content: "Check that the tax disclaimer gets displayed",
-                trigger: '.js_product small:contains(Taxes calculated at checkout.)',
+                trigger: '.js_product small:contains("Final price may vary based on selected items and applicable taxes.")',
             },
             // Assert that the cart's content is correct.
             {
