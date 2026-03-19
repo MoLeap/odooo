@@ -1323,39 +1323,46 @@ class PaymentTransaction(models.Model):
         :rtype: Markup
         """
         validation_status_messages = {
-            'pending': Markup(f'<p>{_("Saving your payment method.")}</p>'),
-            'done': Markup(f'<p>{_("Your payment method has been saved.")}</p>'),
-            'cancel': Markup(f'<p>{_("The saving of your payment method has been canceled.")}</p>'),
-            'error': Markup(f'''
+            "pending": Markup(f"<p>{_('Saving your payment method.')}</p>"),
+            "done": Markup(f"<p>{_('Your payment method has been saved.')}</p>"),
+            "cancel": Markup(f"<p>{_('The saving of your payment method has been canceled.')}</p>"),
+            "error": Markup(f"""
                     <p>{_("An error occurred while saving your payment method.")}</p>
                     <p>{self.state_message}</p>
-            '''),
+            """),
         }
-        if self.operation == 'validation' and self.state in validation_status_messages:
+        if self.operation == "validation" and self.state in validation_status_messages:
             status_messages = validation_status_messages
         else:
             provider_sudo = self.provider_id.sudo()
             status_messages = {
-                'draft': Markup(f'<p>{_("Your payment has not been processed yet.")}</p>'),
-                'pending': provider_sudo.pending_msg,
-                'authorized': provider_sudo.auth_msg,
-                'done': provider_sudo.done_msg,
-                'cancel': provider_sudo.cancel_msg,
-                'error': Markup(f'''
+                "draft": Markup(f"<p>{_('Your payment has not been processed yet.')}</p>"),
+                "pending": provider_sudo.pending_msg,
+                "authorized": provider_sudo.auth_msg,
+                "done": provider_sudo.done_msg,
+                "cancel": provider_sudo.cancel_msg,
+                "error": Markup(f"""
                     <p>{_("An error occurred during the processing of your payment.")}</p>
                     <p>{self.state_message}</p>
-                '''),
+                """),
             }
         return status_messages.get(self.state)
 
+    def generate_notification_channel(self):
+        """Generate notification channel that the websocket will listen to on the /payment/status
+        page.
+
+        :param payment.transaction tx: The transaction to generate a notification channel for.
+        """
+        notification_access_token = payment_utils.generate_access_token(
+            self.id, self.amount, self.currency_id.id, env=self.env
+        )
+        return f"PAYMENT_PROCESSING_CHANNEL_{notification_access_token}"
+
     def _send_trigger_post_processing_notification(self):
-        """Send a notification that will trigger the post processing if it reaches a final state.
+        """Send a notification that will trigger the post processing.
 
         Note: `self.ensure_one()`
         """
-        final_states = self.provider_id._get_final_states()
-        if self.state in final_states:
-            notification_channel = payment_utils.generate_notification_channel(self)
-            self.env["bus.bus"]._sendone(
-                notification_channel, "PAYMENT_TRIGGER_POST_PROCESSING", {}
-            )
+        notification_channel = self.generate_notification_channel()
+        self.env["bus.bus"]._sendone(notification_channel, "PAYMENT_TRIGGER_POST_PROCESSING", {})

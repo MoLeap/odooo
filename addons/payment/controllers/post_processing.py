@@ -3,11 +3,8 @@
 import logging
 
 from odoo import http
-from odoo.exceptions import UserError
 from odoo.http import request
 from odoo.tools.translate import LazyTranslate
-
-from odoo.addons.payment import utils as payment_utils
 
 _lt = LazyTranslate(__name__)
 _logger = logging.getLogger(__name__)
@@ -43,7 +40,7 @@ class PaymentPostProcessing(http.Controller):
         monitored_tx = self._get_monitored_transaction()
         # The session might have expired, or the transaction never existed.
         if monitored_tx:
-            notification_channel = payment_utils.generate_notification_channel(monitored_tx)
+            notification_channel = monitored_tx.generate_notification_channel()
             values = {"tx": monitored_tx, "notification_channel": notification_channel}
         else:
             values = {"payment_not_found": True}
@@ -51,7 +48,7 @@ class PaymentPostProcessing(http.Controller):
 
     @http.route("/payment/post_process", type="jsonrpc", auth="public")
     def payment_post_process(self, **_kwargs):
-        """ Fetch the transaction and trigger its post-processing.
+        """Fetch the transaction and trigger its post-processing.
 
         :return: The post-processing values of the transaction.
         :rtype: dict
@@ -67,7 +64,8 @@ class PaymentPostProcessing(http.Controller):
             except Exception as e:
                 _logger.exception(
                     "Encountered an error while post-processing transaction with id %s:\n%s",
-                    monitored_tx.id, e
+                    monitored_tx.id,
+                    e,  # noqa: TRY401
                 )
                 raise
         return {
