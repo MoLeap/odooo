@@ -237,17 +237,16 @@ class LoyaltyCard(models.Model):
 
     def _recompute_loyalty_card_balances(self):
         """Recalculate the total point balance for loyalty cards after cancellations."""
-        for coupon in self:
-            if available := sum(coupon.history_ids.mapped("available_issued_points")):
-                coupon.points = available
-            else:
-                debts = (
-                    self
-                    .env["loyalty.point.track"]
-                    .sudo()
-                    .search([
-                        ("issuer_line_id", "=", False),
-                        ("redeemer_line_id.card_id", "=", coupon.id),
-                    ])
-                )
-                coupon.points = sum(debts.mapped("points"))
+        if available := sum(self.history_ids.mapped("available_issued_points")):
+            self.points = available
+        else:
+            debts = (
+                self
+                .env["loyalty.point.track"]
+                .sudo()
+                .search([
+                    ("issuer_line_id", "=", False),
+                    ("redeemer_line_id.card_id", "=", self.id),
+                ])
+            )
+            self.points = sum(debts.mapped("points"))

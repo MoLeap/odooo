@@ -248,9 +248,8 @@ class SaleOrder(models.Model):
             )
             self._cancel_loyalty_history_for_coupon(coupon_history_lines)
             cancelled_history_lines -= coupon_history_lines
-
-        # Recalculate balance for all affected cards
-        affected_coupons._recompute_loyalty_card_balances()
+            # Recalculate balance for all affected cards
+            coupon._recompute_loyalty_card_balances()
 
         self.order_line.filtered(lambda line: line.is_reward_line).unlink()
         self.coupon_point_ids.coupon_id.sudo().filtered(
@@ -301,6 +300,7 @@ class SaleOrder(models.Model):
                 issuer = track.issuer_line_id
                 if issuer and (not issuer.expiration_date or issuer.expiration_date >= today):
                     issuer.available_issued_points += track.points
+                    issuer.active = True
                     issuers_to_compensate |= issuer
 
             # Issued points, hence try to reallocate from eligible issuers
@@ -314,9 +314,7 @@ class SaleOrder(models.Model):
         related_point_tracks.unlink()
         coupon_history_lines.sudo().unlink()
 
-        # Handle any remaining debts and update active status
-        issuers_to_compensate = issuers_to_compensate.exists()
-        issuers_to_compensate.active = True
+        # Handle any remaining debts
         issuers_to_compensate.compensate_existing_debts()
 
         # Re-redeem points for the tracks that lost their issuer
