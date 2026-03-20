@@ -8,6 +8,9 @@ EXCLUDED_PATH = (
     'iot_drivers/static/src/',
     'web/static/src/owl2',
     'addons/web/static/lib/owl/owl.js',
+    'html_builder/static/tests/custom_tab/builder_components/builder_list.test.js',  # Test has weird string formatting syntax easier to skip
+    'html_builder/static/tests/custom_tab/builder_components/builder_row.test.js',  # Test has weird string formatting syntax easier to skip
+    'web_studio/static/src/client_action/report_editor/report_editor_xml/translate_xml.js',  # Weird inline xml, easier to do by hand
     '/node_modules/'
 )
 
