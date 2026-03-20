@@ -88,8 +88,8 @@
             <field name="amount">7.0</field>
         </record>
 
-        <function model="pos.session" name="action_pos_session_closing_control"
-            eval="[[ref('pos_closed_session_3')]]" />
+        <function model="pos.session" name="close_session_from_ui"
+            eval="[[ref('pos_closed_session_3')], 2243.57]" />
 
         <!-- Closed Session 4 -->
 
@@ -208,8 +208,8 @@
             <field name="amount">6.60</field>
         </record>
 
-        <function model="pos.session" name="action_pos_session_closing_control"
-            eval="[[ref('pos_closed_session_4')]]" />
+        <function model="pos.session" name="close_session_from_ui"
+            eval="[[ref('pos_closed_session_4')], 2243.57]" />
 
         <!-- Open Session -->
         <record id="customer_1" model="res.partner">
