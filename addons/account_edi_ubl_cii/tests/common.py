@@ -1,6 +1,10 @@
+import requests
+
+from lxml import etree
+
 from odoo import Command
+from odoo.tools import config, file_open
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
-from odoo.tools import file_open
 
 
 class TestUblCiiCommon(AccountTestInvoicingCommon):
@@ -143,7 +147,77 @@ class TestUblCiiCommon(AccountTestInvoicingCommon):
         subfolder = f'export/{subfolder_format}/{subfolder_document}/{subfolder_country}'
 
         self.assertTrue(invoice.ubl_cii_xml_id)
+
+        if 'EXTERNAL_MODE' in config['test_tags']:
+            self._assert_ubl(invoice.ubl_cii_xml_id.raw)
+
         self.assert_xml(invoice.ubl_cii_xml_id.raw, filename, subfolder=subfolder)
+
+    def _assert_ubl(self, xml_element: str | bytes | etree._Element):
+        """
+        Helper to validate the xml_element against the ubl structure.
+        This function should only be run in EXTERNAL_MODE!
+
+        :param xml_element: the _Element/str/bytes content to be validated
+        :return:
+        """
+        assert 'EXTERNAL_MODE' in config['test_tags'], "Can only be run in EXTERNAL_MODE"
+
+        def format_errors(errors: list[str] | dict[str, list[str]]) -> str:
+            if isinstance(errors, list):
+                return '\n- '.join(errors)
+
+            joined = ""
+            for group, group_errors in errors.items():
+                joined += f"{group}: \n{format_errors(group_errors)}\n"
+            return joined
+
+        if isinstance(xml_element, etree._Element):
+            xml_element = etree.tostring(xml_element, encoding='UTF-8')
+        if isinstance(xml_element, bytes):
+            xml_element = xml_element.decode('utf-8')
+
+        payload = {
+            'jsonrpc': '2.0',
+            'method': 'call',
+            'params': {
+                'file_content': xml_element,
+            },
+        }
+
+        # Get file details
+        details_response = requests.post(url='https://iap-services.odoo.com/file_validator/get/details', json=payload)
+        self.assertEqual(details_response.status_code, 200)
+        details_json = details_response.json()
+        self.assertFalse('error' in details_json, f"Details call failed: \n\n{details_json.get('error')}")
+        details = details_json['result']
+
+        # XSD validation
+        payload['params']['xsd_name'] = details['xsd_name']
+
+        xsd_response = requests.post(url='https://iap-services.odoo.com/file_validator/validate/xsd', json=payload)
+        self.assertEqual(xsd_response.status_code, 200)
+        xsd_json = xsd_response.json()['result']
+        self.assertFalse(xsd_json['errors'], f"Call to xsd validator failed:\n\n{format_errors(xsd_json['errors'])}")
+        self.assertFalse(xsd_json['xsd_errors'], f"XSD validation failed with following error(s):\n\n{format_errors(xsd_json['xsd_errors'])}")
+
+        # Schematron validation
+        del payload['params']['xsd_name']
+        payload['params']['script_name'] = 'lxml'
+
+        schematron_validation_errors = {}
+        for schematron_name in details['schematrons']:
+            payload['params']['schematron_name'] = schematron_name
+
+            schematron_response = requests.post(url='https://iap-services.odoo.com/file_validator/validate/schematron', json=payload)
+            self.assertEqual(xsd_response.status_code, 200, f"Schematron call failed for '{schematron_name}'")
+            schematron_json = schematron_response.json()['result']
+
+            self.assertFalse(schematron_json['errors'], f"Error for schematron '{schematron_name}': \n\n{format_errors(schematron_json['errors'])}")
+            if schematron_json['fatals']:
+                schematron_validation_errors[schematron_name] = schematron_json['fatals']
+
+        self.assertFalse(schematron_validation_errors, f"Schematron validation failed with following error(s):\n\n{format_errors(schematron_validation_errors)}")
 
     # -------------------------------------------------------------------------
     # IMPORT HELPERS
