@@ -145,9 +145,6 @@ class ResConfigSettings(models.TransientModel):
         help='This is the default credit limit that will be used on partners that do not have a specific limit on them.',
         compute="_compute_account_default_credit_limit", inverse="_inverse_account_default_credit_limit")
 
-    # Technical field to hide country specific fields from accounting configuration
-    country_code = fields.Char(related='company_id.account_fiscal_country_id.code', readonly=True)
-
     # Storno Accounting
     account_storno = fields.Boolean(string="Storno accounting", readonly=False, related='company_id.account_storno')
     display_account_storno = fields.Boolean(related='company_id.display_account_storno')
