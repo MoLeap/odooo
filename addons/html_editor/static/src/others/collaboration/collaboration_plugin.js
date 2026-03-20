@@ -34,7 +34,7 @@ export class CollaborationPlugin extends Plugin {
         /** Handlers */
         on_history_cleaned_handlers: this.onHistoryClean.bind(this),
         on_history_reset_handlers: this.onHistoryReset.bind(this),
-        on_committed_handlers: (commit) => this.onMutationsCommitted(commit),
+        on_history_written_handlers: (commit) => this.onMutationsCommitted(commit),
 
         /** Overrides */
         set_attribute_overrides: this.setAttribute.bind(this),
@@ -129,8 +129,11 @@ export class CollaborationPlugin extends Plugin {
         let commitIndex = 0;
         const selectionData = this.dependencies.selection.getSelectionData();
 
-        const commits = this.dependencies.history.getHistoryCommits();
         for (const newCommit of newCommits) {
+            // `addExternalCommit` will impact the array of written commits.
+            // Get a new copy at every step of the loop to make sure to have an
+            // updated version.
+            const commits = this.dependencies.history.getHistoryCommits();
             // todo: add a test that no 2 on_history_missing_parent_commit_handlers
             // are called in same stack.
             const insertIndex = this.getInsertCommitIndex(commits, newCommit);
@@ -203,7 +206,7 @@ export class CollaborationPlugin extends Plugin {
         index++;
         while (index < commits.length) {
             if (commits[index].data.previousCommitId === newCommit.data.previousCommitId) {
-                if (commits[index].data.authorTimestamp > newCommit.data.authorTimestamp) {
+                if (commits[index].authorTimestamp > newCommit.authorTimestamp) {
                     break;
                 } else {
                     concurentCommits = [commits[index].id];
@@ -284,7 +287,7 @@ export class CollaborationPlugin extends Plugin {
         const historyLength = this.dependencies.history.getHistoryCommits().length;
         if (!this.lastSnapshotLength || this.lastSnapshotLength < historyLength) {
             this.lastSnapshotLength = historyLength;
-            const commit = this.dependencies.domMutation.createSnapshotCommit();
+            const commit = this.dependencies.history.createSnapshotCommit();
             const snapshot = {
                 time: Date.now(),
                 commit,

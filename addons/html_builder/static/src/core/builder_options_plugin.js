@@ -147,8 +147,8 @@ export class BuilderOptionsPlugin extends Plugin {
     ];
     /** @type {import("plugins").BuilderResources} */
     resources = {
-        on_will_commit_handlers: this.onWillCommit.bind(this),
-        on_committed_handlers: this.onCommitted.bind(this),
+        on_flushed_mutations_handlers: this.onFlushedMutations.bind(this),
+        on_history_written_handlers: this.onHistoryWritten.bind(this),
         on_undone_handlers: (revertedCommit) => this.restoreContainers(revertedCommit, "undo"),
         on_redone_handlers: (revertedCommit) => this.restoreContainers(revertedCommit, "redo"),
         clean_for_save_processors: this.cleanForSave.bind(this),
@@ -511,14 +511,14 @@ export class BuilderOptionsPlugin extends Plugin {
         this.dependencies.domMutation.updateExternal("nextTarget", targetEl);
     }
 
-    onWillCommit(type) {
-        if (!["undo", "redo"].includes(type)) {
+    onFlushedMutations(isRevision) {
+        if (!isRevision) {
             // Store the current target in the current commit.
             this.dependencies.domMutation.updateExternal("currentTarget", this.target);
         }
     }
 
-    onCommitted(commit) {
+    onHistoryWritten(commit) {
         // If a target is specified, activate its containers, otherwise simply
         // update them.
         const nextTargetEl = commit.data.external.nextTarget;

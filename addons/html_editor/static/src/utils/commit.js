@@ -4,15 +4,29 @@
  * @typedef { { [key: string]: any } } EditorCommitData
  *
  * @typedef { Object } EditorCommitMetadata
- * @property { boolean } batchable
- * @property { number | null } commitTimestamp
+ * @property { boolean } [batchable = false]
+ * @property { number | null } [commitTimestamp = null]
  */
 
 /**
- * @template [T={}]
+ * @template { Object } [T=EditorCommitData]
  */
 export class EditorCommit {
-    constructor({ id = this.generateId(), type = "original", data = {}, metadata = {} } = {}) {
+    /**
+     * @param { Object } [param0 = {}]
+     * @param { EditorCommitId } [param0.id = this.generateId()]
+     * @param { EditorCommitType } [param0.type = "original"]
+     * @param { T } [param0.data = {}]
+     * @param { EditorCommitMetadata } [param0.metadata = {}]
+     * @param { Date } [param0.authorTimestamp = Date.now()]
+     */
+    constructor({
+        id = this.generateId(),
+        type = "original",
+        data = {},
+        metadata = {},
+        authorTimestamp = Date.now(),
+    } = {}) {
         /** @type { EditorCommitId } */
         this.id = id;
         /** @type { EditorCommitType } */
@@ -24,6 +38,7 @@ export class EditorCommit {
             batchable: metadata.batchable || false,
             commitTimestamp: metadata.commitTimestamp ?? null,
         };
+        this.authorTimestamp = authorTimestamp;
     }
 
     /**
