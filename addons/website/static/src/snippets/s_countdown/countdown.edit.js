@@ -1,7 +1,7 @@
 import { Countdown } from "./countdown";
 import { registry } from "@web/core/registry";
 
-const CountdownEdit = (I) =>
+export const CountdownEdit = (I) =>
     class extends I {
         setup() {
             super.setup();
