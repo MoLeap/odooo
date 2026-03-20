@@ -19,6 +19,8 @@ class WebsiteSaleL10nTW(WebsiteSale):
         invoicing_step = request.website._get_checkout_step(
             '/shop/l10n_tw_invoicing_info'
         )
+        # NOTE VFE: the invoicing_step is global to all customers, if one customer enables it,
+        # every one will see it. bug? ^^
         invoicing_info_needed = invoicing_step.sudo().is_published = (
             order_sudo.company_id._is_ecpay_enabled() and not order_sudo.partner_id.l10n_tw_edi_require_paper_format
         )
@@ -80,7 +82,7 @@ class WebsiteSaleL10nTW(WebsiteSale):
             'carrier_number_2': order_sudo.l10n_tw_edi_carrier_number_2,
         }
         values = self._get_render_context(order_sudo, default_vals)
-        values.update(request.website._get_checkout_step_values())
+        values.update(request.website._get_checkout_step_values('/shop/l10n_tw_invoicing_info'))
         return request.render('l10n_tw_edi_ecpay_website_sale.l10n_tw_edi_invoicing_info', values)
 
     @route('/shop/l10n_tw_invoicing_info/submit', type='http', auth='public', methods=['POST'], website=True, sitemap=False)
@@ -132,14 +134,14 @@ class WebsiteSaleL10nTW(WebsiteSale):
 
         order_sudo.write(vals_to_write)
 
+        checkout_steps_values = request.website._get_checkout_step_values(
+            '/shop/l10n_tw_invoicing_info'
+        )
         if not errors:
-            request.httprequest.path = '/shop/l10n_tw_invoicing_info'
-            return request.redirect(
-                request.website._get_checkout_step_values()['next_website_checkout_step_href']
-            )
+            return request.redirect(checkout_steps_values['next_website_checkout_step_href'])
 
         values = self._get_render_context(order_sudo, default_vals, errors)
-        values.update(request.website._get_checkout_step_values())
+        values.update(checkout_steps_values)
         return request.render('l10n_tw_edi_ecpay_website_sale.l10n_tw_edi_invoicing_info', values)
 
     @http.route("/payment/ecpay/check_mobile_barcode/<int:sale_order_id>", type="jsonrpc", auth="public")

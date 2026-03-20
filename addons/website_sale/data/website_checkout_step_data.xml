@@ -9,6 +9,13 @@
         <field name="back_button_label">Back to cart</field>
     </record>
 
+    <record id="website_sale.checkout_step_address" model="website.checkout.step">
+        <field name="name">Address</field>
+        <field name="sequence">125</field>
+        <field name="step_href">/shop/address</field>
+        <field name="show_in_breadcrumb">False</field>
+    </record>
+
     <record id="website_sale.checkout_step_delivery" model="website.checkout.step">
         <field name="name">Address</field>
         <field name="sequence">250</field>
