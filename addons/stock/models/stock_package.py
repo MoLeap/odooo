@@ -16,6 +16,7 @@ from odoo.tools.float_utils import float_is_zero
 class StockPackage(models.Model):
     """ Packages containing quants and/or other packages """
     _name = 'stock.package'
+    _inherit = ['barcode.uniqueness.mixin']
     _description = "Package"
     _order = 'name, id'
     _parent_name = 'parent_package_id'
@@ -54,6 +55,9 @@ class StockPackage(models.Model):
     pack_date = fields.Date('Pack Date', default=fields.Date.today)
     parent_path = fields.Char(index=True)
     json_popover = fields.Char('JSON data for popover widget', compute='_compute_json_popover')
+
+    def _get_barcode_fname(self):
+        return ['name']
 
     @api.depends('child_package_ids', 'child_package_ids.parent_path')
     def _compute_all_children_package_ids(self):
