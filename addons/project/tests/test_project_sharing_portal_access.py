@@ -167,5 +167,5 @@ class TestProjectSharingPortalAccess(TestProjectSharingCommon):
         project_share_wizard_confirmation.action_send_mail()
         mail_partner = self.env['mail.message'].search([('partner_ids', '=', partner_portal_no_user.id)], limit=1)
         self.assertTrue(mail_partner, 'A mail should have been sent to the non portal user')
-        self.assertIn(f'href="http://localhost:{config["http_port"]}/web/signup', str(mail_partner.body), 'The message link should contain the url to register to the portal')
+        self.assertIn(f'href="http://127.0.0.1:{config["http_port"]}/web/signup', str(mail_partner.body), 'The message link should contain the url to register to the portal')
         self.assertIn('token=', str(mail_partner.body), 'The message link should contain a personalized token to register to the portal')

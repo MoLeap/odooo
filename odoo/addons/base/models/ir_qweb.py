@@ -966,6 +966,8 @@ class IrQweb(models.AbstractModel):
 
     def _compile(self, template):
         ref = None
+        if 'lang' not in self.env.context:
+            self = self.with_context(lang=self.env.user.lang)
         if isinstance(template, str) and template.endswith('.xml'):
             module_path = Manifest.for_addon(Path(template).parts[0]).path
             if 'templates' not in Path(file_path(template)).relative_to(module_path).parts:
@@ -1031,6 +1033,7 @@ class IrQweb(models.AbstractModel):
         ref = self._get_template_info(template)['id'] if isinstance(template, (int, str)) else None
 
         code, options, def_name = self._generate_code(template)
+        print('cache miss', '_generate_code_cached', def_name, tuple(self.env.context.get(k) or False for k in self._get_template_cache_keys()))
 
         if code is None:
             Error, message, stack = options['error']

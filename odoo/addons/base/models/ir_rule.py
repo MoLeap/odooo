@@ -138,6 +138,7 @@ class IrRule(models.Model):
                        'tuple(self._compute_domain_context_values())'),
     )
     def _compute_domain(self, model_name: str, mode: str = "read") -> Domain:
+        #print('cache miss', '_compute_domain', self.env.uid, self.env.su, model_name, mode, tuple(self._compute_domain_context_values()))
         model = self.env[model_name]
 
         # add rules for parent models

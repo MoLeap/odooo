@@ -1609,7 +1609,7 @@ def preload_registries(dbnames):
 
                 # run post-install tests
                 if config['test_enable']:
-                    from odoo.tests import loader  # noqa: PLC0415
+                    from odoo.tests import loader, common  # noqa: PLC0415
                     t0 = time.time()
                     t0_sql = sql_db.sql_counter
                     module_names = sorted(registry.updated_modules if update_module else
@@ -1617,10 +1617,9 @@ def preload_registries(dbnames):
                     _logger.info("Starting post tests")
                     tests_before = registry._assertion_report.testsRun
                     post_install_suite = loader.make_suite(module_names, 'post_install')
-                    if post_install_suite.has_http_case():
-                        with registry.cursor() as cr:
-                            env = api.Environment(cr, api.SUPERUSER_ID, {})
-                            env['ir.qweb']._pregenerate_assets_bundles()
+
+                    _logger.info('Starting test suite')
+                    common.warmup_tests(post_install_suite, registry)
                     result = loader.run_suite(post_install_suite, global_report=registry._assertion_report)
                     registry._assertion_report.update(result)
                     _logger.info("%d post-tests in %.2fs, %s queries",
@@ -1629,6 +1628,8 @@ def preload_registries(dbnames):
                                 sql_db.sql_counter - t0_sql)
 
                     registry._assertion_report.log_stats()
+                    if os.getenv('ODOO_RUNBOT'):
+                        log_ormcache_stats(signal.SIGUSR1)
                 if registry._assertion_report and not registry._assertion_report.wasSuccessful():
                     rc += 1
         except Exception:
