@@ -10,7 +10,7 @@ from odoo.fields import Domain
 from odoo.http import request
 from odoo.tools import float_is_zero, is_html_empty
 from odoo.tools.sql import SQL, column_exists, create_column
-from odoo.tools.translate import adapt_translated_field_value, html_translate
+from odoo.tools.translate import html_translate
 
 from odoo.addons.website.models import ir_http
 from odoo.addons.website.tools import text_from_html
@@ -137,6 +137,25 @@ class ProductTemplate(models.Model):
         help="Add a strikethrough price to your /shop and product pages for comparison purposes."
         "It will not be displayed if pricelists apply.",
     )
+
+    website_sale_auto_unpublished = fields.Boolean(
+        string="Auto-Unpublished Due to Stock",
+        copy=False,
+        default=False,
+        help=(
+            "Set when the system automatically unpublished this product because all variants "
+            "ran out of stock. Cleared when stock is restored and the product is republished."
+        ),
+    )
+    website_sale_manual_published = fields.Boolean(
+        string="Manually Published Override",
+        copy=False,
+        default=False,
+        help=(
+            "True when a user manually published this product while it was out of stock. "
+            "Prevents automatic unpublishing."
+        ),
+    )
     variants_default_code = fields.Char(
         compute="_compute_variants_default_code",
         store=True,
@@ -214,22 +233,158 @@ class ProductTemplate(models.Model):
 
     # === CRUD METHODS ===#
 
+    @api.model
+    def create(self, vals_list):
+        """Prevent creation from being treated as a manual publish toggle."""
+        records = super(
+            ProductTemplate, self.with_context(website_sale_creating_product=True)
+        ).create(vals_list)
+        # Strip the creation context so callers get a clean recordset without
+        # website_sale_creating_product lingering in their environment.
+        return records.with_env(self.env)
+
     def write(self, vals):
         # Clear empty ecommerce description content to avoid side-effects on product pages
         # when there is no content to display anyway.
-        if vals.get("description_ecommerce"):
-            vals["description_ecommerce"] = adapt_translated_field_value(
-                self.env,
-                vals["description_ecommerce"],
-                lambda lang, v: (  # noqa: ARG005
-                    ""
-                    if is_html_empty(v) and not ("media_iframe_video" in v or "data-embedded" in v)
-                    else v
-                ),
-            )
-        return super().write(vals)
+        if (
+            (description_ecommerce := vals.get("description_ecommerce"))
+            and is_html_empty(description_ecommerce)
+            and not (
+                "media_iframe_video" in description_ecommerce
+                or "data-embedded" in description_ecommerce
+            )  # don't remove "empty" video div
+        ):
+            vals["description_ecommerce"] = ""
+
+        # Guard against recursion from _sync_website_published_state, and against
+        # module install/update which mass-writes is_published via XML data loading —
+        # those are not merchant decisions and must not set the manual-override flag.
+        ctx = self.env.context
+        if (
+            ctx.get("website_sale_syncing_published")
+            or ctx.get("install_mode")
+            or ctx.get("website_sale_creating_product")
+        ):
+            return super().write(vals)
+
+        # Detect manual publish/unpublish: any write to is_published that does NOT come from
+        # the automated stock sync is treated as a deliberate merchant decision.
+        # Merge the flag updates into vals so all fields are written atomically.
+        if "is_published" in vals:
+            vals = dict(vals)
+            if vals["is_published"]:
+                # Merchant is manually publishing → mark override, clear auto flag.
+                vals["website_sale_manual_published"] = True
+                vals["website_sale_auto_unpublished"] = False
+            else:
+                # Merchant is manually unpublishing → clear manual flag so
+                # auto-republish is also blocked.
+                vals["website_sale_manual_published"] = False
+
+        res = super().write(vals)
+
+        # When is_storable is turned ON, run sync immediately: the product now has
+        # tracked inventory, so if it has 0 stock it must be unpublished right away.
+        if vals.get("is_storable"):
+            self.filtered("is_published")._sync_website_published_state()
+
+        return res
 
     # === BUSINESS METHODS ===#
+
+    def _sync_website_published_state(self):
+        """Auto-unpublish/republish products based on stock availability.
+
+        - Unpublish when ALL variants are OOS and the merchant did not manually publish.
+        - Republish when stock is back and the system was the one that unpublished it.
+        """
+        if not self:
+            return
+
+        # sudo() needed: stock triggers run without website_sale record access rights.
+        websites = (
+            self.env["website"].sudo().search([("website_sale_unpublish_out_of_stock", "=", True)])
+        )
+        if not websites:
+            return
+
+        # Flush quant writes to DB then clear qty cache so reads below see fresh values.
+        # We flush only stock.quant to avoid triggering unrelated stored computed fields
+        # (e.g. qty_delivered on sale lines) that are pending in the same transaction.
+        self.env["stock.quant"].flush_model()
+        self.env["product.product"].invalidate_model(["free_qty", "qty_available"])
+
+        for website in websites:
+            warehouse = website.warehouse_id
+            relevant_tmpls = self.filtered(
+                lambda t, w=website: not t.website_id or t.website_id == w
+            )
+            if not relevant_tmpls:
+                continue
+
+            for tmpl in relevant_tmpls:
+                if not tmpl.is_storable:
+                    continue
+                variants = tmpl.product_variant_ids.filtered("active")
+                if not variants:
+                    continue
+
+                all_out_of_stock = all(
+                    self._is_variant_out_of_stock(variant, website, warehouse)
+                    for variant in variants
+                )
+
+                if all_out_of_stock:
+                    if tmpl.is_published and not tmpl.website_sale_manual_published:
+                        tmpl.sudo().with_context(website_sale_syncing_published=True).write({
+                            "is_published": False,
+                            "website_sale_auto_unpublished": True,
+                        })
+                elif not tmpl.is_published and tmpl.website_sale_auto_unpublished:
+                    tmpl.sudo().with_context(website_sale_syncing_published=True).write({
+                        "is_published": True,
+                        "website_sale_auto_unpublished": False,
+                        "website_sale_manual_published": False,
+                    })
+
+    def _is_variant_out_of_stock(self, variant, website, warehouse):
+        """Return True if the variant is considered out of stock for the given website/warehouse.
+
+        OOS definition:
+        - If the product has website-visible packaging (sales=True on product.packaging),
+          OOS means qty_available < smallest packaging quantity.
+        - Otherwise, OOS means qty_available <= 0.
+
+        :param variant: product.product record to check
+        :param website: website.website record (warehouse-aware qty via website_sale_stock)
+        :param warehouse: stock.warehouse record linked to the website (may be empty)
+        :return: True if variant is out of stock
+        :rtype: bool
+        """
+        variant_sudo = variant.sudo()
+        # Use warehouse-scoped qty only when website_sale_stock is installed and a warehouse
+        # is configured. Without a warehouse, injecting warehouse_id=False into context
+        # creates a stale cache entry — read qty_available directly instead.
+        if hasattr(website, "_get_product_available_qty") and warehouse:
+            qty = website._get_product_available_qty(variant_sudo)
+        else:
+            qty = variant_sudo.qty_available
+
+        # packaging_ids and the sales flag exist only when the sale module is installed.
+        # A sales packaging defines the minimum orderable qty; below it the product is OOS.
+        if hasattr(variant_sudo, "packaging_ids"):
+            sales_packagings = variant_sudo.packaging_ids.filtered(
+                lambda p: getattr(p, "sales", False)
+            )
+            if sales_packagings:
+                return qty < min(sales_packagings.mapped("qty"))
+
+        return qty <= 0
+
+    def _prepare_variant_values(self, combination):
+        variant_dict = super()._prepare_variant_values(combination)
+        variant_dict["base_unit_count"] = self.base_unit_count
+        return variant_dict
 
     def _get_website_accessory_product(self):
         domain = Domain(self.env["website"].sale_product_domain())

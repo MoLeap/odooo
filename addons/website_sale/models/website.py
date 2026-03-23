@@ -244,6 +244,12 @@ class Website(models.Model):
         string="Wishlist Grid Gap", help="Gap between products on the wishlist page", default="16px"
     )
 
+    website_sale_unpublish_out_of_stock = fields.Boolean(
+        string="Unpublish Out-of-Stock Products",
+        default=False,
+        help="Automatically unpublish/republish products based on stock availability.",
+    )
+
     prevent_sale = fields.Boolean(string="Hide Add To Cart")
 
     prevent_sale_for = fields.Selection(
@@ -272,6 +278,39 @@ class Website(models.Model):
         domain=[("model", "=", "sale.order")],
         default=_default_confirmation_email_template,
     )
+
+    # === CRUD METHODS ===#
+
+    def write(self, vals):
+        """Override to retroactively evaluate OOS state when the setting is first enabled.
+
+        When website_sale_unpublish_out_of_stock is switched from False to True, any currently
+        published product that is already out of stock must be unpublished immediately,
+        without waiting for the next stock move.
+        """
+        newly_enabled = (
+            self.filtered(lambda w: not w.website_sale_unpublish_out_of_stock)
+            if vals.get("website_sale_unpublish_out_of_stock")
+            else self.env["website"]
+        )
+
+        res = super().write(vals)
+
+        for website in newly_enabled:
+            templates = (
+                self
+                .env["product.template"]
+                .sudo()
+                .search([
+                    ("is_published", "=", True),
+                    "|",
+                    ("website_id", "=", website.id),
+                    ("website_id", "=", False),
+                ])
+            )
+            templates.with_context(website_id=website.id)._sync_website_published_state()
+
+        return res
 
     # === COMPUTE METHODS ===#
 
