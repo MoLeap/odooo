@@ -22,6 +22,7 @@ import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
 import { mixCssColors } from "@web/core/utils/colors";
 import { router } from "@web/core/browser/router";
+import { loadBundle } from "@web/core/assets";
 import { Component, onMounted, onWillStart, onWillUnmount } from "@odoo/owl";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 import { fuzzyLevenshteinLookup } from "@web/core/utils/search";
@@ -649,9 +650,21 @@ export class ThemeSelectionScreen extends ApplyConfiguratorScreen {
         );
     }
 
-    chooseTheme(themeName) {
+    async chooseTheme(themeName) {
+        this.uiService.block();
+        this.state.previewIsLoading = true;
         this.state.selectedTheme = themeName;
+        this.state.themePreviewBody = await this.orm.call(
+            "website",
+            "configurator_theme_preview_body",
+            [],
+            {
+                theme_name: themeName,
+                install_theme: true,
+            }
+        );
         this.props.navigate(ROUTES.setupStyleScreen);
+        this.uiService.unblock();
     }
 
     async getThemes() {
@@ -682,16 +695,104 @@ export class SetupStyleScreen extends ApplyConfiguratorScreen {
     static template = "website.Configurator.SetupStyleScreen";
     setup() {
         super.setup();
+        this.uiService = useService("ui");
         this.orm = useService("orm");
         this.state = useStore();
+        this.previewIframeRef = useRef("previewIframe");
+        onWillStart(async () => {
+            this.state.previewIsLoading = true;
+            if (!this.state.selectedTheme) {
+                return;
+            }
+            if (!this.state.themePreviewBody) {
+                this.state.themePreviewBody = await this.orm.call(
+                    "website",
+                    "configurator_theme_preview_body",
+                    [],
+                    {
+                        theme_name: this.state.selectedTheme,
+                        install_theme: true,
+                    }
+                );
+            }
+        });
     }
 
     changeTheme() {
         this.props.navigate(ROUTES.themeSelectionScreen);
     }
 
+    async getPalettes() {
+        return "";
+    }
+
+    setPalette(p) {
+        return "";
+    }
+
+    setFont(font) {
+        this.state.selectedFont = font;
+    }
+
     async startBuilding() {
+        if (!this.state.selectedPalette) {
+            const fallbackPaletteName = this.state.palettes["default-25"]
+                ? "default-25"
+                : Object.keys(this.state.palettes || {})[0];
+            if (fallbackPaletteName) {
+                this.state.selectPalette(fallbackPaletteName);
+            }
+        }
+        if (!this.state.selectedTheme) {
+            this.state.selectedTheme = "theme_default";
+        }
         await this.applyConfigurator(this.state.selectedTheme);
+    }
+
+    async onPreviewIframeLoad() {
+        this.uiService.block();
+        const iframeDoc = this.previewIframeRef.el?.contentDocument;
+        await loadBundle("web.assets_frontend", { targetDoc: iframeDoc, js: false });
+        this.deactivatePreviewInteractions(iframeDoc);
+        this.state.previewIsLoading = false;
+        this.uiService.unblock();
+    }
+
+    deactivatePreviewInteractions(iframeDoc) {
+        const stopInteraction = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+        };
+        iframeDoc.addEventListener("click", stopInteraction, true);
+        iframeDoc.addEventListener("submit", stopInteraction, true);
+    }
+
+    get previewSrcdoc() {
+        // const p = this.state.selectedPalette;
+        const previewBody = this.state.themePreviewBody || '<div class="oe_structure"></div>';
+        return `
+            <!doctype html>
+            <html>
+                <head>
+                    <base href="${window.location.origin}/">
+                    <style>
+                        body { margin: 0; font-family: ${JSON.stringify(
+                            this.state.selectedFont || "system-ui"
+                        )}; }
+                    </style>
+                </head>
+                <body>
+                    <div id="wrapwrap" class="homepage">
+                        <header>
+                        </header>
+                        <main class="" style="">
+                            ${previewBody}
+                        </main>
+                        <footer>
+                        </footer>
+                    </div>
+                </body>
+            </html>`;
     }
 }
 
@@ -1008,6 +1109,7 @@ export class Configurator extends Component {
             selectedIndustry: undefined,
             selectedPalette: undefined,
             selectedTheme: undefined,
+            previewIsLoading: false,
             recommendedPalette: undefined,
             defaultColors: defaultColors,
             palettes: palettes,
@@ -1026,6 +1128,7 @@ export class Configurator extends Component {
             selectedIndustry: state.selectedIndustry,
             selectedPalette: state.selectedPalette,
             selectedTheme: state.selectedTheme,
+            themePreviewBody: state.themePreviewBody,
             selectedPurpose: state.selectedPurpose,
             formerSelectedPurpose: state.formerSelectedPurpose,
             selectedType: state.selectedType,
