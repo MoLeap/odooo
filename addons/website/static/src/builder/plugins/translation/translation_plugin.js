@@ -2,16 +2,29 @@ import { Plugin } from "@html_editor/plugin";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { AttributeTranslateDialog } from "../../translation_components/attributeTranslateDialog";
+import { shouldEditableMediaBeEditable } from "@html_builder/utils/utils_css";
 import { withSequence } from "@html_editor/utils/resource";
 import { makeContentsInline, unwrapContents } from "@html_editor/utils/dom";
 import { DISABLED_NAMESPACE } from "@html_editor/main/toolbar/toolbar_plugin";
 import { closestElement } from "@html_editor/utils/dom_traversal";
 
 /**
+ * @typedef {Object} TranslationShared
+ * @property {TranslationPlugin["updateTranslationMap"]} updateTranslationMap
+ */
+
+/**
  * @typedef {((editableEls: HTMLElement[]) => void)[]} on_nodes_marked_translatable_handlers
  */
 
-const TRANSLATED_ATTRS = ["placeholder", "title", "alt", "value"];
+const TRANSLATED_ATTRS = [
+    "placeholder",
+    "title",
+    "alt",
+    "value",
+    "data-oe-translate-src",
+    "data-oe-translate-srcset",
+];
 const TRANSLATION_ATTRIBUTES_SELECTOR = TRANSLATED_ATTRS.map(
     (att) => `[${att}*="data-oe-translation-source-sha="]`
 ).join(", ");
@@ -49,7 +62,8 @@ function findOEditable(containerEl) {
 
 export class TranslationPlugin extends Plugin {
     static id = "translation";
-    static dependencies = ["history"];
+    static dependencies = ["builderOptions", "history", "imageSave"];
+    static shared = ["updateTranslationMap"];
 
     /** @type {import("plugins").WebsiteResources} */
     resources = {
@@ -77,7 +91,9 @@ export class TranslationPlugin extends Plugin {
         },
         on_editor_started_handlers: withSequence(5, () => {
             this.prepareTranslation();
+            this.dependencies.builderOptions.updateContainers(this.editable);
         }),
+        on_image_saved_handlers: this.updateTranslationsOnImageSaved.bind(this),
         system_classes: ["o_savable_attribute"],
         before_insert_processors: withSequence(20, (container) => {
             makeContentsInline(container);
@@ -99,6 +115,7 @@ export class TranslationPlugin extends Plugin {
         this.dialogService = this.services.dialog;
         this.nonTranslatedSelector =
             `:not(${this.config.translatedElements.join(", ")})` + `:not(.o_translate_inline)`;
+        this.imageTranslations = [];
     }
 
     prepareTranslation() {
@@ -151,6 +168,12 @@ export class TranslationPlugin extends Plugin {
             ".o_not_editable .o_savable, .o_not_editable .o_savable_attribute"
         );
         for (const savableInsideNotEditableEl of savableInsideNotEditableEls) {
+            if (
+                savableInsideNotEditableEl.matches(".o_editable_media") &&
+                shouldEditableMediaBeEditable(savableInsideNotEditableEl)
+            ) {
+                continue;
+            }
             this.addDomListener(savableInsideNotEditableEl, "click", showNotification);
         }
         // Keep the original values of elToTranslationInfoMap so that we know
@@ -182,12 +205,11 @@ export class TranslationPlugin extends Plugin {
      */
     buildTranslationInfoMap(editableEls) {
         this.elToTranslationInfoMap = new Map();
-        const translatedAttrs = ["placeholder", "title", "alt", "value"];
         const translationRegex =
             /<span [^>]*data-oe-translation-source-sha="([^"]+)"[^>]*>(.*)<\/span>/;
         const isEmpty = (el) => !el.hasChildNodes() || el.innerHTML.trim() === "";
         const matchTag = (el) => el.matches("input, select, textarea, img");
-        for (const translatedAttr of translatedAttrs) {
+        for (const translatedAttr of TRANSLATED_ATTRS) {
             const filteredEditableEls = editableEls.filter(
                 (editableEl) =>
                     editableEl.hasAttribute(translatedAttr) &&
@@ -197,10 +219,20 @@ export class TranslationPlugin extends Plugin {
                     (isEmpty(editableEl) || matchTag(editableEl))
             );
             for (const filteredEditableEl of filteredEditableEls) {
-                const translation = filteredEditableEl.getAttribute(translatedAttr);
-                this.updateTranslationMap(filteredEditableEl, translation, translatedAttr);
+                const translation = decodeURI(filteredEditableEl.getAttribute(translatedAttr));
+                this.setupTranslationMap(filteredEditableEl, translation, translatedAttr);
                 const match = translation.match(translationRegex);
-                filteredEditableEl.setAttribute(translatedAttr, match[2]);
+                if (translatedAttr.startsWith("data-oe-translate-")) {
+                    filteredEditableEl.removeAttribute(translatedAttr);
+                    const translationInfo = this.elToTranslationInfoMap.get(filteredEditableEl);
+                    const originalAttr = translatedAttr.split("data-oe-translate-")[1];
+                    // Use the original attribute in the translation map to make
+                    // it easier to update later.
+                    translationInfo[originalAttr] = translationInfo[translatedAttr];
+                    delete translationInfo[translatedAttr];
+                } else {
+                    filteredEditableEl.setAttribute(translatedAttr, match[2]);
+                }
                 if (translatedAttr === "value") {
                     filteredEditableEl.value = match[2];
                 }
@@ -214,7 +246,7 @@ export class TranslationPlugin extends Plugin {
         );
         for (const textEditEl of textEditEls) {
             const translation = textEditEl.textContent;
-            this.updateTranslationMap(textEditEl, translation, "textContent");
+            this.setupTranslationMap(textEditEl, translation, "textContent");
             const match = translation.match(translationRegex);
             textEditEl.value = match[2];
             // Update the text content of textarea too
@@ -317,7 +349,7 @@ export class TranslationPlugin extends Plugin {
             .querySelector("[data-oe-translation-source-sha]");
     }
 
-    updateTranslationMap(translateEl, translation, attrName) {
+    setupTranslationMap(translateEl, translation, attrName) {
         const translationEl = this.parseTranslationEl(translation);
         if (!this.elToTranslationInfoMap.get(translateEl)) {
             this.elToTranslationInfoMap.set(translateEl, {});
@@ -325,6 +357,20 @@ export class TranslationPlugin extends Plugin {
         this.elToTranslationInfoMap.get(translateEl)[attrName] = translationEl.dataset;
         this.elToTranslationInfoMap.get(translateEl)[attrName].translation =
             translationEl.innerHTML;
+    }
+    /**
+     * @param {HTMLElement} translateEl - element on which the translatable
+     * attribute is
+     * @param {string} translation - new translation
+     * @param {string} attrName - attribute to translate
+     */
+    updateTranslationMap(translateEl, translation, attrName) {
+        if (!this.elToTranslationInfoMap.get(translateEl)) {
+            throw new Error(
+                `Translation map was not set up: cannot update ${attrName} on ${translateEl.nodeName}`
+            );
+        }
+        this.elToTranslationInfoMap.get(translateEl)[attrName].translation = translation;
     }
 
     /**
@@ -346,6 +392,9 @@ export class TranslationPlugin extends Plugin {
                     const translation = spanEl.dataset.translation;
                     delete spanEl.dataset.translation;
                     spanEl.innerHTML = translation;
+                    if (translateEl.matches(".o_b64_image_to_save, .o_modified_image_to_save")) {
+                        this.imageTranslations.push([translateEl, attr, spanEl]);
+                    }
                     dirtyEls.push(spanEl);
                 }
             }
@@ -361,6 +410,15 @@ export class TranslationPlugin extends Plugin {
             root.dataset.oeTranslationSourceSha = root.dataset.oeTranslationSaveSha;
             delete root.dataset.oeTranslationSaveSha;
         }
+    }
+
+    updateTranslationsOnImageSaved({ imageEl }) {
+        for (const [imgEl, attr, spanEl] of this.imageTranslations) {
+            if (imageEl === imgEl) {
+                spanEl.textContent = imageEl.getAttribute(attr);
+            }
+        }
+        this.imageTranslations = [];
     }
 }
 
