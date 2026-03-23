@@ -5,7 +5,7 @@ import re
 
 from lxml import etree
 
-from odoo import _, api, fields, models, Command
+from odoo import api, fields, models, Command
 from odoo.tools.mimetypes import guess_mimetype
 from odoo.exceptions import UserError
 from odoo.tools import frozendict
@@ -83,22 +83,6 @@ class AccountMove(models.Model):
                         'errors': errors,
                     }]
         return super()._get_invoice_legal_documents(filetype, allow_fallback=allow_fallback)
-
-    def get_extra_print_items(self):
-        print_items = super().get_extra_print_items()
-        posted_moves = self.filtered(lambda move: move.state == 'posted')
-        suggested_edi_formats = {
-            suggested_format
-            for partner in posted_moves.commercial_partner_id
-            if (suggested_format := partner ._get_suggested_ubl_cii_edi_format())
-        }
-        if posted_moves.ubl_cii_xml_id or suggested_edi_formats:
-            print_items.append({
-                'key': 'download_ubl',
-                'description': _('Export XML'),
-                **posted_moves.action_invoice_download_ubl(),
-            })
-        return print_items
 
     def action_group_ungroup_lines_by_tax(self):
         """

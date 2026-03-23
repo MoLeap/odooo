@@ -1,7 +1,4 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-from io import BytesIO
-from zipfile import ZipFile
-
 from lxml import etree
 from unittest.mock import patch
 from odoo import fields, Command
@@ -619,43 +616,6 @@ comment-->1000.0</TaxExclusiveAmount></xpath>"""
         imported_invoice = self._import_as_attachment_on(attachment=xml_attachment, journal=self.company_data["default_journal_sale"])
         for line in imported_invoice.invoice_line_ids:
             self.assertFalse(line.discount, "A discount on the imported lines signals a rounding error in the discount computation")
-
-    def test_export_xml_with_multiple_invoices(self):
-        partner = self._create_partner_be(invoice_edi_format='ubl_bis3')
-        self.company_data['company'].partner_id.write({
-            'peppol_eas': '0230',
-            'peppol_endpoint': 'C2584563200',
-        })
-        invoices = self.env['account.move'].create([
-            {
-                'partner_id': partner.id,
-                'move_type': 'out_invoice',
-                'invoice_line_ids': [
-                    Command.create({
-                        'product_id': self.product_a.id,
-                        'quantity': qty,
-                        'price_unit': price,
-                    }),
-                ],
-            }
-            for qty, price in [(1, 100), (2, 200), (3, 300)]
-        ])
-        invoices[:2].action_post()
-        invoices[:2]._generate_and_send()
-        xml_print_url = next(item for item in invoices.get_extra_print_items() if item['key'] == 'download_ubl')['url']
-        self.assertEqual(
-            xml_print_url,
-            f'/account/download_invoice_documents/{invoices[0].id},{invoices[1].id}/ubl?allow_fallback=true',
-            'Only posted invoices should be called in the URL',
-        )
-        self.authenticate(self.env.user.login, self.env.user.login)
-        res = self.url_open(xml_print_url)
-        self.assertEqual(res.status_code, 200)
-        with ZipFile(BytesIO(res.content)) as zip_file:
-            self.assertEqual(
-                zip_file.namelist(),
-                (invoices[:2]).ubl_cii_xml_id.mapped('name'),
-            )
 
     def test_payment_means_code_in_facturx_xml(self):
         partner_bank = self.env['res.partner.bank'].create({
