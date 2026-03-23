@@ -12,7 +12,7 @@ from odoo import _, http
 from odoo.exceptions import AccessError
 from odoo.http import request, Response
 from odoo.tools import consteq
-from odoo.addons.mail.tools.discuss import add_guest_to_context
+from odoo.addons.mail.tools.discuss import add_guest_to_context, Store
 from odoo.tools.misc import file_open
 
 _logger = logging.getLogger(__name__)
@@ -236,6 +236,14 @@ class MailController(http.Controller):
             'model_name': request.env['ir.model'].sudo()._get(model).display_name,
             'access_url': record._notify_get_action_link('view', model=model, res_id=res_id) if display_link else False,
         })
+
+    @http.route("/mail/set_status_message", methods=["POST"], type="jsonrpc", auth="user")
+    def mail_action_set_status_message(self, message):
+        request.env.user.status_message = message
+        Store(bus_channel=request.env.user, bus_subchannel="presence").add(
+            request.env.user.partner_id,
+            lambda res: res.one("main_user_id", ["status_message"]),
+        ).bus_send()
 
     @http.route('/mail/message/<int:message_id>', type='http', auth='public')
     @add_guest_to_context
