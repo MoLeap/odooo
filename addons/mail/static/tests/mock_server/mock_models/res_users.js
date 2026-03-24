@@ -5,6 +5,7 @@ import { serializeDate, today } from "@web/core/l10n/dates";
 
 export class ResUsers extends webModels.ResUsers {
     im_status = fields.Char({ default: "online" });
+    status_message = fields.Char();
     notification_type = fields.Selection({
         selection: [
             ["email", "Handle by Emails"],
@@ -53,7 +54,10 @@ export class ResUsers extends webModels.ResUsers {
                                         "active",
                                         "avatar_128",
                                         "is_admin",
-                                        mailDataHelpers.Store.one("main_user_id", ["partner_id"]),
+                                        mailDataHelpers.Store.one(
+                                            "main_user_id",
+                                            ResUsers._get_store_main_user_fields()
+                                        ),
                                         "name",
                                         "tz",
                                         "user",
@@ -215,6 +219,10 @@ export class ResUsers extends webModels.ResUsers {
                 this.env["res.partner"]._get_store_avatar_card_fields()
             ),
         ];
+    }
+
+    _get_store_main_user_fields() {
+        return ["active", "partner_id", "share", "status_message"];
     }
 
     get _to_store_defaults() {

@@ -15,6 +15,7 @@
                     </span>
                     <div class="d-flex flex-column o_card_user_infos overflow-hidden">
                         <span t-if="this.name" class="o-mail-avatar-card-name fw-bold" t-out="this.name"/>
+                        <span t-if="this.user?.status_message" class="text-muted small pb-1" t-out="this.user.status_message"/>
                         <t t-if="this.userInfoTemplate" t-call="{{this.userInfoTemplate}}"/>
                         <a t-if="this.email" t-att-href="'mailto:'+this.email" t-att-title="this.email" class="text-truncate">
                             <i class="fa fa-fw fa-envelope me-1"/><t t-out="this.email"/>

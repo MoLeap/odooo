@@ -12,4 +12,11 @@ patch(DiscussContent.prototype, {
         super.setup(...arguments);
         this.rtc = useService("discuss.rtc");
     },
+
+    get correspondentStatusMessage() {
+        if (this.thread?.channel?.channel_type !== "chat") {
+            return "";
+        }
+        return this.thread.channel.correspondent?.partner_id?.main_user_id?.status_message || "";
+    },
 });

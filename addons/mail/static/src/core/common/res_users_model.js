@@ -22,6 +22,8 @@ export class ResUsers extends Record {
     share;
     /** @type {boolean} */
     active;
+    /** @type {string} */
+    status_message;
     /** @type {ReturnType<import("@odoo/owl").markup>|string|undefined} */
     signature = fields.Html(undefined);
 

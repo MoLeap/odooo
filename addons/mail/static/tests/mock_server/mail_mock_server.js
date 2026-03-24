@@ -863,6 +863,28 @@ async function mail_thread_subscribe(request) {
     ).get_result();
 }
 
+registerRoute("/mail/set_status_message", mail_set_status_message);
+/** @type {RouteCallback} */
+async function mail_set_status_message(request) {
+    /** @type {import("mock_models").BusBus} */
+    const BusBus = this.env["bus.bus"];
+    /** @type {import("mock_models").ResPartner} */
+    const ResPartner = this.env["res.partner"];
+    /** @type {import("mock_models").ResUsers} */
+    const ResUsers = this.env["res.users"];
+    const { message } = await parseRequestParams(request);
+    ResUsers.write([this.env.uid], { status_message: message });
+    const [user] = ResUsers.browse(this.env.uid);
+    const store = new mailDataHelpers.Store();
+    store.add(
+        ResPartner.browse(user.partner_id),
+        makeKwArgs({
+            fields: [mailDataHelpers.Store.one("main_user_id", ["status_message"])],
+        })
+    );
+    BusBus._sendone([user, "presence"], "mail.record/insert", store.get_result());
+}
+
 function processRequest(fetchParams, context) {
     const store = new mailDataHelpers.Store();
     for (const fetchParam of fetchParams) {
