@@ -56,6 +56,9 @@ class PaymentPostProcessing(http.Controller):
         # We only call the payment post processing on existing transactions.
         monitored_tx = self._get_monitored_transaction()
 
+        processing_cron = self.env.ref("payment.process_payment_data_cron")
+        processing_cron.method_direct_trigger()
+
         # Post-process the transaction before redirecting the user to the landing route and its
         # document.
         if not monitored_tx.is_post_processed:

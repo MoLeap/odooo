@@ -18,6 +18,11 @@ export class PaymentPostProcessing extends Interaction {
         this.busService.subscribe(this.notificationType, this.triggerPostProcessing.bind(this));
 
         this.landingRoute = this.el.dataset.landingRoute;
+
+        // TODO: temp location for this initial safety net call
+        rpc("/payment/post_process", { csrf_token: odoo.csrf_token })
+            .then(this.handlePostProcessingResult);
+
         // Redirect automatically after 5 seconds
         // this.redirectTimeout = this.waitForTimeout(() => {
         //     this.redirectToLandingRoute();
