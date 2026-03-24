@@ -243,6 +243,7 @@ export class UseSuggestion {
         }
         const { type, suggestions } = this.suggestionService.searchSuggestions(this.search, {
             thread: this.thread,
+            composerType: this.comp.props.type,
         });
         if (!suggestions.length) {
             this.state.items = undefined;
@@ -267,6 +268,7 @@ export class UseSuggestion {
             await this.suggestionService.fetchSuggestions(this.search, {
                 thread: this.thread,
                 abortSignal: this.abortController.signal,
+                composerType: this.comp.props.type,
             });
         } catch (e) {
             this.lastFetchedSearch = null;
