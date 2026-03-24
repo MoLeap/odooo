@@ -250,12 +250,6 @@ class SaleOrderLine(models.Model):
             if line.move_ids.filtered(lambda m: m.state != 'cancel'):
                 line.product_updatable = False
 
-    @api.depends('product_id', 'company_id')
-    def _compute_customer_lead(self):
-        super()._compute_customer_lead() # Reset customer_lead when the product is modified
-        for line in self:
-            line.customer_lead = line.product_id.with_company(line.company_id).sale_delay
-
     def _inverse_customer_lead(self):
         for line in self:
             if line.state == 'sale' and not line.order_id.commitment_date:
