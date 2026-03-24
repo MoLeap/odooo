@@ -2,7 +2,7 @@
 
 {
     'name': 'Hungary - E-invoicing Receive Vendor Bills',
-    'category': 'Hidden',
+    'category': 'Accounting/Localizations',
     'description': """
 Electronically receive vendor bills from the NAV (Hungarian Tax Agency).
     """,
