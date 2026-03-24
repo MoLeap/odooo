@@ -14,13 +14,12 @@ class PaymentTransaction(models.Model):
         confirmed_orders.filtered("website_id")._archive_partner_if_no_user()
         return confirmed_orders
 
-    def _process(self, provider_code, payment_data):
+    def _process(self, payment_data):
         """Override of `payment` to allow retrying if transaction is canceled or has an error, by
         redirecting to payment page."""
-        tx = super()._process(provider_code, payment_data)
-        if tx.sale_order_ids.website_id and tx.state in ["cancel", "error"]:
-            tx.landing_route = "/shop/payment"
-        return tx
+        super()._process(payment_data)
+        if self.sale_order_ids.website_id and self.state in ["cancel", "error"]:
+            self.landing_route = "/shop/payment"
 
     def _get_transaction_status_message(self, **kwargs):
         """Override of `payment` to add a custom message when cart amount is different after payment

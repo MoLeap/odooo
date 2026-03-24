@@ -130,6 +130,7 @@ class PaymentTransaction(models.Model):
         readonly=True,
     )
     refunds_count = fields.Integer(string="Refunds Count", compute="_compute_refunds_count")
+    payment_data_count = fields.Integer(compute="_compute_payment_data_count")
 
     # Fields used for user redirection & payment post-processing
     is_post_processed = fields.Boolean(
@@ -178,6 +179,16 @@ class PaymentTransaction(models.Model):
         data = {source_transaction.id: count for source_transaction, count in rg_data}
         for record in self:
             record.refunds_count = data.get(record.id, 0)
+
+    def _compute_payment_data_count(self):
+        rg_data = self.env["payment.data"]._read_group(
+            domain=[("transaction_id", "in", self.ids)],
+            groupby=["transaction_id"],
+            aggregates=["__count"],
+        )
+        data = {transaction.id: count for transaction, count in rg_data}
+        for record in self:
+            record.payment_data_count = data.get(record.id, 0)
 
     # === CONSTRAINT METHODS === #
 
@@ -292,6 +303,21 @@ class PaymentTransaction(models.Model):
             action["domain"] = [("source_transaction_id", "=", self.id)]
         return action
 
+    def action_view_payment_data(self):
+        """Return a window action to browse the payment data linked to the transaction.
+
+        :return: A window action to browse the payment data.
+        :rtype: dict
+        """
+        self.ensure_one()
+        return {
+            "name": _("Pending Updates"),
+            "type": "ir.actions.act_window",
+            "domain": [("transaction_id", "=", self.id)],
+            "res_model": "payment.data",
+            "view_mode": "list,form",
+        }
+
     def action_capture(self):
         """Open the partial capture wizard if it is supported by the related providers, otherwise
         capture the transactions immediately.
@@ -401,7 +427,7 @@ class PaymentTransaction(models.Model):
         self._post_process()
         return {"type": "ir.actions.client", "tag": "soft_reload"}
 
-    # === BUSINESS METHODS - PRE-PROCESSING === #
+    # === LIFECYCLE METHODS - INITIALIZATION === #
 
     @api.model
     def _compute_reference(self, provider_code, prefix=None, separator="-", **kwargs):  # noqa: ARG002
@@ -773,28 +799,7 @@ class PaymentTransaction(models.Model):
             **custom_create_values,
         })
 
-    # === BUSINESS METHODS - PROCESSING === #
-
-    def _process(self, provider_code, payment_data):
-        """Process the payment data received from the provider and update the transaction.
-
-        :param str provider_code: The code of the provider handling the transaction.
-        :param dict payment_data: The payment data sent by the provider.
-        :return: The updated transaction.
-        :rtype: payment.transaction
-        """
-        tx = self or self._search_by_reference(provider_code, payment_data)
-        if tx:
-            tx.ensure_one()
-            previous_state = tx.state
-            tx._validate_amount(payment_data)
-            if tx.state == "error" and tx.state != previous_state:
-                return tx
-            tx._apply_updates(payment_data)
-            if tx.tokenize and tx.state in {"authorized", "done"}:
-                tx._tokenize(payment_data)
-            tx._send_trigger_post_processing_notification()
-        return tx
+    # === LIFECYCLE METHODS - RECORDING === #  # TODO ANV rename?
 
     @api.model
     def _search_by_reference(self, provider_code, payment_data):
@@ -831,6 +836,50 @@ class PaymentTransaction(models.Model):
         :rtype: str
         """
         return payment_data.get("reference")
+
+    def _record(self, payment_data):
+        """Record the payment data and schedule the transaction for processing.
+
+        This method serves as the unique entry point for processing payment data and updating the
+        transaction. It should always be called upon receiving payment data from the provider.
+
+        When payment data are received, they are recorded in the database and the transaction is
+        scheduled for processing. The processing is done asynchronously to avoid concurrent updates.
+
+        :param dict payment_data: The payment data received from the provider.
+        :rtype: None
+        """
+        self.ensure_one()
+
+        self.env["payment.data"].create({"transaction_id": self.id, "payload": payment_data})
+        # self.env.ref("payment.process_payment_data_cron")._trigger()  # TODO ANV uncomment
+
+    # === LIFECYCLE METHODS - PROCESSING === #
+
+    def _process(self, payment_data):
+        """Process the payment data to update the internal state.
+
+        :param dict payment_data: The payment data to process.
+        :rtype: None
+        """
+        self.ensure_one()
+        print("Entering _process()")  # TODO ANV remove
+
+        # Check that the payment data match the initial payment request
+        previous_state = self.state
+        self._validate_amount(payment_data)
+        if self.state == "error" and self.state != previous_state:  # The tx was just set in error
+            return
+
+        # Update the transaction with the payment data.
+        self._apply_updates(payment_data)
+
+        # Tokenize the transaction if needed.
+        if self.tokenize and self.state in {"authorized", "done"}:  # The payment was successful
+            self._tokenize(payment_data)
+
+        # Notify the client about the updated transaction values
+        self._send_trigger_post_processing_notification()
 
     def _validate_amount(self, payment_data):
         """Ensure that the transaction's amount and currency match the ones from the payment data.
@@ -1116,7 +1165,7 @@ class PaymentTransaction(models.Model):
                 child_tx.source_transaction_id._update_state(("authorized",), target_state, "")
                 child_tx.source_transaction_id._log_received_message()
 
-    # === BUSINESS METHODS - POST-PROCESSING === #
+    # === LIFECYCLE METHODS - POST-PROCESSING === #
 
     def _cron_post_process(self):
         """Trigger the post-processing of the transactions that were not handled by the client in
@@ -1124,6 +1173,9 @@ class PaymentTransaction(models.Model):
 
         :return: None
         """
+        print("Starting post processing cron; sleeping 10s")  # TODO ANV remove
+        import time  # TODO ANV remove
+        time.sleep(10)
         txs_to_post_process = self
         if not txs_to_post_process:
             # Don't try forever to post-process a transaction that doesn't go through. Set the limit
@@ -1156,6 +1208,7 @@ class PaymentTransaction(models.Model):
 
         :return: None
         """
+        print("Entering _post_process()")  # TODO ANV remove
         self.is_post_processed = True
 
     # === REQUEST HELPERS === #

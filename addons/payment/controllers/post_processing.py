@@ -3,6 +3,7 @@
 import logging
 
 from odoo import http
+from odoo.exceptions import UserError
 from odoo.http import request
 from odoo.tools.translate import LazyTranslate
 
@@ -13,7 +14,7 @@ _logger = logging.getLogger(__name__)
 class PaymentPostProcessing(http.Controller):
     """
     This controller is responsible for the monitoring and finalization of the post-processing of
-    transactions.
+    transactions. TODO ANV update
 
     It exposes the route `/payment/status`: All payment flows must go through this route at some
     point to allow the user checking on the transactions' status, and to trigger the finalization of
@@ -46,6 +47,24 @@ class PaymentPostProcessing(http.Controller):
             values = {"payment_not_found": True}
         return request.render("payment.payment_status", values)
 
+    @http.route("/payment/process", type="jsonrpc", auth="public")
+    def payment_process(self):
+        """Perform the processing of the current transaction.
+
+        :rtype: None
+        """
+        print("Entering /payment/process")  # TODO ANV remove
+        monitored_tx_sudo = self._get_monitored_transaction()
+        if monitored_tx_sudo.payment_data_count == 0:  # The transaction has already been processed
+            return
+
+        processing_cron = self.env.ref("payment.process_payment_data_cron")
+        try:
+            processing_cron.sudo().method_direct_trigger()  # In sudo mode to run as the cron user
+        except UserError:  # The cron is already running
+            print("Skipped cron call since already running")  # TODO ANV remove
+            pass  # Nothing to do; the tx will eventually be processed
+
     @http.route("/payment/post_process", type="jsonrpc", auth="public")
     def payment_post_process(self, **_kwargs):
         """Fetch the transaction and trigger its post-processing.
@@ -53,6 +72,7 @@ class PaymentPostProcessing(http.Controller):
         :return: The post-processing values of the transaction.
         :rtype: dict
         """
+        print("Entering /payment/post_process")  # TODO ANV remove
         # We only call the payment post processing on existing transactions.
         monitored_tx = self._get_monitored_transaction()
 
