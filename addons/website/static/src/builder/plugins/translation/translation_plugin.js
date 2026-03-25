@@ -53,6 +53,7 @@ export class TranslationPlugin extends Plugin {
 
     /** @type {import("plugins").WebsiteResources} */
     resources = {
+        require_repeat_translation_state_background_selectors: ["a[role]", "a.nav-link"], // TODO: find a more appropriate plugin to do that
         clean_for_save_processors: this.cleanForSave.bind(this),
         dirty_els_providers: this.getDirtyTranslations.bind(this),
         after_setup_editor_overrides: () => {
