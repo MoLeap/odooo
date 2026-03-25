@@ -24,6 +24,14 @@
         <field name="model">product.product</field>
         <field name="inherit_id" ref="product.product_product_tree_view"/>
         <field name="arch" type="xml">
+            <list position="attributes">
+                <attribute name="default_order">
+                    website_sequence, is_favorite desc, default_code, name, id
+                </attribute>
+            </list>
+            <field name="is_favorite" position="before">
+                <field name="website_sequence" widget="handle"/>
+            </field>
             <field name="name" position="after">
                 <field name="website_id" groups="website.group_multi_website" optional="show"/>
                 <field name="is_published" string="Is Published" optional="hide"/>
