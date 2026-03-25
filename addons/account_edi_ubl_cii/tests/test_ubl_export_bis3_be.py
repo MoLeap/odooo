@@ -799,3 +799,50 @@ class TestUblExportBis3BE(TestUblBis3Common, TestUblCiiBECommon):
             partner=self.partner_nl,
             test_file='test_invoice_customer_party_identifiers_partner_nl_vat_eas_oin_company_registry',
         )
+
+    def test_invoice_customer_license_plate(self):
+        """
+        Test if vehicle is set on line, it should be exported in the XML under
+        AdditionalItemProperty/Value with AdditionalItemProperty/Value == 'PlateNumber'
+        """
+        self.ensure_installed('fleet')
+        self.env.user.group_ids |= self.env.ref('fleet.fleet_group_manager')
+        brand = self.env['fleet.vehicle.model.brand'].create({  # noqa: OLS03001
+            'name': 'Test Brand',
+        })
+        model = self.env['fleet.vehicle.model'].create({  # noqa: OLS03001
+            'name': 'Test Model',
+            'brand_id': brand.id,
+        })
+        car = self.env['fleet.vehicle'].create({  # noqa: OLS03001
+            'model_id': model.id,
+            'license_plate': '1-ABC-123',
+        })
+        car2 = self.env['fleet.vehicle'].create({  # noqa: OLS03001
+            'model_id': model.id,
+            'license_plate': '2-DEF-456',
+        })
+        tax_21 = self.percent_tax(21.0)
+        invoice = self._create_invoice(
+            partner_id=self.partner_be,
+            invoice_line_ids=[
+                self._prepare_invoice_line(
+                    product_id=self.product_a,
+                    price_unit=200.0,
+                    quantity=1.0,
+                    tax_ids=tax_21,
+                    vehicle_id=car,
+                ),
+                self._prepare_invoice_line(
+                    product_id=self.product_a,
+                    price_unit=200.0,
+                    quantity=1.0,
+                    tax_ids=tax_21,
+                    vehicle_id=car2,
+                ),
+            ],
+            post=True,
+        )
+
+        self._generate_invoice_ubl_file(invoice)
+        self._assert_invoice_ubl_file(invoice, 'test_invoice_with_vehicle_license_plate')

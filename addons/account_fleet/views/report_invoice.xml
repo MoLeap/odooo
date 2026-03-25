@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="report_invoice_document" inherit_id="account.report_invoice_document">
+
+        <table name="invoice_line_table" position="before">
+            <t t-set="vehicle_column_needed" t-value="any(l.vehicle_id for l in o._get_move_lines_to_report())"/>
+        </table>
+
+        <!-- Add new column on invoice lines: License Plate -->
+        <th name="th_quantity" position="before">
+            <th class="text-start" t-if="vehicle_column_needed">
+                <span>Vehicle</span>
+            </th>
+        </th>
+
+        <td name="td_quantity" position="before">
+            <td class="text-start" t-if="vehicle_column_needed">
+                <span t-field="line.vehicle_id.license_plate" class="text-nowrap"/>
+            </td>
+        </td>
+    </template>
+
+</odoo>
