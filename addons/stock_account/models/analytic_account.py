@@ -92,6 +92,7 @@ class AccountAnalyticAccount(models.Model):
                 if float_is_zero(new_amount, precision_rounding=currency.rounding):
                     existing_aal.unlink()
                 else:
+                    existing_aal = existing_aal.sudo()
                     existing_aal.amount = new_amount
                     existing_aal.unit_amount = new_unit_amount
                 # Prevent this distribution from being applied again
