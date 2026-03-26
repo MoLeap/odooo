@@ -30,7 +30,19 @@ from collections import defaultdict, OrderedDict
 from enum import auto, IntEnum
 from json.encoder import c_make_encoder
 from opcode import opmap, opname
-from types import CodeType
+from types import (
+    BuiltinMethodType,
+    ClassMethodDescriptorType,
+    CodeType,
+    FunctionType,
+    GetSetDescriptorType,
+    MemberDescriptorType,
+    MethodDescriptorType,
+    MethodType,
+    ModuleType,
+    NoneType,
+    WrapperDescriptorType,
+)
 from weakref import WeakKeyDictionary
 
 import werkzeug
@@ -89,10 +101,35 @@ class UnsafeContextError(UnsafeError):
 class UnsafeObjectError(UnsafeError):
     """ Exception raised when an object is unsafe. """
 
+
+class UnsafeModuleError(UnsafeObjectError):
+
+    def __init__(self, obj):
+        super().__init__(f'Unsafe module access: {obj!r}')
+
+
+class UnsafeClassError(UnsafeObjectError):
+
+    def __init__(self, obj):
+        obj_path = safe_whitelist.get_full_path(obj)
+        super().__init__(f'Unsafe class access: {obj!r} (path: {obj_path})')
+
+
+class UnsafeInstanceError(UnsafeObjectError):
+
+    def __init__(self, obj):
+        obj_path = safe_whitelist.get_full_path(type(obj))
+        super().__init__(
+            f'Unsafe instance access: {obj!r} (type: {type(obj)!r}, path: {obj_path})',
+        )
+
+
+class UnsafeFunctionError(UnsafeObjectError):
+
     def __init__(self, obj):
         obj_path = safe_whitelist.get_full_path(obj)
         super().__init__(
-            f'Unsafe object access (type {type(obj)!r}): {obj!r} (path: {obj_path})',
+            f'Unsafe function access: {obj!r} (type: {type(obj)!r}, path: {obj_path})',
         )
 
 
@@ -675,17 +712,22 @@ class _SafeChecker:
 
     def __init__(self):
         self.__hooks: WeakKeyDictionary[type, typing.Callable | None] = WeakKeyDictionary()
-        # Add hooks
-        for t in _SafeWhitelist.TRUSTED_TYPES: self.add_hook(t, None)  # Optimization to save time when serializing these types  # noqa: E701
+        # Check hooks
+        self.add_hook(ModuleType, self._hook_module)
+        self.add_hook(type, self._hook_class)
+        # Optimization to save time when serializing these instances
+        for t in _SafeWhitelist.TRUSTED_CLASSES: self.add_hook(t, None)  # noqa: E701
+        self.add_hook(FunctionType, self._hook_function)
+        self.add_hook(MethodType, self._hook_method)
+        self.add_hook(BuiltinMethodType, self._hook_builtin_method)  # is `BuiltinFunctionType`
+        self.add_hook(MethodDescriptorType, self._hook_descriptor)
+        self.add_hook(MemberDescriptorType, self._hook_descriptor)
+        self.add_hook(GetSetDescriptorType, self._hook_descriptor)
+        self.add_hook(ClassMethodDescriptorType, self._hook_class_method_descriptor)
+        self.add_hook(WrapperDescriptorType, self._hook_wrapper_descriptor)
+        # Serialization hooks
         for t in self.SEQUENCES: self.add_hook(t, list)  # noqa: E701
         for t in self.MAPPINGS: self.add_hook(t, dict)  # noqa: E701
-        self.add_hook(type, self._hook_class)
-        self.add_hook(types.ModuleType, self._hook_module)
-        self.add_hook(types.BuiltinFunctionType, self._hook_builtin_function)
-        self.add_hook(types.BuiltinMethodType, self._hook_builtin_function)
-        self.add_hook(types.FunctionType, self._hook_function)
-        self.add_hook(types.MethodType, self._hook_function)
-        self.add_hook(types.MethodDescriptorType, self._hook_descriptor)
         self.add_hook(functools.partial, self._hook_partial)
         self.add_hook(lazy, self._hook_lazy)
         self.add_hook(type(reversed([])), self._hook_simple_iterator)
@@ -770,26 +812,66 @@ class _SafeChecker:
 
         return hook(obj)
 
-    def _hook_simple_iterator(self, obj):
-        return gc.get_referents(obj)[-1]
+    # Primary check hooks (return `None` or raise an `UnsafeObjectError`)
 
     def _hook_module(self, obj):
-        safe_whitelist.check_module(obj)
+        raise UnsafeModuleError(obj)
 
-    def _hook_builtin_function(self, obj):
-        if obj in safe_whitelist.TRUSTED_BUILTIN_FUNCTIONS:
-            return
-        safe_whitelist.check_function(obj)
+    def _hook_class(self, obj) -> None:
+        if obj not in _SafeWhitelist.TRUSTED_CLASSES:
+            safe_whitelist.check_class(obj)
 
-    def _hook_function(self, obj):
-        if obj is safe_call:
+    def _hook_instance(self, obj) -> None:
+        if type(obj) not in _SafeWhitelist.TRUSTED_CLASSES:
+            safe_whitelist.check_instance(obj)
+
+    def _hook_function(self, obj) -> None:
+        # At runtime if `__name__` is present in globals, `__module__` will
+        # be present on the user defined function
+        if obj is safe_call or not getattr(obj, '__module__', False):
             return
-        if getattr(obj, '__module__', False):  # Not user-defined
+        if obj not in _SafeWhitelist.TRUSTED_FUNCTIONS:
             safe_whitelist.check_function(obj)
+
+    # Secondary check hooks (fallback on primary hooks)
+
+    def _hook_method(self, obj):
+        self_ = obj.__self__
+        try:  # Try checking with bound object
+            return (self._hook_class if isinstance(self_, type) else self._hook_instance)(self_)
+        except UnsafeObjectError:
+            return self._hook_function(obj)
+
+    def _hook_builtin_method(self, obj):
+        self_ = obj.__self__
+        # Try trusted with bound object (which can be a module)
+        if isinstance(self_, ModuleType):
+            return self._hook_function(obj)
+        try:
+            return (self._hook_class if isinstance(self_, type) else self._hook_instance)(self_)
+        except UnsafeObjectError:
+            return self._hook_function(obj)
 
     def _hook_descriptor(self, obj):
-        if hasattr(obj, '__objclass__'):  # Not bound
-            safe_whitelist.check_function(obj)
+        try:  # Fallback on the class
+            return self._hook_class(obj.__objclass__)
+        except UnsafeObjectError:
+            return self._hook_function(obj)
+
+    def _hook_class_method_descriptor(self, obj):
+        # C-level class methods, used for protocol hooks
+        # These are effectively "only" exposed as dunder methods
+        raise UnsafeFunctionError(obj)
+
+    def _hook_wrapper_descriptor(self, obj):
+        # C-level slot wrappers (e.g. __add__, __len__)
+        # These are always exposed as dunder methods
+        raise UnsafeFunctionError(obj)
+
+    # Serialization hooks (return an object to continue the serialisation)
+
+    def _hook_simple_iterator(self, obj):
+        return gc.get_referents(obj)[-1]
 
     def _hook_partial(self, obj):
         return (obj.func, obj.args, obj.keywords)
@@ -798,14 +880,6 @@ class _SafeChecker:
         if getattr(obj, '_func', None) is None:
             return obj._cached_value
         return (obj._func, obj._args, obj._kwargs)
-
-    def _hook_class(self, obj):
-        if obj in safe_whitelist.TRUSTED_TYPES:
-            return
-        safe_whitelist.check_class(obj)
-
-    def _hook_instance(self, obj):
-        safe_whitelist.check_instance(obj)
 
 
 class _SafeWhitelist:
@@ -824,16 +898,31 @@ class _SafeWhitelist:
     """
 
     RE_NOTHING = re.compile(r'(?!)')
-    TRUSTED_TYPES = frozenset((
+    TRUSTED_CLASSES = frozenset((
+        # basic types
+        object,
+        NoneType, bool, int, float, str, bytes, bytearray, memoryview,
+        # errors
+        Exception,
+        AttributeError, KeyError, TypeError, UnboundLocalError, ValueError,
+        ZeroDivisionError,
+        # iterators and generators
+        enumerate, filter, map, range, reversed, zip,
         *_SafeChecker.MAPPINGS, *_SafeChecker.SEQUENCES,
-        object, bool, int, float, str, bytes, bytearray, memoryview,
-        types.NoneType,
-        filter, map, enumerate, range, zip, reversed,
-        Exception, ValueError, TypeError, AttributeError, KeyError, ZeroDivisionError, UnboundLocalError,
+        # wrapped modules
+        wrap_module,
     ))
-    TRUSTED_BUILTIN_FUNCTIONS = frozenset((
-        min, max, sum, abs, sorted, round, len, repr, all, any, ord, chr, divmod,
-        isinstance, hasattr,
+    TRUSTED_FUNCTIONS = frozenset((
+        # math and numbers
+        abs, divmod, max, min, round, sum,
+        # string and conversion
+        chr, ord, repr,
+        # collections and iterables
+        all, any, len, sorted,
+        # introspection and type checking
+        hasattr, isinstance,
+        # others
+        _import, functools.reduce,
     ))
 
     @staticmethod
@@ -866,21 +955,20 @@ class _SafeWhitelist:
         self._functions = list()
 
     def add_class(self, qualname: str) -> None:
-        self._classes.append(qualname)
+        if qualname not in self._classes:
+            self._classes.append(qualname)
+            vars(self).pop('_re_class', None)
         self.add_instance(qualname)
-        vars(self).pop('_re_class', None)
 
     def add_instance(self, qualname: str) -> None:
-        self._instances.append(qualname)
-        # Trust function of the class/instance implicitly
-        if not qualname.endswith('.*'):
-            qualname += '.*'
-        self.add_function(qualname)
-        vars(self).pop('_re_instance', None)
+        if qualname not in self._instances:
+            self._instances.append(qualname)
+            vars(self).pop('_re_instance', None)
 
     def add_function(self, qualname: str) -> None:
-        self._functions.append(qualname)
-        vars(self).pop('_re_function', None)
+        if qualname not in self._functions:
+            self._functions.append(qualname)
+            vars(self).pop('_re_function', None)
 
     _re_class = functools.cached_property(lambda self: self._re_compile(self._classes))
     _re_instance = functools.cached_property(lambda self: self._re_compile(self._instances))
@@ -921,25 +1009,45 @@ class _SafeWhitelist:
 
     def check_class(self, obj):
         if not self._re_class.fullmatch(self.get_full_path(obj)):
-            raise UnsafeObjectError(obj)
+            raise UnsafeClassError(obj)
 
     def check_instance(self, obj):
-        obj = type(obj)
-        if not self._re_instance.fullmatch(self.get_full_path(obj)):
-            raise UnsafeObjectError(obj)
+        if not self._re_instance.fullmatch(self.get_full_path(type(obj))):
+            raise UnsafeInstanceError(obj)
 
     def check_function(self, obj):
         if not self._re_function.fullmatch(self.get_full_path(obj)):
-            raise UnsafeObjectError(obj)
+            raise UnsafeFunctionError(obj)
 
     def check_module(self, obj):
-        raise UnsafeObjectError(obj)
+        raise UnsafeModuleError(obj)
 
 
 safe_transformer = _SafeTransformer()
 safe_transform = safe_transformer.visit
 safe_checker = _SafeChecker()
 safe_whitelist = _SafeWhitelist()
+
+
+T = typing.TypeVar("T", bound=type)
+F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
+
+
+def safe_class(cls: T) -> T:
+    safe_whitelist.add_class(safe_whitelist.get_full_path(cls))
+    return cls
+
+
+def safe_instance(cls: T) -> T:
+    safe_whitelist.add_instance(safe_whitelist.get_full_path(cls))
+    return cls
+
+
+def safe_function(func: F) -> F:
+    if func.__qualname__.endswith('<lambda>'):
+        func.__qualname__ += f'.<{func.__code__.co_firstlineno}>'
+    safe_whitelist.add_function(safe_whitelist.get_full_path(func))
+    return func
 
 
 def safe_call(callee, /, *args, **kwargs):
@@ -989,29 +1097,34 @@ def add_monitoring(code):
 
 @functools.cache
 def _initialize_safe_whitelist():
-    # Primitive types and builtins (C functions)
-    safe_whitelist.add_function('bool.*')
-    safe_whitelist.add_function('int.*')
-    safe_whitelist.add_function('float.*')
-    safe_whitelist.add_function('str.*')
-    safe_whitelist.add_function('bytes.*')
-    safe_whitelist.add_function('list.*')
-    safe_whitelist.add_function('tuple.*')
-    safe_whitelist.add_function('set.*')
-    safe_whitelist.add_function('dict.*')
-    safe_whitelist.add_function('mappingproxy.*')
-    safe_whitelist.add_function('defaultdict.*')
-    safe_whitelist.add_function('OrderedDict.*')
-    safe_whitelist.add_function('_functools.reduce')
+    # Wrapped modules
+    safe_whitelist.add_class('datetime.date')
+    safe_whitelist.add_class('datetime.datetime')
+    safe_whitelist.add_class('datetime.time')
+    safe_whitelist.add_class('datetime.timedelta')
+    safe_whitelist.add_class('datetime.timezone')
+    safe_whitelist.add_class('datetime.tzinfo')
+    safe_whitelist.add_class('dateutil.tz.tz.tzutc')
+    safe_whitelist.add_function('dateutil.parser.isoparser.isoparser.isoparse')
+    safe_whitelist.add_function('dateutil.parser._parser.parse')
+    safe_whitelist.add_class('dateutil.relativedelta.relativedelta')
+    safe_whitelist.add_class('dateutil.rrule.rrule')
+    safe_whitelist.add_class('dateutil.rrule.rruleset')
+    safe_whitelist.add_instance('dateutil.rrule._rrulestr')
+    safe_whitelist.add_function('time.time')
+    safe_whitelist.add_function('time.strptime')
+    safe_whitelist.add_function('time.strftime')
+    safe_whitelist.add_function('time.sleep')
     # Monkey patches
     safe_whitelist.add_class('odoo._monkeypatches.zoneinfo.ZoneInfo')
     safe_whitelist.add_function('odoo._monkeypatches.*')
     # Core
-    safe_whitelist.add_class('odoo.addons.*')  # TODO: Restrict addons
     safe_whitelist.add_class('odoo.upgrade.*')
+    safe_whitelist.add_function('odoo.upgrade.*')
     safe_whitelist.add_class('odoo.orm.domains.*')
     safe_whitelist.add_class('odoo.orm.fields.*')
     safe_whitelist.add_class('odoo.orm.fields_binary.*')
+    safe_whitelist.add_class('odoo.orm.fields_properties.*')
     safe_whitelist.add_class('odoo.orm.fields_selection.*')
     safe_whitelist.add_class('odoo.orm.models.*')
     safe_whitelist.add_class('odoo.orm.commands.Command')
@@ -1039,8 +1152,6 @@ def _initialize_safe_whitelist():
     safe_whitelist.add_class('odoo.tools.json._ScriptSafe')
     safe_whitelist.add_class('odoo.tools.json.JSON')
     safe_whitelist.add_class('odoo.tools.profiler.QwebTracker')
-    safe_whitelist.add_class('odoo.tools.safe_eval.wrap_module')
-    safe_whitelist.add_instance('odoo.tools.misc.OrderedSet')
     safe_whitelist.add_instance('odoo.tools.misc.ReversedIterable')
     safe_whitelist.add_instance('odoo.tools.query.Query')
     safe_whitelist.add_instance('odoo.tools.translate.LazyGettext')
@@ -1055,7 +1166,6 @@ def _initialize_safe_whitelist():
     safe_whitelist.add_function('odoo.tools.misc.format_date')
     safe_whitelist.add_function('odoo.tools.misc.format_duration')
     safe_whitelist.add_function('odoo.tools.misc.street_split')
-    safe_whitelist.add_function('odoo.tools.safe_eval._import')
     safe_whitelist.add_function('odoo.tools.translate.html_translate')
     # Psycopg2
     safe_whitelist.add_class('psycopg2.InterfaceError')
@@ -1066,23 +1176,6 @@ def _initialize_safe_whitelist():
     # Cursor
     safe_whitelist.add_function('cursor.fetchall')
     safe_whitelist.add_function('cursor.fetchone')
-    # Dates - Times - Timezone
-    safe_whitelist.add_class('datetime.date')
-    safe_whitelist.add_class('datetime.datetime')
-    safe_whitelist.add_class('datetime.time')
-    safe_whitelist.add_class('datetime.timedelta')
-    safe_whitelist.add_class('datetime.timezone')
-    safe_whitelist.add_class('datetime.tzinfo')
-    safe_whitelist.add_function('date.*')
-    safe_whitelist.add_function('datetime.*')
-    safe_whitelist.add_function('time.*')
-    safe_whitelist.add_function('timedelta.*')
-    safe_whitelist.add_function('timezone.*')
-    safe_whitelist.add_function('tzinfo.*')
-    safe_whitelist.add_class('dateutil.relativedelta.relativedelta')
-    safe_whitelist.add_instance('pytz.tzfile.UTC')
-    safe_whitelist.add_function('pytz.tzinfo.DstTzInfo.localize')
-    safe_whitelist.add_function('pytz.UTC.localize')
     # Collections
     safe_whitelist.add_class('collections.defaultdict')
     safe_whitelist.add_class('collections.OrderedDict')

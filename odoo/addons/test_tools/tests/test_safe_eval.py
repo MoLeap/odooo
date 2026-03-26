@@ -6,11 +6,18 @@ from unittest.mock import patch
 from odoo import Command
 from odoo.tests.common import tagged, BaseCase, TransactionCase
 from odoo.tools import mute_logger
+from odoo.tools.misc import OrderedSet
 from odoo.tools.safe_eval import (
+    _BUILTINS,
     const_eval,
     expr_eval,
+    safe_checker,
     safe_eval,
-    UnsafeObjectError,
+    safe_whitelist,
+    UnsafeClassError,
+    UnsafeFunctionError,
+    UnsafeInstanceError,
+    UnsafeModuleError,
     UnsafePolicy,
 )
 
@@ -213,6 +220,7 @@ class TestSafeEvalRuntime(TransactionCase):
         cls.unsafe_context = {'UnsafeClass': UnsafeClass}
 
     def test_transform_decorators(self):
+        safe_whitelist.add_function('odoo.addons.test_tools.tests.test_safe_eval.TestSafeEvalRuntime.test_transform_decorators.<locals>.*')
         steps = []
 
         def make_deco(x):
@@ -249,7 +257,7 @@ class TestSafeEvalRuntime(TransactionCase):
         expr = """
             UnsafeClass()
         """
-        with self.assertRaisesRegex(ValueError, '^UnsafeObjectError'):
+        with self.assertRaisesRegex(ValueError, '^UnsafeClassError'):
             safe_eval(dedent(expr), self.unsafe_context, mode='exec')
 
     @mute_logger('odoo.tools.safe_eval.runtime')
@@ -258,7 +266,7 @@ class TestSafeEvalRuntime(TransactionCase):
             callee = lambda *args, **kwargs: ...
             callee(UnsafeClass)
         """
-        with self.assertRaisesRegex(ValueError, '^UnsafeObjectError'):
+        with self.assertRaisesRegex(ValueError, '^UnsafeClassError'):
             safe_eval(dedent(expr), self.unsafe_context, mode='exec')
 
     @mute_logger('odoo.tools.safe_eval.runtime')
@@ -267,7 +275,7 @@ class TestSafeEvalRuntime(TransactionCase):
             callee = lambda *args, **kwargs: ...
             callee(kw=UnsafeClass)
         """
-        with self.assertRaisesRegex(ValueError, '^UnsafeObjectError'):
+        with self.assertRaisesRegex(ValueError, '^UnsafeClassError'):
             safe_eval(dedent(expr), self.unsafe_context, mode='exec')
 
     @mute_logger('odoo.tools.safe_eval.runtime')
@@ -277,7 +285,7 @@ class TestSafeEvalRuntime(TransactionCase):
             struct = {'a': {'b': {'c': UnsafeClass}}}
             callee(struct)
         """
-        with self.assertRaisesRegex(ValueError, '^UnsafeObjectError'):
+        with self.assertRaisesRegex(ValueError, '^UnsafeClassError'):
             safe_eval(dedent(expr), self.unsafe_context, mode='exec')
 
         expr = """
@@ -285,7 +293,7 @@ class TestSafeEvalRuntime(TransactionCase):
             struct = ['a', 'b', 'c', UnsafeClass]
             callee(struct)
         """
-        with self.assertRaisesRegex(ValueError, '^UnsafeObjectError'):
+        with self.assertRaisesRegex(ValueError, '^UnsafeClassError'):
             safe_eval(dedent(expr), self.unsafe_context, mode='exec')
 
     @mute_logger('odoo.tools.safe_eval.runtime')
@@ -293,19 +301,19 @@ class TestSafeEvalRuntime(TransactionCase):
         expr = """
             map(UnsafeClass, ['foo'])
         """
-        with self.assertRaisesRegex(ValueError, '^UnsafeObjectError'):
+        with self.assertRaisesRegex(ValueError, '^UnsafeClassError'):
             safe_eval(dedent(expr), self.unsafe_context, mode='exec')
 
         expr = """
             filter(UnsafeClass, ['foo'])
         """
-        with self.assertRaisesRegex(ValueError, '^UnsafeObjectError'):
+        with self.assertRaisesRegex(ValueError, '^UnsafeClassError'):
             safe_eval(dedent(expr), self.unsafe_context, mode='exec')
 
         expr = """
             sorted(['foo'], key=UnsafeClass)
         """
-        with self.assertRaisesRegex(ValueError, '^UnsafeObjectError'):
+        with self.assertRaisesRegex(ValueError, '^UnsafeClassError'):
             safe_eval(dedent(expr), self.unsafe_context, mode='exec')
 
     @mute_logger('odoo.tools.safe_eval.runtime')
@@ -322,7 +330,7 @@ class TestSafeEvalRuntime(TransactionCase):
             'type': 'qweb',
             'arch_db': arch,
         })
-        with self.assertRaises(UnsafeObjectError):
+        with self.assertRaises(UnsafeClassError):
             self.env['ir.qweb']._render(view.id, self.unsafe_context)
 
     def test_override_call(self):
@@ -347,3 +355,114 @@ class TestSafeEvalRuntime(TransactionCase):
         """
         with self.assertRaises(SyntaxError):
             safe_eval(dedent(expr), self.unsafe_context, mode='exec')
+
+    def test_trust_auto_objects(self):
+        import builtins  # noqa: PLC0415
+        import collections  # noqa: PLC0415
+        import functools  # noqa: PLC0415
+        import types  # noqa: PLC0415
+
+        objs = (
+            # classes
+            builtins.object,
+            builtins.bool, builtins.int, builtins.float, builtins.str,
+            builtins.bytes, builtins.bytearray, builtins.memoryview,
+            builtins.Exception,
+            builtins.AttributeError, builtins.KeyError, builtins.TypeError,
+            builtins.UnboundLocalError, builtins.ValueError, builtins.ZeroDivisionError,
+            builtins.enumerate, builtins.filter, builtins.map, builtins.range,
+            builtins.reversed, builtins.zip,
+            builtins.dict,
+            builtins.list, builtins.tuple, builtins.set, builtins.frozenset,
+            types.MappingProxyType,
+            collections.defaultdict, collections.OrderedDict,
+            OrderedSet,  # tools
+            # functions
+            builtins.abs, builtins.divmod, builtins.max, builtins.min,
+            builtins.round, builtins.sum,
+            builtins.chr, builtins.ord, builtins.repr,
+            builtins.all, builtins.any, builtins.len, builtins.sorted,
+            builtins.hasattr, builtins.isinstance,
+            functools.reduce,
+        )
+        for obj in objs:
+            safe_checker.check(obj)
+
+        # Ensure controlled builtins are trusted
+        for obj in _BUILTINS.values():
+            safe_checker.check(obj)
+
+    def test_trust_wrapped_modules(self):
+        # Modules is not verified
+        import datetime  # noqa: PLC0415
+        import dateutil  # noqa: PLC0415
+        import dateutil.parser  # noqa: PLC0415
+        import dateutil.relativedelta  # noqa: PLC0415
+        import dateutil.rrule  # noqa: PLC0415
+        import dateutil.tz  # noqa: PLC0415
+        import json  # noqa: PLC0415
+        import time  # noqa: PLC0415
+
+        modules = (
+            datetime,
+            dateutil,
+            dateutil.parser,
+            dateutil.relativedelta,
+            dateutil.rrule,
+            dateutil.tz,
+            json,
+            time,
+        )
+        for module in modules:
+            with self.assertRaises(UnsafeModuleError):
+                safe_checker.check(module)
+
+        # Only wrapped modules can be used
+        import odoo.tools.safe_eval as safe_eval  # noqa: PLC0415
+
+        modules = (
+            safe_eval.datetime,
+            safe_eval.dateutil,
+            safe_eval.dateutil.parser,
+            safe_eval.dateutil.relativedelta,
+            safe_eval.dateutil.rrule,
+            safe_eval.dateutil.tz,
+            safe_eval.json,
+            safe_eval.time,
+        )
+        for module in modules:
+            safe_checker.check(module)
+
+        # Objects of authorised modules must be trusted
+        objs = (
+            datetime.date, datetime.datetime, datetime.time, datetime.timedelta,
+            datetime.timezone, datetime.tzinfo,
+            dateutil.tz.UTC, dateutil.tz.tzutc,
+            dateutil.parser.isoparse, dateutil.parser.parse,
+            dateutil.relativedelta.relativedelta,
+            dateutil.rrule.rrule, dateutil.rrule.rruleset, dateutil.rrule.rrulestr,
+            time.time, time.strptime, time.strftime, time.sleep,
+        )
+        for obj in objs:
+            safe_checker.check(obj)
+
+        # Specific test for monkeypatched `ZoneInfo` class
+        with self.assertRaises(UnsafeInstanceError):
+            safe_checker.check(dateutil.tz.gettz)
+        safe_checker.check(safe_eval.dateutil.tz.gettz)
+
+        # Specific test for import
+        with self.assertRaises(UnsafeFunctionError):
+            safe_checker.check(__import__)
+        safe_checker.check(safe_eval._import)
+
+    def test_trust_registry(self):
+        # Trust recordset
+        safe_checker.check(self.env['res.partner'])  # Serialisation hook
+        # Trust recordset method
+        safe_checker.check(self.env['res.partner'].create)  # Regex `odoo.orm.models.*`
+        # Trust model
+        safe_checker.check(self.env.registry['res.partner'])  # Serialisation hook
+        # Not trust model functions
+        with self.assertRaises(UnsafeFunctionError):
+            safe_checker.check(self.env.registry['res.partner'].create)
