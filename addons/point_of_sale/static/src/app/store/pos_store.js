@@ -327,6 +327,8 @@ export class PosStore extends Reactive {
             const PaymentInterface = this.electronic_payment_interfaces[pm.use_payment_terminal];
             if (PaymentInterface) {
                 pm.payment_terminal = new PaymentInterface(this, pm);
+                // Extend request timeout to 60 sec for payment terminals
+                this.data.requestTimeoutMs = 60000;
             }
         }
 
