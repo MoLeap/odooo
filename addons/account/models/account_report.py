@@ -399,7 +399,16 @@ class AccountReportLine(models.Model):
     )
     sequence = fields.Integer(string="Sequence")
     code = fields.Char(string="Code", help="Unique identifier for this line.")
-    foldable = fields.Boolean(string="Foldable", help="By default, we always unfold the lines that can be. If this is checked, the line won't be unfolded by default, and a folding button will be displayed.")
+    foldable = fields.Selection(
+        selection=[
+            ('always_unfolded', 'Always Unfolded'),
+            ('never', 'Never Unfolded'),
+            ('foldable', 'Foldable'),
+        ],
+        compute='_compute_foldable',
+        store=True,
+        readonly=False
+    )
     print_on_new_page = fields.Boolean('Print On New Page', help='When checked this line and everything after it will be printed on a new page.')
     action_id = fields.Many2one(string="Action", comodel_name='ir.actions.actions', help="Setting this field will turn the line into a link, executing the action when clicked.")
     hide_if_zero = fields.Boolean(string="Hide if Zero", help="This line and its children will be hidden when all of their columns are 0.")
@@ -435,6 +444,19 @@ class AccountReportLine(models.Model):
         for report_line in self:
             if report_line.parent_id:
                 report_line.horizontal_split_side = report_line.parent_id.horizontal_split_side
+
+    @api.depends('children_ids', 'expression_ids.engine', 'report_id.groupby', 'groupby', 'user_groupby')
+    def _compute_foldable(self):
+        for line in self:
+            if line.foldable:
+                continue
+            expressions = line.expression_ids
+            if line.children_ids or any(expr.engine == 'custom' for expr in expressions):
+                line.foldable = 'always_unfolded'
+            elif line.groupby or line.user_groupby or (line.report_id.groupby and all(expr.engine not in ('external', 'aggregation') for expr in expressions)):
+                line.foldable = 'foldable'
+            else:
+                line.foldable = 'never'
 
     @api.depends('groupby', 'expression_ids.engine')
     def _compute_user_groupby(self):
