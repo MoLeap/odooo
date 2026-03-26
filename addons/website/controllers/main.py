@@ -152,6 +152,11 @@ class Website(Home):
 
         raise request.not_found()
 
+    def _force_website(self, website_id):
+        website_id = int(website_id)
+        request.session['force_website_id'] = website_id
+        return website_id
+
     @http.route('/website/force/<int:website_id>', type='http', auth="user", website=True, sitemap=False, multilang=False, readonly=True)
     def website_force(self, website_id, path='/', isredir=False, **kw):
         """ To switch from a website to another, we need to force the website in
@@ -182,7 +187,7 @@ class Website(Home):
                     f'/website/force/{website.id}?{query_params}',
                 )
                 return request.redirect(url_to)
-        website._force()
+        self._force_website(website.id)
         return request.redirect(path)
 
     @http.route(['/@/', '/@/<path:path>'], type='http', auth='public', website=True, sitemap=False, multilang=False, readonly=True)
@@ -784,10 +789,8 @@ class Website(Home):
                 template = default_templ
 
         template = template and dict(template=template) or {}
-        website_id = kwargs.get('website_id')
         if website_id:
-            website = request.env['website'].browse(int(website_id))
-            website._force()
+            website = request.env['website'].with_context(website_id=self._force_website(int(website_id)))
         else:
             website = request.env['website'].get_current_website()
 
