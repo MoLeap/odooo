@@ -27,7 +27,9 @@ patch(PosStore.prototype, {
         }
         const tobeRemoved = order.getDiscountLine(); // remove once we successfully create new line
 
-        const discountableLines = lines.filter((line) => line.isGlobalDiscountApplicable());
+        const discountableLines = lines.filter(
+            (line) => line.isGlobalDiscountApplicable() && !line.is_service_charge
+        );
         const baseLines = discountableLines.map((line) =>
             accountTaxHelpers.prepare_base_line_for_taxes_computation(
                 line,

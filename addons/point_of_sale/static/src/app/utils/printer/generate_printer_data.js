@@ -225,6 +225,16 @@ export class GeneratePrinterData {
               ])
             : false;
 
+        const serviceChargeLine = this.order.getServiceChargeLine();
+        let serviceCharge = false;
+        if (serviceChargeLine) {
+            serviceCharge = {
+                amount: serviceChargeLine.currencyDisplayPrice,
+                qty: serviceChargeLine.qty,
+                name: serviceChargeLine.getFullProductName(),
+            };
+        }
+
         return {
             order: this.order.raw,
             config: this.config.raw,
@@ -255,6 +265,7 @@ export class GeneratePrinterData {
                 cashier_name: this.order.getCashierName(),
                 formated_date_order: this.order.formatDateOrTime("date_order", "datetime"),
                 formated_shipping_date: this.order.formatDateOrTime("shipping_date", "date"),
+                service_charge: serviceCharge,
             },
         };
     }
