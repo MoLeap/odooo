@@ -291,7 +291,7 @@ class StockValuationLayer(models.Model):
             }
             am_vals_list.append(move_vals)
 
-        account_moves = self.env['account.move'].sudo().create(am_vals_list)
+        account_moves = self.env['account.move'].sudo().with_context(is_price_change=True).create(am_vals_list)
         if account_moves:
             account_moves._post()
 
