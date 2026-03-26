@@ -6,13 +6,15 @@ import time
 import zipfile
 
 import requests
-from requests import RequestException
+from requests.exceptions import RequestException
 
 from odoo import _
+from odoo.tools.urls import urljoin as url_join
 
 SINVOICE_API_URL = 'https://api-vinvoice.viettel.vn/services/einvoiceapplication/api/'
 SINVOICE_AUTH_URL = 'https://api-vinvoice.viettel.vn/auth/login'
 SINVOICE_TIMEOUT = 60  # They recommend between 60 and 90 seconds, but 60s is already quite long.
+SINVOICE_MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB — generous for invoice ZIP/XML files.
 
 
 class SInvoiceService:
@@ -25,41 +27,45 @@ class SInvoiceService:
 
     def __enter__(self):
         self._active = True
+        self.session = requests.Session()
+        self.session.cookies.set('access_token', self.access_token)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         self._active = False
         self.access_token = None
+        self.session.close()
+        self.session = None
 
     @classmethod
     def get_access_token(cls, username, password):
         """ Request a new access token from the SInvoice auth endpoint.
         Returns (token_data_dict, error_message). """
         try:
-            response = requests.post(
-                SINVOICE_AUTH_URL,
-                json={'username': username, 'password': password},
-                timeout=SINVOICE_TIMEOUT,
-            )
-            resp_json = response.json()
-            if resp_json.get('code') or resp_json.get('error'):
-                data = resp_json.get('data') or resp_json.get('error')
-                return {}, _('Error when contacting SInvoice: %s.', data)
-            return resp_json, None
+            with requests.Session() as session:
+                response = session.post(
+                    SINVOICE_AUTH_URL,
+                    json={'username': username, 'password': password},
+                    timeout=SINVOICE_TIMEOUT,
+                )
+                resp_json = response.json()
+                if resp_json.get('code') or resp_json.get('error'):
+                    data = resp_json.get('data') or resp_json.get('error')
+                    return {}, _('Error when contacting SInvoice: %s.', data)
+                return resp_json, None
         except (RequestException, ValueError) as err:
             return {}, _('Something went wrong, please try again later: %s', err)
 
     def _send_request(self, method, endpoint, json_data=None, params=None, headers=None):
         """ Send an authenticated request to the SInvoice API.
         Returns (response_dict, error_message). """
-        url = SINVOICE_API_URL + endpoint
+        url = url_join(SINVOICE_API_URL, endpoint)
         try:
-            response = requests.request(
+            response = self.session.request(
                 method, url,
                 json=json_data,
                 params=params,
                 headers=headers,
-                cookies={'access_token': self.access_token},
                 timeout=SINVOICE_TIMEOUT,
             )
             resp_json = response.json()
@@ -213,10 +219,15 @@ class SInvoiceService:
         try:
             # SInvoice returns a zip containing another zip, which contains the xsl + xml files.
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_file:
-                inner_zip_bytes = zip_file.read(zip_file.infolist()[0])
+                outer_entry = zip_file.infolist()[0]
+                if outer_entry.file_size > SINVOICE_MAX_FILE_SIZE:
+                    return {}, _('SInvoice ZIP entry exceeds maximum allowed file size.')
+                inner_zip_bytes = zip_file.read(outer_entry)
                 with zipfile.ZipFile(io.BytesIO(inner_zip_bytes)) as inner_zip:
                     for file in inner_zip.infolist():
                         if file.filename.endswith('.xml'):
+                            if file.file_size > SINVOICE_MAX_FILE_SIZE:
+                                return {}, _('SInvoice ZIP entry exceeds maximum allowed file size.')
                             return {
                                 'name': file.filename,
                                 'mimetype': 'application/xml',
@@ -224,7 +235,7 @@ class SInvoiceService:
                                 'res_field': 'l10n_vn_edi_sinvoice_xml_file',
                             }, None
             return {}, _('No XML file found in the SInvoice ZIP response.')
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             return {}, _('Failed to extract XML from SInvoice ZIP: %s', err)
 
     # -------------------------------------------------------------------------
