@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef } from "@web/owl2/utils";
-import { Component, xml } from "@odoo/owl";
+import { useRef } from "@web/owl2/utils";
+import { Component, xml, useEffect } from "@odoo/owl";
 import { useIsChildLarger } from "@point_of_sale/app/hooks/hooks";
 import { useService } from "@web/core/utils/hooks";
 import { Dialog } from "@web/core/dialog/dialog";
@@ -16,7 +16,7 @@ class ListContainerDialog extends Component {
         <Dialog title="this.title" footer="false">
             <div class="list-container-items d-flex p-2 flex-wrap" style="gap: 0.5rem;">
                 <t t-foreach="this.props.items" t-as="item" t-key="item_index">
-                    <t t-slot="default" item="item" />
+                    <t t-call-slot="default" item="item" />
                 </t>
             </div>
         </Dialog>
@@ -46,7 +46,7 @@ export class ListContainer extends Component {
             <div class="overflow-hidden flex-grow-1">
                 <div t-custom-ref="container" class="list-container-items d-flex align-items-center gap-1">
                     <div t-if="!this.props.forceSmall" t-foreach="this.props.items" t-as="item" t-key="item_index" t-att-class="{'invisible order-2': this.shouldBeInvisible(item_index)}">
-                        <t t-slot="default" item="item"/>
+                        <t t-call-slot="default" item="item"/>
                     </div>
                     <button t-if="this.sizing.isLarger or this.props.forceSmall" t-on-click="this.toggle"
                         class="btn btn-lg btn-secondary order-1 flex-shrink-0 fw-bolder lh-lg"
@@ -64,12 +64,9 @@ export class ListContainer extends Component {
         this.ui = useService("ui");
         this.dialog = useService("dialog");
 
-        useLayoutEffect(
-            () => {
-                this.sizing.reload();
-            },
-            () => [this.props.items]
-        );
+        useEffect(() => {
+            Promise.resolve().then(() => this.sizing.reload());
+        });
     }
     shouldBeInvisible(itemIndex) {
         return itemIndex >= this.sizing.maxItems;
