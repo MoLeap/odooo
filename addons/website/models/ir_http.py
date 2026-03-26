@@ -259,7 +259,7 @@ class IrHttp(models.AbstractModel):
             return False
         if current_id == expected_website_id:
             return current_id
-        if expected_website_id not in self.env['website']._cached_data()['id']:
+        if expected_website_id not in self.env['website'].get_all().ids:
             return False
         user = self.env.user or self.env['res.users'].sudo().browse(request.session.uid)
         if (user and user.has_group('website.group_multi_website')
@@ -276,14 +276,14 @@ class IrHttp(models.AbstractModel):
         3. ``False``
         """
         if force_website_id := request.session.get('force_website_id'):
-            if force_website_id in self.env['website']._cached_data()['id']:
+            if force_website_id in self.env['website'].get_all().ids:
                 return force_website_id
             else:
                 # Don't crash if the session website got deleted
                 request.session.pop('force_website_id')
 
         if website_id := request.env.context.get('website_id'):
-            if website_id in self.env['website']._cached_data()['id']:
+            if website_id in self.env['website'].get_all().ids:
                 return website_id
         return False
 

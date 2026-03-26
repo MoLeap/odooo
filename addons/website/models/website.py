@@ -1435,7 +1435,7 @@ class Website(models.CachedModel):
         :type fallback: bool
         :return: website recordset
         """
-        existing_ids = self._cached_data()['id']
+        existing_ids = self.get_all().ids
         if website_id := self.env.context.get('website_id'):
             # during the match of env['ir.http'], the website information was
             # added from the request.
@@ -1524,7 +1524,7 @@ class Website(models.CachedModel):
             values['multi_website_websites_current'] = self.name
             values['multi_website_websites'] = [
                 {'website_id': website.id, 'name': website.name, 'domain': website.domain}
-                for website in self.browse(self.env['website']._cached_data()['id']) if website != self
+                for website in self.get_all() if website != self
             ]
 
             cur_company = self.env.company
