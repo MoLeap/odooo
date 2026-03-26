@@ -31,15 +31,17 @@ export class CollaborationPlugin extends Plugin {
     static dependencies = ["history", "domMutation", "selection", "sanitize"];
     /** @type {import("plugins").EditorResources} */
     resources = {
+        history_data_keys: ["peerId"],
+
         /** Handlers */
         on_history_cleaned_handlers: this.onHistoryClean.bind(this),
         on_history_reset_handlers: this.onHistoryReset.bind(this),
-        on_history_written_handlers: (commit) => this.onMutationsCommitted(commit),
+        on_history_committed_handlers: (commit) => this.onHistoryCommitted(commit),
 
         /** Overrides */
         set_attribute_overrides: this.setAttribute.bind(this),
 
-        editor_commit_processors: this.processEditorCommit.bind(this),
+        pending_commit_data_processors: (data) => ({ ...data, peerId: this.peerId }),
         is_commit_reversible_predicates: (commit) => {
             if (commit.data.peerId !== this.peerId) {
                 return false;
@@ -78,7 +80,7 @@ export class CollaborationPlugin extends Plugin {
         this.branchCommitIds = [];
     }
     onHistoryReset() {
-        const firstCommit = this.dependencies.history.getHistoryCommits()[0];
+        const firstCommit = this.dependencies.history.getCommits()[0];
         this.snapshots = [{ commit: firstCommit }];
     }
     /**
@@ -97,7 +99,7 @@ export class CollaborationPlugin extends Plugin {
      * Get all the history ids for the current history branch.
      */
     getBranchIds() {
-        const commits = this.dependencies.history.getHistoryCommits();
+        const commits = this.dependencies.history.getCommits();
         return (this.initialBranchCommitId || "")
             .split(",")
             .concat(this.branchCommitIds)
@@ -133,15 +135,14 @@ export class CollaborationPlugin extends Plugin {
             // `addExternalCommit` will impact the array of written commits.
             // Get a new copy at every step of the loop to make sure to have an
             // updated version.
-            const commits = this.dependencies.history.getHistoryCommits();
+            const commits = this.dependencies.history.getCommits();
             // todo: add a test that no 2 on_history_missing_parent_commit_handlers
             // are called in same stack.
             const insertIndex = this.getInsertCommitIndex(commits, newCommit);
             if (typeof insertIndex === "undefined") {
                 continue;
             }
-            // TODO AGE: should `ignoreDomMutations` be done manually in
-            // `on_will_add_external_commit_handlers` and `on_external_commit_added_handlers`?
+            // TODO AGE: can we let dom mutation do this? via history?
             this.dependencies.domMutation.ignoreDOMMutations(() => {
                 this.dependencies.history.addExternalCommit(newCommit, insertIndex);
             });
@@ -206,7 +207,7 @@ export class CollaborationPlugin extends Plugin {
         index++;
         while (index < commits.length) {
             if (commits[index].data.previousCommitId === newCommit.data.previousCommitId) {
-                if (commits[index].authorTimestamp > newCommit.authorTimestamp) {
+                if (commits[index].data.authorTimestamp > newCommit.data.authorTimestamp) {
                     break;
                 } else {
                     concurentCommits = [commits[index].id];
@@ -230,7 +231,7 @@ export class CollaborationPlugin extends Plugin {
      * @param {string} [params.toCommitId]
      */
     historyGetMissingCommits({ fromCommitId, toCommitId }) {
-        const commits = this.dependencies.history.getHistoryCommits();
+        const commits = this.dependencies.history.getCommits();
         const fromIndex = commits.findIndex((x) => x.id === fromCommitId);
         const toIndex = toCommitId ? commits.findIndex((x) => x.id === toCommitId) : commits.length;
         if (fromIndex === -1 || toIndex === -1) {
@@ -240,7 +241,7 @@ export class CollaborationPlugin extends Plugin {
     }
 
     getSnapshotCommits() {
-        const historyCommits = this.dependencies.history.getHistoryCommits();
+        const historyCommits = this.dependencies.history.getCommits();
         // If the current snapshot has no time, it means that there is the no
         // other snapshot that have been made (either it is the one created upon
         // initialization or reseted by history's resetFromCommits).
@@ -284,7 +285,7 @@ export class CollaborationPlugin extends Plugin {
     }
 
     makeSnapshot() {
-        const historyLength = this.dependencies.history.getHistoryCommits().length;
+        const historyLength = this.dependencies.history.getCommits().length;
         if (!this.lastSnapshotLength || this.lastSnapshotLength < historyLength) {
             this.lastSnapshotLength = historyLength;
             const commit = this.dependencies.history.createSnapshotCommit();
@@ -301,15 +302,8 @@ export class CollaborationPlugin extends Plugin {
     /**
      * @param {EditorCommit} commit
      */
-    onMutationsCommitted(commit) {
+    onHistoryCommitted(commit) {
         commit.updateData("peerId", this.peerId);
         this.trigger("on_collaboration_commit_added_handlers", commit);
-    }
-    /**
-     * @param {EditorCommit} commit
-     */
-    processEditorCommit(commit) {
-        commit.updateData("peerId", this.peerId);
-        return commit;
     }
 }

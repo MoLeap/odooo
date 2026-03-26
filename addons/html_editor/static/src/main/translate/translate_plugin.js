@@ -12,7 +12,7 @@ export class TranslatePlugin extends Plugin {
     static dependencies = [
         "baseContainer",
         "selection",
-        "domMutation",
+        "history",
         "dom",
         "sanitize",
         "dialog",
@@ -51,7 +51,7 @@ export class TranslatePlugin extends Plugin {
         const dialogParams = {
             insert: (content) => {
                 const insertedNodes = this.dependencies.dom.insert(content);
-                this.dependencies.domMutation.commit();
+                this.dependencies.history.commit();
                 // Add a frame around the inserted content to highlight it for 2
                 // seconds.
                 const start = insertedNodes?.length && closestElement(insertedNodes[0]);

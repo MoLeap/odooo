@@ -21,7 +21,7 @@ import { renderToElement } from "@web/core/utils/render";
  */
 export class EmbeddedComponentPlugin extends Plugin {
     static id = "embeddedComponents";
-    static dependencies = ["history", "domMutation", "protectedNode", "selection"];
+    static dependencies = ["history", "domMutation", "domReference", "protectedNode", "selection"];
     static shared = ["renderBlueprintToElement"];
     /** @type {import("plugins").EditorResources} */
     resources = {
@@ -30,7 +30,7 @@ export class EmbeddedComponentPlugin extends Plugin {
         on_savepoint_restored_handlers: () => this.handleComponents(this.editable),
         on_history_reset_handlers: () => this.handleComponents(this.editable),
         on_history_reset_from_commits_handlers: () => this.handleComponents(this.editable),
-        on_history_written_handlers: (commit) => {
+        on_history_committed_handlers: (commit) => {
             let root;
             this.getResource("commit_root_providers").find((p) => {
                 root = p(commit);
@@ -93,7 +93,7 @@ export class EmbeddedComponentPlugin extends Plugin {
     }
 
     /**
-     * @typedef {import("@html_editor/core/dom_mutation_plugin").Tree} Tree
+     * @typedef {import("@html_editor/core/dom_reference_plugin").Tree} Tree
      *
      * @param {Tree[]} serializableDescendants
      * @param {Node} elem
@@ -157,7 +157,7 @@ export class EmbeddedComponentPlugin extends Plugin {
         let newAttributeValue;
         if (attributeChange.attributeName === "data-embedded-state") {
             const attrState = wasReversed ? attributeChange.oldValue : attributeChange.value;
-            const target = this.dependencies.domMutation.getNodeById(attributeChange.nodeId);
+            const target = this.dependencies.domReference.getNodeById(attributeChange.nodeId);
             const stateChangeManager = this.getStateChangeManager(target);
             if (stateChangeManager) {
                 // onStateChanged returns undefined if no change is needed for
@@ -180,7 +180,7 @@ export class EmbeddedComponentPlugin extends Plugin {
         if (!this.hostToStateChangeManagerMap.has(host)) {
             const config = {
                 host,
-                commitStateChanges: () => this.dependencies.domMutation.commit(),
+                commitStateChanges: () => this.dependencies.history.commit(),
             };
             const stateChangeManager = embedding.getStateChangeManager(config);
             stateChangeManager.setup();

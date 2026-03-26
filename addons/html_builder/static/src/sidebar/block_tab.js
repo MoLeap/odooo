@@ -69,7 +69,7 @@ export class BlockTab extends Component {
     onSnippetGroupClick(snippet) {
         this.shared.operation.next(
             async () => {
-                this.cancelDragAndDrop = this.shared.domMutation.makeSavePoint();
+                this.cancelDragAndDrop = this.shared.history.makeSavePoint();
                 this.dragState = {};
                 let snippetEl;
                 this.state.ongoingInsertion = true;
@@ -265,7 +265,7 @@ export class BlockTab extends Component {
                     withLoadingEffect: false,
                     canTimeout: false,
                 });
-                const restoreDragSavePoint = this.shared.domMutation.makeSavePoint();
+                const restoreDragSavePoint = this.shared.history.makeSavePoint();
                 this.cancelDragAndDrop = () => {
                     this.shared.dropzone.removeDropzones();
                     // Undo the changes needed to ease the drag and drop.
@@ -529,7 +529,7 @@ export class BlockTab extends Component {
         }
         this.env.editor.config.updateInvisibleElementsPanel();
         this.shared.disableSnippets.disableUndroppableSnippets();
-        this.shared.domMutation.commit();
+        this.shared.history.commit();
     }
 
     /**

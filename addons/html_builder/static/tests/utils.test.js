@@ -48,10 +48,10 @@ describe("useDomState", () => {
         await animationFrame();
 
         editor.editable.querySelector(".test-options-target").textContent = "b";
-        editor.shared.domMutation.commit();
+        editor.shared.history.commit();
         const resolve2 = currentResolve;
         editor.editable.querySelector(".test-options-target").textContent = "c";
-        editor.shared.domMutation.commit();
+        editor.shared.history.commit();
         const resolve3 = currentResolve;
 
         resolve3("z");

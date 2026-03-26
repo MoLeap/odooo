@@ -1056,11 +1056,11 @@ test("isDirty should not be reset to false if onChange fired between getEditorCo
     expect(`.o_form_button_save`).not.toBeVisible();
     const p = htmlField.editor.editable.querySelector("p");
     p.append(htmlField.editor.document.createTextNode("Second"));
-    htmlField.editor.shared.domMutation.commit();
+    htmlField.editor.shared.history.commit();
     await clickSave();
     await firstStep;
     p.append(htmlField.editor.document.createTextNode("Third"));
-    htmlField.editor.shared.domMutation.commit();
+    htmlField.editor.shared.history.commit();
     resolveSecond();
     await thirdStep;
     await animationFrame();
@@ -2393,7 +2393,7 @@ describe("save image", () => {
         sendBeaconDef = new Deferred();
         setSelectionInHtmlField(".test_target");
         await insertText(htmlEditor, "a");
-        htmlEditor.shared.domMutation.commit();
+        htmlEditor.shared.history.commit();
         await formController.beforeUnload();
         await sendBeaconDef;
 
@@ -2402,7 +2402,7 @@ describe("save image", () => {
         const imageContainerElement = parseHTML(htmlEditor.document, imageContainerHTML).firstChild;
         const paragraph = htmlEditor.editable.querySelector(".test_target");
         htmlEditor.editable.replaceChild(imageContainerElement, paragraph);
-        htmlEditor.shared.domMutation.commit();
+        htmlEditor.shared.history.commit();
 
         // Simulate an urgent save before the end of the RPC roundtrip for the
         // image.

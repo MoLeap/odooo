@@ -9,7 +9,7 @@ import { childNodeIndex } from "@html_editor/utils/position";
 
 /**
  * @typedef {Object} CollaborationSelection
- * @property {import("@html_editor/core/history_plugin").SerializedSelection} selection
+ * @property {import("@html_editor/core/selection_plugin").SerializedSelection} selection
  * @property {string} color
  * @property {string} peerId
  */
@@ -61,7 +61,7 @@ export class CollaborationOdooPlugin extends Plugin {
         clean_for_save_processors: (root) => this.attachHistoryIds(root),
         on_history_missing_parent_commit_handlers: this.onHistoryMissingParentCommit.bind(this),
         on_history_reset_handlers: this.onReset.bind(this),
-        on_history_written_handlers: (commit) =>
+        on_history_committed_handlers: (commit) =>
             this.ptp?.notifyAllPeers("oe_history_commit", commit, { transport: "rtc" }),
     };
 
@@ -122,10 +122,8 @@ export class CollaborationOdooPlugin extends Plugin {
     }
 
     getCurrentCollaborativeSelection() {
-        const selection = this.dependencies.selection.getEditableSelection();
         return {
-            // TODO AGE: if I could get rid of this, I could put serializeSelection in CurrentChanges.
-            selection: this.dependencies.domMutation.serializeSelection(selection),
+            selection: this.dependencies.selection.serializeEditableSelection(),
             peerId: this.config.collaboration.peerId,
         };
     }
@@ -325,7 +323,7 @@ export class CollaborationOdooPlugin extends Plugin {
                             // ensure they are in sync.
                             this.ptp.notifyAllPeers(
                                 "oe_history_commit",
-                                this.dependencies.history.getHistoryCommits().at(-1),
+                                this.dependencies.history.getCommits().at(-1),
                                 { transport: "rtc" }
                             );
                             this.resetCollaborativeSelection(fromPeerId);

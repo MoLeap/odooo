@@ -9,7 +9,14 @@ import { isHtmlContentSupported } from "@html_editor/core/selection_plugin";
 
 export class TableOfContentPlugin extends Plugin {
     static id = "tableOfContent";
-    static dependencies = ["dom", "selection", "embeddedComponents", "link", "domMutation"];
+    static dependencies = [
+        "dom",
+        "selection",
+        "embeddedComponents",
+        "link",
+        "history",
+        "domReference",
+    ];
     /** @type {import("plugins").EditorResources} */
     resources = {
         user_commands: [
@@ -34,14 +41,14 @@ export class TableOfContentPlugin extends Plugin {
         on_history_reset_handlers: () => this.delayedUpdateTableOfContents(this.editable),
         on_history_reset_from_commits_handlers: () =>
             this.delayedUpdateTableOfContents(this.editable),
-        on_history_written_handlers: (commit) => {
+        on_history_committed_handlers: (commit) => {
             let root;
             this.getResource("commit_root_providers").find((p) => {
                 root = p(commit);
                 return root;
             });
             return this.delayedUpdateTableOfContents(
-                this.dependencies.domMutation.getNodeById(root)
+                this.dependencies.domReference.getNodeById(root)
             );
         },
         on_external_commit_added_handlers: this.delayedUpdateTableOfContents.bind(
@@ -65,7 +72,7 @@ export class TableOfContentPlugin extends Plugin {
     insertTableOfContent() {
         const tableOfContentBlueprint = renderToElement("html_editor.TableOfContentBlueprint");
         this.dependencies.dom.insert(tableOfContentBlueprint);
-        this.dependencies.domMutation.commit();
+        this.dependencies.history.commit();
     }
 
     /**

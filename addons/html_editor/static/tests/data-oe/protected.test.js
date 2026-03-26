@@ -29,7 +29,7 @@ test("should ignore protected elements children mutations (true)", async () => {
                 '[data-oe-protected="true"] > p'
             );
             protectedParagraph.append(document.createTextNode("b"));
-            editor.shared.domMutation.commit();
+            editor.shared.history.commit();
             execCommand(editor, "historyUndo");
         },
         contentAfterEdit: unformat(`
@@ -122,7 +122,7 @@ test("should not normalize protected elements children (true)", async () => {
 test("should not remove/merge empty (identical) protecting nodes", async () => {
     const { el, editor } = await setupEditor(`<p><span data-oe-protected="true"></span>[]</p>`);
     editor.shared.dom.insert(parseHTML(editor.document, `<span data-oe-protected="true"></span>`));
-    editor.shared.domMutation.commit();
+    editor.shared.history.commit();
     expect(getContent(el)).toBe(
         unformat(
             `<p>
@@ -294,12 +294,12 @@ test("should protect disconnected nodes", async () => {
     const protectedP = div.querySelector("p");
     protectedP.remove();
     div.remove();
-    editor.shared.domMutation.commit();
-    const lastCommit = editor.shared.history.getHistoryCommits().at(-1);
+    editor.shared.history.commit();
+    const lastCommit = editor.shared.history.getCommits().at(-1);
     expect(lastCommit.data.mutations.length).toBe(1);
     expect(lastCommit.data.mutations[0].type).toBe("remove");
     expect(
-        plugins.get("domMutation").unserializeNode(lastCommit.data.mutations[0].serializedNode)
+        plugins.get("domReference").unserializeNode(lastCommit.data.mutations[0].serializedNode)
             .outerHTML
     ).toBe(`<div data-oe-protected="true" contenteditable="false"></div>`);
 });
@@ -312,13 +312,13 @@ test("should not crash when changing attributes and removing a protecting anchor
     const div = el.querySelector("div");
     div.dataset.attr = "other";
     div.remove();
-    editor.shared.domMutation.commit();
-    const lastCommit = editor.shared.history.getHistoryCommits().at(-1);
+    editor.shared.history.commit();
+    const lastCommit = editor.shared.history.getCommits().at(-1);
     expect(lastCommit.data.mutations.length).toBe(2);
     expect(lastCommit.data.mutations[0].type).toBe("attributes");
     expect(lastCommit.data.mutations[1].type).toBe("remove");
     expect(
-        plugins.get("domMutation").unserializeNode(lastCommit.data.mutations[1].serializedNode)
+        plugins.get("domReference").unserializeNode(lastCommit.data.mutations[1].serializedNode)
             .outerHTML
     ).toBe(
         `<div data-oe-protected="true" data-attr="other" contenteditable="false"><p>a</p></div>`
@@ -410,15 +410,15 @@ test("removing a protected node and then removing its protected parent should be
         `)
     );
     const domMutationPlugin = plugins.get("domMutation");
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
-    expect(domMutationPlugin.currentChanges.mutations).toEqual([]);
+    expect(editor.shared.history.getCommits().length).toBe(1);
+    expect(domMutationPlugin.mutations).toEqual([]);
     const a = el.querySelector(".a");
     const b = el.querySelector(".b");
     b.remove();
     a.remove();
-    editor.shared.domMutation.commit();
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
-    expect(domMutationPlugin.currentChanges.mutations).toEqual([]);
+    editor.shared.history.commit();
+    expect(editor.shared.history.getCommits().length).toBe(1);
+    expect(domMutationPlugin.mutations).toEqual([]);
     expect(getContent(el)).toBe(
         `<p data-selection-placeholder=""><br></p><div data-oe-protected="true" contenteditable="false"></div><p data-selection-placeholder=""><br></p>`
     );
@@ -437,17 +437,17 @@ test("removing a protected ancestor, then a protected descendant, then its prote
         `)
     );
     const domMutationPlugin = plugins.get("domMutation");
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
-    expect(domMutationPlugin.currentChanges.mutations).toEqual([]);
+    expect(editor.shared.history.getCommits().length).toBe(1);
+    expect(domMutationPlugin.mutations).toEqual([]);
     const a = el.querySelector(".a");
     const b = el.querySelector(".b");
     const c = el.querySelector(".c");
     a.remove();
     c.remove();
     b.remove();
-    editor.shared.domMutation.commit();
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
-    expect(domMutationPlugin.currentChanges.mutations).toEqual([]);
+    editor.shared.history.commit();
+    expect(editor.shared.history.getCommits().length).toBe(1);
+    expect(domMutationPlugin.mutations).toEqual([]);
     expect(getContent(el)).toBe(
         `<p data-selection-placeholder=""><br></p><div data-oe-protected="true" contenteditable="false"></div><p data-selection-placeholder=""><br></p>`
     );
@@ -465,18 +465,19 @@ test("moving a protected node at an unprotected location, only remove should be 
         `)
     );
     const domMutationPlugin = plugins.get("domMutation");
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
-    expect(domMutationPlugin.currentChanges.mutations).toEqual([]);
+    expect(editor.shared.history.getCommits().length).toBe(1);
+    expect(domMutationPlugin.mutations).toEqual([]);
     const a = el.querySelector(".a");
     const b = el.querySelector(".b");
     b.append(a);
-    editor.shared.domMutation.commit();
-    const historyCommits = editor.shared.history.getHistoryCommits();
+    editor.shared.history.commit();
+    const historyCommits = editor.shared.history.getCommits();
     expect(historyCommits.length).toBe(2);
     const lastCommit = historyCommits.at(-1);
     expect(lastCommit.data.mutations.length).toBe(1);
     expect(lastCommit.data.mutations[0].type).toBe("add");
-    expect(domMutationPlugin.getNodeById(lastCommit.data.mutations[0].nodeId)).toBe(a);
+    const domReferencePlugin = plugins.get("domReference");
+    expect(domReferencePlugin.getNodeById(lastCommit.data.mutations[0].nodeId)).toBe(a);
     expect(getContent(el)).toBe(
         unformat(`
             <p data-selection-placeholder=""><br></p>
@@ -504,18 +505,19 @@ test("moving an unprotected node at a protected location, only add should be ign
         `)
     );
     const domMutationPlugin = plugins.get("domMutation");
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
-    expect(domMutationPlugin.currentChanges.mutations).toEqual([]);
+    expect(editor.shared.history.getCommits().length).toBe(1);
+    expect(domMutationPlugin.mutations).toEqual([]);
     const a = el.querySelector(".a");
     const b = el.querySelector(".b");
     b.append(a);
-    editor.shared.domMutation.commit();
-    const historyCommits = editor.shared.history.getHistoryCommits();
+    editor.shared.history.commit();
+    const historyCommits = editor.shared.history.getCommits();
     expect(historyCommits.length).toBe(2);
     const lastCommit = historyCommits.at(-1);
     expect(lastCommit.data.mutations.length).toBe(1);
     expect(lastCommit.data.mutations[0].type).toBe("remove");
-    expect(domMutationPlugin.getNodeById(lastCommit.data.mutations[0].nodeId)).toBe(a);
+    const domReferencePlugin = plugins.get("domReference");
+    expect(domReferencePlugin.getNodeById(lastCommit.data.mutations[0].nodeId)).toBe(a);
     expect(getContent(el)).toBe(
         unformat(`
             <p data-selection-placeholder=""><br></p>
@@ -540,13 +542,13 @@ test("sequentially added nodes under a protecting parent are correctly protected
         `)
     );
     const protectedPlugin = plugins.get("protectedNode");
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
+    expect(editor.shared.history.getCommits().length).toBe(1);
     const protecting = el.querySelector("[data-oe-protected='true']");
     const element = editor.document.createElement("div");
     const node = editor.document.createTextNode("a");
     protecting.prepend(element);
     element.prepend(node);
-    editor.shared.domMutation.commit();
+    editor.shared.history.commit();
     expect(protectedPlugin.protectedNodes.has(element)).toBe(true);
     expect(protectedPlugin.protectedNodes.has(node)).toBe(true);
     expect(getContent(el)).toBe(
@@ -560,7 +562,7 @@ test("sequentially added nodes under a protecting parent are correctly protected
         `)
     );
     node.remove();
-    editor.shared.domMutation.commit();
+    editor.shared.history.commit();
     expect(getContent(el)).toBe(
         unformat(`
             <p data-selection-placeholder=""><br></p>
@@ -571,7 +573,7 @@ test("sequentially added nodes under a protecting parent are correctly protected
             <p data-selection-placeholder=""><br></p>
         `)
     );
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
+    expect(editor.shared.history.getCommits().length).toBe(1);
 });
 
 test("don't protect a node under data-oe-protected='false' through delete and undo", async () => {
@@ -586,14 +588,14 @@ test("don't protect a node under data-oe-protected='false' through delete and un
         `)
     );
     const protectedPlugin = plugins.get("protectedNode");
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
+    expect(editor.shared.history.getCommits().length).toBe(1);
     const protecting = el.querySelector("[data-oe-protected='false']");
     const paragraph = editor.document.createElement("p");
     const node = editor.document.createTextNode("b");
     protecting.prepend(paragraph);
     paragraph.prepend(node);
-    editor.shared.domMutation.commit();
-    expect(editor.shared.history.getHistoryCommits().length).toBe(2);
+    editor.shared.history.commit();
+    expect(editor.shared.history.getCommits().length).toBe(2);
     expect(protectedPlugin.protectedNodes.has(paragraph)).toBe(false);
     expect(protectedPlugin.protectedNodes.has(node)).toBe(false);
     expect(getContent(el)).toBe(
@@ -623,7 +625,7 @@ test("don't protect a node under data-oe-protected='false' through delete and un
             <p>[]a</p>
         `)
     );
-    expect(editor.shared.history.getHistoryCommits().length).toBe(4);
+    expect(editor.shared.history.getCommits().length).toBe(4);
 });
 
 test("protected plugin is robust against other plugins which can filter mutations", async () => {
@@ -660,15 +662,15 @@ test("protected plugin is robust against other plugins which can filter mutation
         { config: { Plugins: [FilterPlugin, ...MAIN_PLUGINS] } }
     );
     const domMutationPlugin = plugins.get("domMutation");
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
-    expect(domMutationPlugin.currentChanges.mutations).toEqual([]);
+    expect(editor.shared.history.getCommits().length).toBe(1);
+    expect(domMutationPlugin.mutations).toEqual([]);
     const a = el.querySelector(".a");
     const b = el.querySelector(".b");
     a.remove();
     b.remove();
-    editor.shared.domMutation.commit();
-    expect(editor.shared.history.getHistoryCommits().length).toBe(1);
-    expect(domMutationPlugin.currentChanges.mutations).toEqual([]);
+    editor.shared.history.commit();
+    expect(editor.shared.history.getCommits().length).toBe(1);
+    expect(domMutationPlugin.mutations).toEqual([]);
     expect(getContent(el)).toBe(
         `<p data-selection-placeholder=""><br></p><div data-oe-protected="true" contenteditable="false"></div><p data-selection-placeholder=""><br></p>`
     );

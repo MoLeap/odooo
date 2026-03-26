@@ -16,7 +16,7 @@ export class SyntaxHighlightingPlugin extends Plugin {
     static dependencies = [
         "baseContainer",
         "overlay",
-        "domMutation",
+        "history",
         "selection",
         "protectedNode",
         "embeddedComponents",
@@ -105,7 +105,7 @@ export class SyntaxHighlightingPlugin extends Plugin {
                         const textarea = codeBlock.querySelector("textarea");
                         if (textarea !== codeBlock.ownerDocument.activeElement) {
                             textarea.focus();
-                            this.dependencies.domMutation.stageFocus();
+                            this.dependencies.selection.stageFocus();
                         }
                     }
                 }
@@ -124,9 +124,9 @@ export class SyntaxHighlightingPlugin extends Plugin {
     setupNewCodeBlock({ name, props }) {
         if (name === "syntaxHighlighting") {
             Object.assign(props, {
-                onTextareaFocus: () => this.dependencies.domMutation.stageFocus(),
+                onTextareaFocus: () => this.dependencies.selection.stageFocus(),
                 convertToParagraph: ({ target }) => {
-                    this.dependencies.domMutation.stageSelection();
+                    this.dependencies.selection.stageSelection();
                     const component = target.closest(`[data-embedded='${name}']`);
                     const embeddedProps = getEmbeddedProps(component);
                     const baseContainer = this.dependencies.baseContainer.createBaseContainer();
@@ -134,7 +134,7 @@ export class SyntaxHighlightingPlugin extends Plugin {
                     component.replaceWith(baseContainer);
                     newlinesToLineBreaks(baseContainer);
                     this.dependencies.selection.setCursorStart(baseContainer);
-                    this.dependencies.domMutation.commit();
+                    this.dependencies.history.commit();
                 },
             });
             props.host.removeAttribute("data-syntax-highlighting-autofocus");
