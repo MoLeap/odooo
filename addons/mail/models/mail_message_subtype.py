@@ -103,7 +103,7 @@ class MailMessageSubtype(models.Model):
         # as default in apps, in business flows, plans, ...
         protected = self.browse()
         model_info = self._get_model_info_by_xmlid()
-        protected_fnames = set(fname for required_values in model_info for fname in required_values.keys())
+        protected_fnames = set(fname for required_values in model_info.values() for fname in required_values.keys())
         if protected_fnames & vals.keys():
             for xml_id, required_values in model_info.items():
                 subtype = self.env.ref(xml_id, raise_if_not_found=False)
