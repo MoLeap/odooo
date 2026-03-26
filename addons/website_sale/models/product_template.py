@@ -1020,7 +1020,7 @@ class ProductTemplate(models.Model):
 
     def _website_show_quick_add(self):
         self.ensure_one()
-        if not self.filtered_domain(self.env["website"]._product_domain()):
+        if self._is_sold_out() or not self.filtered_domain(self.env["website"]._product_domain()):
             return False
         website = self.env["website"].get_current_website()
         return not (
@@ -1183,3 +1183,18 @@ class ProductTemplate(models.Model):
         self.ensure_one()
 
         return bool(self.valid_product_template_attribute_line_ids)
+
+    def _is_sold_out(self):
+        """Return whether the product is sold out (no available quantity).
+
+        If a product inventory is not tracked, or if it's allowed to be sold regardless
+        of availabilities, the product is never considered sold out.
+
+        Note: only checks the availability of the first variant of the template.
+
+        :return: whether the product can still be sold
+        :rtype: bool
+        """
+        if not self.is_storable or self.allow_out_of_stock_order:
+            return False
+        return not self.product_variant_id or self.product_variant_id._is_sold_out()

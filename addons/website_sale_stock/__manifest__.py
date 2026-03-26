@@ -15,7 +15,6 @@ Then it can be made specific at the product level.
         "views/res_config_settings_views.xml",
         "views/sale_order_views.xml",
         "views/website_sale_stock_templates.xml",
-        "views/wishlist_templates.xml",
         "data/template_email.xml",
         "data/ir_cron_data.xml",
     ],

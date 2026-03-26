@@ -11,24 +11,6 @@ from odoo.addons.website.models import ir_http
 class ProductTemplate(models.Model):
     _inherit = "product.template"
 
-    def _is_sold_out(self):
-        """Return whether the product is sold out (no available quantity).
-
-        If a product inventory is not tracked, or if it's allowed to be sold regardless
-        of availabilities, the product is never considered sold out.
-
-        Note: only checks the availability of the first variant of the template.
-
-        :return: whether the product can still be sold
-        :rtype: bool
-        """
-        if not self.is_storable or self.allow_out_of_stock_order:
-            return False
-        return not self.product_variant_id or self.product_variant_id._is_sold_out()
-
-    def _website_show_quick_add(self):
-        return super()._website_show_quick_add() and not self._is_sold_out()
-
     def _get_additionnal_combination_info(self, product_or_template, quantity, uom, date, website):
         res = super()._get_additionnal_combination_info(
             product_or_template, quantity, uom, date, website
