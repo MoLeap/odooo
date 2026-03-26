@@ -165,8 +165,12 @@ export class TourService {
             if (!tour) {
                 throw new Error(`Tour '${name}' is not found in the database.`);
             }
-            if (!tour.steps.length && tourRegistry.contains(tour.name)) {
-                tour.steps = tourRegistry.get(tour.name).steps;
+            if (!tour.steps.length) {
+                if (tourRegistry.contains(tour.name)) {
+                    tour.steps = tourRegistry.get(tour.name).steps;
+                } else {
+                    tour.onHold = true;
+                }
             }
             return {
                 ...tour,
