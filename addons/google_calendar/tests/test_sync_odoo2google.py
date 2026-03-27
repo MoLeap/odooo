@@ -738,18 +738,48 @@ class TestSyncOdoo2Google(TestSyncGoogle):
         self.assertGoogleEventNotDeleted()
 
     @patch_api
-    def test_videocall_location_on_location_set(self):
-        partner = self.env['res.partner'].create({'name': 'Jean-Luc', 'email': 'jean-luc@opoo.com'})
-        event = self.env['calendar.event'].create({
-            'name': "Event",
-            'start': datetime(2020, 1, 15, 8, 0),
-            'stop': datetime(2020, 1, 15, 18, 0),
-            'partner_ids': [(4, partner.id)],
-            'need_sync': False,
-            'location' : 'Event Location'
-        })
-        event._sync_odoo2google(self.google_service)
-        self.assertGoogleEventInserted({'conferenceData': False})
+    def test_videocall_location_generation(self):
+        """
+        Test the automated generation of the videocall link. We make sure that
+        cal_google_disable_auto_videocall_link setting is correctly handled on creating
+        new meetings without location, and that links are not created when location is set.
+        """
+        self.assertGoogleEventNotInserted()
+        for location, disable_link_generation_setting, expected_link_generation in [
+            ("Location Set", False, False),
+            ("Location Set", True, False),
+            (False, False, True),
+            (False, True, False),
+        ]:
+            with self.subTest(
+                location=location,
+                disable_link_generation_setting=disable_link_generation_setting,
+                expected_link_generation=expected_link_generation,
+            ):
+                # Reset insert values manually as we are doing subtests
+                self._gsync_insert_values = []
+                self.env["ir.config_parameter"].sudo().set_bool(
+                    "google_calendar.cal_google_disable_auto_videocall_link",
+                    disable_link_generation_setting
+                )
+                partner = self.env["res.partner"].create({"name": "Jean-Luc", "email": "jean-luc@opoo.com"})
+                event = self.env["calendar.event"].create({
+                    "name": "test-disable-link-generation",
+                    "start": datetime(2020, 1, 15, 8, 0),
+                    "stop": datetime(2020, 1, 15, 18, 0),
+                    "partner_ids": [(4, partner.id)],
+                    "need_sync": False,
+                    "location": location,
+                })
+
+                event._sync_odoo2google(self.google_service)
+                self.assertGoogleEventInserted({"summary": "test-disable-link-generation"})
+                insert_values, _unused = self._gsync_insert_values[0]
+
+                if expected_link_generation:
+                    self.assertTrue(insert_values["conferenceData"]["createRequest"]["requestId"])
+                else:
+                    self.assertFalse(insert_values.get("conferenceData"))
 
     @patch_api
     def test_event_available_privacy(self):
