@@ -48,7 +48,7 @@ class TestEdiZatca(TestSaEdiCommon):
                 final_move.action_post()
 
             final_move._l10n_sa_generate_unsigned_data()
-            generated_file = self.env['account.edi.format']._l10n_sa_generate_zatca_template(final_move)
+            generated_file = final_move._l10n_sa_generate_zatca_template()
             current_tree = self.get_xml_tree_from_string(generated_file)
             current_tree = self.with_applied_xpath(current_tree, self.remove_ubl_extensions_xpath)
 
@@ -344,7 +344,7 @@ class TestEdiZatca(TestSaEdiCommon):
         # Fetch company name from xml
         invoice = self._create_test_invoice(**move_data)
         invoice.action_post()
-        xml_content = self.env['account.edi.format']._l10n_sa_generate_zatca_template(invoice)
+        xml_content = invoice._l10n_sa_generate_zatca_template()
         xml_root = etree.fromstring(xml_content)
         xml_company_name = xml_root.xpath(
             "//cac:AccountingSupplierParty/cac:Party/cac:PartyName/cbc:Name",
@@ -416,7 +416,7 @@ class TestEdiZatca(TestSaEdiCommon):
         invoice.action_post()
 
         # Generate XML
-        xml_content = self.env['account.edi.format']._l10n_sa_generate_zatca_template(invoice)
+        xml_content = invoice._l10n_sa_generate_zatca_template()
         xml_root = etree.fromstring(xml_content)
 
         # Get PriceAmount from XML
@@ -450,7 +450,7 @@ class TestEdiZatca(TestSaEdiCommon):
             ]
         )
         invoice.action_post()
-        xml_content = self.env['account.edi.format']._l10n_sa_generate_zatca_template(invoice)
+        xml_content = invoice._l10n_sa_generate_zatca_template()
         xml_root = etree.fromstring(xml_content)
         namespaces = self.env['account.edi.xml.ubl_21.zatca']._l10n_sa_get_namespaces()
 

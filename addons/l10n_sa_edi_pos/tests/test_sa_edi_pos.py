@@ -3,7 +3,6 @@ from unittest.mock import patch
 from odoo.tests import tagged
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
-from odoo.addons.l10n_sa_edi.tests.common import AccountEdiTestCommon
 from odoo.addons.point_of_sale.tests.test_frontend import TestPointOfSaleHttpCommon
 from odoo.addons.point_of_sale.tests.test_generic_localization import (
     TestGenericLocalization,
@@ -13,7 +12,6 @@ from odoo.addons.point_of_sale.tests.test_generic_localization import (
 @tagged('post_install', '-at_install', 'post_install_l10n')
 class TestGenericSAEdi(TestGenericLocalization):
     @classmethod
-    @AccountEdiTestCommon.setup_edi_format('l10n_sa_edi.edi_sa_zatca')
     @AccountTestInvoicingCommon.setup_country('sa')
     def setUpClass(cls):
         super().setUpClass()
@@ -47,7 +45,7 @@ class TestGenericSAEdi(TestGenericLocalization):
 class TestUi(TestPointOfSaleHttpCommon):
 
     @classmethod
-    @AccountEdiTestCommon.setup_country('sa')
+    @AccountTestInvoicingCommon.setup_country('sa')
     def setUpClass(cls):
         super().setUpClass()
 

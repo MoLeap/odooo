@@ -7,9 +7,7 @@ class IrAttachment(models.Model):
 
     @api.ondelete(at_uninstall=False)
     def _unlink_except_posted_pdf_invoices(self):
-        '''
-        Prevents unlinking of invoice pdfs linked to an invoice that is posted.
-        '''
+        """Prevents unlinking of invoice pdfs linked to an invoice that is posted."""
         restricted_moves = self._get_posted_pdf_moves_to_check().filtered(lambda move: move.country_code == 'SA' and move.state == 'posted')
         if restricted_moves:
             raise UserError(_("The Invoice PDF(s) cannot be deleted according to ZATCA rules: %s", ', '.join(restricted_moves.mapped('invoice_pdf_report_id.name'))))
