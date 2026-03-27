@@ -43,14 +43,34 @@ function _positionInputBoxOverlay(target) {
     closestInputBox.style.setProperty("--inputbox-overlay-end-size", endPadding + "px");
     const inlineEl = closestInputBox.querySelector(".o_input_box_overlay_inline");
     if (inlineEl) {
+        const previousInlineEl = closestInputBox.__inputBoxInlineObserverTarget;
+        if (previousInlineEl !== inlineEl) {
+            closestInputBox.__inputBoxInlineObserver?.disconnect();
+            const observer = new MutationObserver(() => positionInputBoxOverlay(closestInputBox));
+            observer.observe(inlineEl, {
+                childList: true,
+                characterData: true,
+                subtree: true,
+            });
+            closestInputBox.__inputBoxInlineObserver = observer;
+            closestInputBox.__inputBoxInlineObserverTarget = inlineEl;
+        }
+    } else if (closestInputBox.__inputBoxInlineObserver) {
+        closestInputBox.__inputBoxInlineObserver.disconnect();
+        delete closestInputBox.__inputBoxInlineObserver;
+        delete closestInputBox.__inputBoxInlineObserverTarget;
+    }
+    if (inlineEl) {
         const inputEl = closestInputBox.querySelector(
             ".o_input, textarea, select, [contenteditable]"
         );
+        const unitEl = closestInputBox.querySelector(".o_input_box_overlay_inline > span");
         if (inputEl && inputEl.value) {
             const length = inputEl.value.length;
+            const unitWidth = unitEl ? unitEl.clientWidth : inlineEl.clientWidth;
             closestInputBox.style.setProperty(
                 "--inputbox-overlay-inline-position",
-                `calc(100% - (${length}px + ${length}ch) - var(--inputbox-overlay-size) - var(--inputbox-spacing-unit))`
+                `calc(100% - (${length}px + ${length}ch + ${unitWidth}px) - var(--inputbox-spacing-unit))`
             );
         }
     }
