@@ -130,6 +130,7 @@ class PaymentTransaction(models.Model):
         readonly=True,
     )
     refunds_count = fields.Integer(string="Refunds Count", compute="_compute_refunds_count")
+    payment_data_count = fields.Integer(compute="_compute_payment_data_count")
 
     # Fields used for user redirection & payment post-processing
     is_post_processed = fields.Boolean(
@@ -178,6 +179,16 @@ class PaymentTransaction(models.Model):
         data = {source_transaction.id: count for source_transaction, count in rg_data}
         for record in self:
             record.refunds_count = data.get(record.id, 0)
+
+    def _compute_payment_data_count(self):
+        rg_data = self.env["payment.data"]._read_group(
+            domain=[("transaction_id", "in", self.ids)],
+            groupby=["transaction_id"],
+            aggregates=["__count"],
+        )
+        data = {transaction.id: count for transaction, count in rg_data}
+        for record in self:
+            record.payment_data_count = data.get(record.id, 0)
 
     # === CONSTRAINT METHODS === #
 
@@ -292,6 +303,21 @@ class PaymentTransaction(models.Model):
             action["domain"] = [("source_transaction_id", "=", self.id)]
         return action
 
+    def action_view_payment_data(self):
+        """Return a window action to browse the payment data linked to the transaction.
+
+        :return: A window action to browse the payment data.
+        :rtype: dict
+        """
+        self.ensure_one()
+        return {
+            "name": _("Pending Updates"),
+            "type": "ir.actions.act_window",
+            "domain": [("transaction_id", "=", self.id)],
+            "res_model": "payment.data",
+            "view_mode": "list,form",
+        }
+
     def action_capture(self):
         """Open the partial capture wizard if it is supported by the related providers, otherwise
         capture the transactions immediately.
@@ -401,7 +427,7 @@ class PaymentTransaction(models.Model):
         self._post_process()
         return {"type": "ir.actions.client", "tag": "soft_reload"}
 
-    # === BUSINESS METHODS - PRE-PROCESSING === #
+    # === LIFECYCLE METHODS - INITIALIZATION === #
 
     @api.model
     def _compute_reference(self, provider_code, prefix=None, separator="-", **kwargs):  # noqa: ARG002
@@ -608,7 +634,8 @@ class PaymentTransaction(models.Model):
         try:
             self._send_payment_request()
         except ValidationError as e:
-            self._set_error(str(e))
+            # Safe to bypass because TODO
+            self.with_context(payment_safe_write=True)._set_error(str(e))
 
     def _send_payment_request(self):
         """Request the provider handling the transaction to send a token payment request.
@@ -773,27 +800,7 @@ class PaymentTransaction(models.Model):
             **custom_create_values,
         })
 
-    # === BUSINESS METHODS - PROCESSING === #
-
-    def _process(self, provider_code, payment_data):
-        """Process the payment data received from the provider and update the transaction.
-
-        :param str provider_code: The code of the provider handling the transaction.
-        :param dict payment_data: The payment data sent by the provider.
-        :return: The updated transaction.
-        :rtype: payment.transaction
-        """
-        tx = self or self._search_by_reference(provider_code, payment_data)
-        if tx:
-            tx.ensure_one()
-            previous_state = tx.state
-            tx._validate_amount(payment_data)
-            if tx.state == "error" and tx.state != previous_state:
-                return tx
-            tx._apply_updates(payment_data)
-            if tx.tokenize and tx.state in {"authorized", "done"}:
-                tx._tokenize(payment_data)
-        return tx
+    # === LIFECYCLE METHODS - RECORDING === #  # TODO rename?
 
     @api.model
     def _search_by_reference(self, provider_code, payment_data):
@@ -830,6 +837,49 @@ class PaymentTransaction(models.Model):
         :rtype: str
         """
         return payment_data.get("reference")
+
+    def _record(self, payment_data):
+        """Record the payment data and schedule the transaction for processing.
+
+        This method serves as the unique entry point for processing payment data and updating the
+        transaction. It should always be called upon receiving payment data from the provider.
+
+        When payment data are received, they are recorded in the database and the transaction is
+        scheduled for processing. The processing is done asynchronously to avoid concurrent updates.
+
+        :param dict payment_data: The payment data received from the provider.
+        :rtype: None
+        """
+        self.ensure_one()
+
+        self.env["payment.data"].create({"transaction_id": self.id, "payload": payment_data})
+        self.env.ref("payment.process_payment_data_cron")._trigger()
+
+    # === LIFECYCLE METHODS - PROCESSING === #
+
+    def _process(self, payment_data):
+        """Process the payment data to update the internal state.
+
+        :param dict payment_data: The payment data to process.
+        :rtype: None
+        """
+        self.ensure_one()
+
+        # Check that the payment data match the initial payment request
+        previous_state = self.state
+        self._validate_amount(payment_data)
+        if self.state == "error" and self.state != previous_state:  # The tx was just set in error
+            return
+
+        # Update the transaction with the payment data.
+        self._apply_updates(payment_data)
+
+        # Tokenize the transaction if needed.
+        if self.tokenize and self.state in {"authorized", "done"}:  # The payment was successful
+            self._tokenize(payment_data)
+
+        # Notify the client about the updated transaction values
+        self._send_trigger_post_processing_notification()
 
     def _validate_amount(self, payment_data):
         """Ensure that the transaction's amount and currency match the ones from the payment data.
@@ -1115,7 +1165,7 @@ class PaymentTransaction(models.Model):
                 child_tx.source_transaction_id._update_state(("authorized",), target_state, "")
                 child_tx.source_transaction_id._log_received_message()
 
-    # === BUSINESS METHODS - POST-PROCESSING === #
+    # === LIFECYCLE METHODS - POST-PROCESSING === #
 
     def _cron_post_process(self):
         """Trigger the post-processing of the transactions that were not handled by the client in
@@ -1314,3 +1364,54 @@ class PaymentTransaction(models.Model):
         :rtype: recordset of `payment.transaction`
         """
         return self.filtered(lambda t: t.state != "draft").sorted()[:1]
+
+    def _get_transaction_status_message(self, **_kwargs):
+        """Get the status message relevant to the current transaction.
+
+        :return: status message of the transaction.
+        :rtype: Markup
+        """
+        validation_status_messages = {
+            "pending": Markup(f"<p>{_('Saving your payment method.')}</p>"),
+            "done": Markup(f"<p>{_('Your payment method has been saved.')}</p>"),
+            "cancel": Markup(f"<p>{_('The saving of your payment method has been canceled.')}</p>"),
+            "error": Markup(f"""
+                    <p>{_("An error occurred while saving your payment method.")}</p>
+                    <p>{self.state_message}</p>
+            """),
+        }
+        if self.operation == "validation" and self.state in validation_status_messages:
+            status_messages = validation_status_messages
+        else:
+            provider_sudo = self.provider_id.sudo()
+            status_messages = {
+                "draft": Markup(f"<p>{_('Your payment has not been processed yet.')}</p>"),
+                "pending": provider_sudo.pending_msg,
+                "authorized": provider_sudo.auth_msg,
+                "done": provider_sudo.done_msg,
+                "cancel": provider_sudo.cancel_msg,
+                "error": Markup(f"""
+                    <p>{_("An error occurred during the processing of your payment.")}</p>
+                    <p>{self.state_message}</p>
+                """),
+            }
+        return status_messages.get(self.state)
+
+    def generate_notification_channel(self):
+        """Generate notification channel that the websocket will listen to on the /payment/status
+        page.
+
+        :param payment.transaction tx: The transaction to generate a notification channel for.
+        """
+        notification_access_token = payment_utils.generate_access_token(
+            self.id, self.amount, self.currency_id.id, env=self.env
+        )
+        return f"PAYMENT_PROCESSING_CHANNEL_{notification_access_token}"
+
+    def _send_trigger_post_processing_notification(self):
+        """Send a notification that will trigger the post processing.
+
+        Note: `self.ensure_one()`
+        """
+        notification_channel = self.generate_notification_channel()
+        self.env["bus.bus"]._sendone(notification_channel, "PAYMENT_TRIGGER_POST_PROCESSING", {})
