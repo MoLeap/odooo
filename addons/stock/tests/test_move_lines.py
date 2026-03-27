@@ -269,3 +269,28 @@ class StockMoveLine(TestStockCommon):
 
         line = move.move_line_ids[0]
         self.assertEqual(line.lot_id, serial_lot)
+
+    def test_edit_move_line_reference_persists(self):
+        """Test that it is possible to change and persistently save the reference field of a stock_move_line."""
+        move = self.env['stock.move'].create({
+            'name': 'Test Move',
+            'product_id': self.productA.id,
+            'product_uom': self.uom_unit.id,
+            'product_uom_qty': 1.0,
+            'location_id': self.stock_location,
+            'location_dest_id': self.customer_location,
+        })
+
+        move_line = self.env['stock.move.line'].create({
+            'move_id': move.id,
+            'product_id': self.productA.id,
+            'product_uom_id': self.uom_unit.id,
+            'quantity': 1.0,
+            'location_id': self.stock_location,
+            'location_dest_id': self.customer_location,
+        })
+
+        move_line.reference = 'My custom reference'
+
+        self.assertEqual(move.reference, 'My custom reference')
+        self.assertEqual(move_line.reference, 'My custom reference')
