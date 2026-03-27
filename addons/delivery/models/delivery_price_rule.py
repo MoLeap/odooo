@@ -28,7 +28,12 @@ class DeliveryPriceRule(models.Model):
     )
     def _compute_name(self):
         for rule in self:
-            name = "if %s %s %.02f then" % (rule.variable, rule.operator, rule.max_value)
+            name = "if %s %s %.02f %s then" % (
+                rule.variable,
+                rule.operator,
+                rule.max_value,
+                rule.max_value_uom_name,
+            )
             if rule.currency_id:
                 base_price = format_amount(self.env, rule.list_base_price, rule.currency_id)
                 price = format_amount(self.env, rule.list_price, rule.currency_id)
@@ -48,6 +53,25 @@ class DeliveryPriceRule(models.Model):
                 )
             rule.name = name
 
+    @api.depends(
+        "variable", "carrier_id.weight_uom_name", "carrier_id.volume_uom_name", "currency_id"
+    )
+    def _compute_max_value_uom_name(self):
+        for rule in self:
+            if rule.variable == "weight":
+                rule.max_value_uom_name = rule.carrier_id.weight_uom_name
+            elif rule.variable == "volume":
+                rule.max_value_uom_name = rule.carrier_id.volume_uom_name
+            elif rule.variable == "wv":
+                rule.max_value_uom_name = "%s * %s" % (
+                    rule.carrier_id.weight_uom_name,
+                    rule.carrier_id.volume_uom_name,
+                )
+            elif rule.variable == "price":
+                rule.max_value_uom_name = rule.currency_id.symbol or rule.currency_id.name or ""
+            else:
+                rule.max_value_uom_name = "Units"
+
     name = fields.Char(compute="_compute_name")
     sequence = fields.Integer(required=True, default=10)
     carrier_id = fields.Many2one(
@@ -62,6 +86,7 @@ class DeliveryPriceRule(models.Model):
         required=True,
     )
     max_value = fields.Float(string="Maximum Value", required=True)
+    max_value_uom_name = fields.Char(compute="_compute_max_value_uom_name", store=False)
     list_base_price = fields.Float(
         string="Sale Base Price", min_display_digits="Product Price", default=0.0, required=True
     )

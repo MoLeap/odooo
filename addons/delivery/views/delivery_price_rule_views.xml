@@ -14,7 +14,10 @@
                     <div class="o_row">
                         <field name="variable"/>
                         <field name="operator"/>
-                        <field name="max_value"/>
+                        <div class="o_input_box">
+                            <field name="max_value"/>
+                            <field name="max_value_uom_name" class="o_input_box_overlay_end o_input_box_overlay_inline"/>
+                        </div>
                     </div>
                     <field name="currency_id" invisible="1"/>
                     <label for="list_base_price" string="Delivery Cost"/>
