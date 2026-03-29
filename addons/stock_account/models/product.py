@@ -272,6 +272,14 @@ class ProductProduct(models.Model):
             product.total_value = sum(total_value_by_company_id[c.id].get(product.id, 0) for c in self.env.companies)
             product.avg_cost = product.total_value / product.qty_available if product.qty_available else std_price_by_company_id[self.env.company.id].get(product.id, product.standard_price)
 
+        # Temporary PERF patch for big databases.
+        # This compute method is batched by the ORM, so len(self) <= 1000
+        # With this context (enabled by a system parameter), the cache will be cleared for every batch,
+        # preventing a memory error that could be caused by _run_fifo & _run_avco (who fetch all the moves).
+        if self.env.context.get('should_clear_cache', False):
+            self.env["stock.move"].invalidate_model()
+            self.env["stock.move.line"].invalidate_model()
+
     @api.model_create_multi
     def create(self, vals_list):
         products = super().create(vals_list)
