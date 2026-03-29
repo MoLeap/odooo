@@ -150,7 +150,8 @@ class PosOrder(models.Model):
             raise UserError(_("Invalid preset"))
 
         pos_reference, tracking_number = pos_config._get_next_order_refs()
-        prefix = f"K{pos_config.id}-" if device_type == "kiosk" else "S"
+        prefix = "K" if device_type == "kiosk" else "S"
+        order_tracking_number = f"{prefix}{pos_config.id}-{tracking_number}"
         fiscal_position_id = preset_id.fiscal_position_id if preset_id else pos_config.default_fiscal_position_id
         pricelist_id = preset_id.pricelist_id if preset_id else pos_config.pricelist_id
         lines = [self._check_pos_order_lines(pos_config, order, line, fiscal_position_id) for line in order.get('lines', [])]
@@ -158,12 +159,12 @@ class PosOrder(models.Model):
         partner = pos_config.env['res.partner'].browse(partner_id) if partner_id else None
 
         if device_type == 'kiosk':
-            floating_order_name = f"Table tracker {order['table_stand_number']}" if order.get('table_stand_number') else tracking_number
+            floating_order_name = f"Table tracker {order['table_stand_number']}" if order.get('table_stand_number') else order_tracking_number
 
         if not order.get('floating_order_name') and table:
             floating_order_name = f"Self-Order T {table.table_number}"
         elif not order.get('floating_order_name'):
-            floating_order_name = f"Self-Order {tracking_number}"
+            floating_order_name = f"Self-Order {order_tracking_number}"
 
         return {
             'id': order.get('id'),
@@ -186,7 +187,7 @@ class PosOrder(models.Model):
             'fiscal_position_id': fiscal_position_id.id if fiscal_position_id else False,
             'preset_id': preset_id.id if preset_id else False,
             'preset_time': order.get('preset_time'),
-            'tracking_number': f"{prefix}{tracking_number}",
+            'tracking_number': order_tracking_number,
             'source': 'kiosk' if device_type == 'kiosk' else 'mobile',
             'email': partner.email if partner else order.get('email'),
             'mobile': order.get('mobile'),
