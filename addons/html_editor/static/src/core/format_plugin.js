@@ -29,7 +29,14 @@ import {
     findFurthest,
 } from "../utils/dom_traversal";
 import { FONT_SIZE_CLASSES, formatsSpecs } from "../utils/formatting";
-import { boundariesIn, boundariesOut, DIRECTIONS, leftPos, rightPos } from "../utils/position";
+import {
+    boundariesIn,
+    boundariesOut,
+    DIRECTIONS,
+    leftPos,
+    nodeSize,
+    rightPos,
+} from "../utils/position";
 import { prepareUpdate } from "@html_editor/utils/dom_state";
 import { _t } from "@web/core/l10n/translation";
 import { callbacksForCursorUpdate } from "@html_editor/utils/selection";
@@ -279,23 +286,32 @@ export class FormatPlugin extends Plugin {
             }
         }
 
-        const selectedTextNodes = /** @type { Text[] } **/ (
-            this.dependencies.selection
-                .getTargetedNodes()
-                .filter(
-                    (n) =>
-                        this.dependencies.selection.areNodeContentsFullySelected(n) &&
-                        ((isTextNode(n) &&
-                            (isVisibleTextNode(n) ||
-                                isZWS(n) ||
-                                (/^\n+$/.test(n.nodeValue) && !applyStyle))) ||
-                            (n.nodeName === "BR" &&
-                                (isFakeLineBreak(n) ||
-                                    previousLeaf(n, closestBlock(n))?.nodeName === "BR"))) &&
-                        isContentEditable(n)
-                )
+        const selectedNodes = /** @type { Node[] } **/ (
+            this.dependencies.selection.getTargetedNodes().filter(
+                (n) =>
+                    this.dependencies.selection.areNodeContentsFullySelected(n) &&
+                    ((isTextNode(n) &&
+                        (isVisibleTextNode(n) ||
+                            isZWS(n) ||
+                            // keep FEFF for stable reselection
+                            isZwnbsp(n) ||
+                            (/^\n+$/.test(n.nodeValue) && !applyStyle))) ||
+                        (n.nodeName === "BR" &&
+                            (isFakeLineBreak(n) ||
+                                previousLeaf(n, closestBlock(n))?.nodeName === "BR")) ||
+                        // Formatting can be applied to <li> elements.
+                        // If the last <li> is empty (e.g., <li>[abc</li><li>]<br></li>),
+                        // the selection should stay on the last <li>.
+                        (n.nodeName === "LI" && n.textContent === "")) &&
+                    isContentEditable(n)
+            )
         );
-        const unformattedTextNodes = selectedTextNodes.filter((n) => {
+
+        const unformattedTextNodes = selectedNodes.filter((n) => {
+            // Don't apply formatting to FEFF.
+            if (isZwnbsp(n)) {
+                return false;
+            }
             const listItem = closestElement(n, "li");
             if (listItem && this.dependencies.selection.isNodeContentsFullySelected(listItem)) {
                 const hasFontSizeStyle =
@@ -418,21 +434,30 @@ export class FormatPlugin extends Plugin {
             unformattedTextNodes[0].textContent === "\u200B"
         ) {
             this.dependencies.selection.setCursorStart(unformattedTextNodes[0]);
-        } else if (selectedTextNodes.length) {
-            const firstNode = selectedTextNodes[0];
-            const lastNode = selectedTextNodes[selectedTextNodes.length - 1];
+        } else if (selectedNodes.length) {
+            const firstNode = selectedNodes[0];
+            let lastNode = selectedNodes[selectedNodes.length - 1];
+            const closestLI = closestElement(lastNode, "li");
+            if (closestLI && this.dependencies.selection.isNodeContentsFullySelected(closestLI)) {
+                // If selection fully covers li, set lastNode to that li.
+                // Otherwise, since lastNode would be the text "def",
+                // trailing br's would be excluded from selection.
+                // Example: <li>[abc</li><li>def<br><br>]<br></li>
+                // Without this: <li>[abc</li><li>def]<br><br><br></li>
+                lastNode = closestLI;
+            }
             let newSelection;
             if (selection.direction === DIRECTIONS.RIGHT) {
                 newSelection = {
                     anchorNode: firstNode,
                     anchorOffset: 0,
                     focusNode: lastNode,
-                    focusOffset: lastNode.length,
+                    focusOffset: nodeSize(lastNode),
                 };
             } else {
                 newSelection = {
                     anchorNode: lastNode,
-                    anchorOffset: lastNode.length,
+                    anchorOffset: nodeSize(lastNode),
                     focusNode: firstNode,
                     focusOffset: 0,
                 };
