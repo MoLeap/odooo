@@ -485,7 +485,7 @@ class HrEmployee(models.Model):
             return self.browse(ctx.get('default_employee_id'))
         return self.env.user.employee_id
 
-    def _get_consumed_leaves(self, work_entry_types, target_date=False, ignore_future=False):
+    def _get_consumed_leaves(self, work_entry_types, target_date=False, ignore_future=False, precomputed_allocations=None):
         employees = self or self._get_contextual_employee()
         leaves_domain = [
             ('work_entry_type_id', 'in', work_entry_types.ids),
@@ -564,12 +564,18 @@ class HrEmployee(models.Model):
         for allocation in allocations:
             allocation_data = allocations_leaves_consumed[allocation.employee_id][allocation.work_entry_type_id][allocation]
             future_leaves = 0
-            if allocation.allocation_type == 'accrual':
-                future_leaves = allocation._get_future_leaves_on(target_date)
-            max_leaves = allocation.number_of_hours_display\
-                if allocation.work_entry_type_id.unit_of_measure == 'hour'\
-                else allocation.number_of_days_display
-            max_leaves += future_leaves
+            if precomputed_allocations and allocation in precomputed_allocations:
+                precomputed_allocation_data = precomputed_allocations[allocation]
+                max_leaves = precomputed_allocation_data['number_of_days']
+                if allocation.work_entry_type_id.unit_of_measure == 'hour':
+                    max_leaves *= allocation._get_employee_hours_per_day(precomputed_allocation_data)
+            else:
+                max_leaves = allocation.number_of_days
+                if allocation.work_entry_type_id.unit_of_measure == 'hour':
+                    max_leaves *= allocation._get_employee_hours_per_day()
+                if allocation.allocation_type == 'accrual':
+                    future_leaves = allocation._get_additionnal_future_leaves_on(target_date, precomputed_allocations)
+                    max_leaves += future_leaves
             allocation_data.update({
                 'max_leaves': max_leaves,
                 'accrual_bonus': future_leaves,
@@ -582,7 +588,7 @@ class HrEmployee(models.Model):
         for employee in employees:
             for work_entry_type in work_entry_types:
                 if not work_entry_type.requires_allocation:
-                    # Ensure that leave types that do not require allocation are
+                    # Ensure that work entry types that do not require allocation are
                     # still stored in the consumed allocation leaves.
                     # False is the special key used for this type of leave
                     allocations_leaves_consumed[employee][
@@ -693,7 +699,7 @@ class HrEmployee(models.Model):
                     virtual_remaining = 0
                     additional_leaves_duration = 0
                     for allocation in consumed_content:
-                        latest_accrual_bonus += allocation and allocation._get_future_leaves_on(date_to_simulate)
+                        latest_accrual_bonus += allocation and allocation._get_additionnal_future_leaves_on(date_to_simulate, precomputed_allocations)
                         date_accrual_bonus += consumed_content[allocation]['accrual_bonus']
                         virtual_remaining += consumed_content[allocation]['virtual_remaining_leaves']
                     for leave in content['to_recheck_leaves']:
