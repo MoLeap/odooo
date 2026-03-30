@@ -1,18 +1,13 @@
-from odoo.tools.sql import column_exists, create_column
-
 from . import models
 from . import wizard
 from . import tools
 
 
 def _post_init_pdp(env):
-    """
-        Update templates for Factur-X.
-        # TODO: Maybe we should make a dedicated format instead
-    """
+    """Update templates for Factur-X."""
     for view_name in [
-            'account_edi_ubl_cii.account_invoice_partner_facturx_export_22',
-            'account_edi_ubl_cii.account_invoice_facturx_export_22',
+        'account_edi_ubl_cii.account_invoice_partner_facturx_export_22',
+        'account_edi_ubl_cii.account_invoice_facturx_export_22',
     ]:
         view = env.ref(view_name).sudo()
         view.reset_arch(mode="hard")

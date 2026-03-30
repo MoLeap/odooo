@@ -4,7 +4,7 @@ import requests
 from markupsafe import Markup
 from urllib import parse
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 
 from odoo.addons.l10n_fr_pdp.tools.demo_utils import handle_demo
@@ -63,7 +63,7 @@ class ResPartner(models.Model):
             )
         ):
             ubl_21_fr_string = dict(self._fields['invoice_edi_format']._description_selection(self.env))['ubl_21_fr']
-            raise ValidationError(_('For French regulated invoices, only %(format_name)s is supported.', format_name=ubl_21_fr_string))
+            raise ValidationError(self.env._('For French regulated invoices, only %(format_name)s is supported.', format_name=ubl_21_fr_string))
 
     # -------------------------------------------------------------------------
     # OVERRIDE AND HELPERS
@@ -91,7 +91,7 @@ class ResPartner(models.Model):
         if eas != '0225':
             return super()._build_error_peppol_endpoint(eas, endpoint)
         if not self.env["res.company"]._check_pdp_identifier(endpoint):
-            return _("The Peppol endpoint is not valid. The expected format is: SIREN, SIREN_SIRET, SIREN_SIRET_CodeRoutage or SIREN_SuffixeAdressage")
+            return self.env._("The Peppol endpoint is not valid. The expected format is: SIREN, SIREN_SIRET, SIREN_SIRET_CodeRoutage or SIREN_SuffixeAdressage")
 
     def _get_edi_builder(self, invoice_edi_format):
         # EXTENDS 'account_edi_ubl_cii'
@@ -135,7 +135,7 @@ class ResPartner(models.Model):
         if self._get_pdp_receiver_identification_info()[0] != 'pdp':
             return super()._log_verification_state_update(company, old_value, new_value)
         if old_value == new_value:
-            return
+            return None
 
         state_field = self._fields['pdp_verification_display_state']
         selection_values = dict(state_field.selection)
@@ -161,37 +161,6 @@ class ResPartner(models.Model):
             company=company.display_name,
         )
         self._message_log(body=body)
-
-    @api.model
-    def _pdp_peppol_lookup_participant(self, edi_identification):
-        """NAPTR DNS peppol participant lookup through Odoo's Peppol proxy"""
-        edi_mode = self.env.company._get_peppol_edi_mode()
-        origin = self.env['account_edi_proxy_client.user']._get_proxy_urls()['pdp'][edi_mode]
-        query = parse.urlencode({'peppol_identifier': edi_identification.lower()})
-        endpoint = f'{origin}/api/pdp/1/peppol_lookup?{query}'
-
-        try:
-            response = requests.get(endpoint, timeout=TIMEOUT)
-        except requests.exceptions.RequestException as e:
-            _logger.debug("failed to query peppol participant %s: %s", edi_identification, e)
-            return
-
-        try:
-            decoded_response = response.json()
-        except ValueError:
-            _logger.error('invalid JSON response %s when querying peppol participant %s', response.status_code, edi_identification)
-            return
-
-        if error := decoded_response.get('error'):
-            if error.get('code') != 'NOT_FOUND':
-                _logger.error('error when querying peppol participant %s: %s', edi_identification, error.get('message', 'unknown error'))
-            return
-
-        if not response.ok:
-            _logger.error('unsuccessful response %s when querying peppol participant %s', response.status_code, edi_identification)
-            return
-
-        return decoded_response.get('result')
 
     @api.model
     @handle_demo
@@ -225,21 +194,21 @@ class ResPartner(models.Model):
             response = requests.get(endpoint, timeout=TIMEOUT)
         except requests.exceptions.RequestException as e:
             _logger.debug("failed to query annuaire for identifier %s: %s", edi_identification, e)
-            return
+            return None
 
         try:
             decoded_response = response.json()
         except ValueError:
             _logger.error('invalid JSON response %s when querying annuaire for identifier %s', response.status_code, edi_identification)
-            return
+            return None
 
         if error := decoded_response.get('error'):
             _logger.error('error when querying annuaire for identifier %s: %s', edi_identification, error.get('message', 'unknown error'))
-            return
+            return None
 
         if not response.ok:
             _logger.error('unsuccessful response %s when querying annuaire for identifier %s', response.status_code, edi_identification)
-            return
+            return None
 
         return decoded_response.get('result')
 

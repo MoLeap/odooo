@@ -3,7 +3,7 @@ from datetime import datetime
 from lxml import etree
 from markupsafe import Markup
 
-from odoo import _, api, fields, models, tools
+from odoo import api, fields, models, tools
 from odoo.exceptions import UserError
 
 from odoo.addons.account_edi_proxy_client.models.account_edi_proxy_user import AccountEdiProxyError
@@ -12,6 +12,8 @@ from odoo.addons.l10n_fr_pdp.tools.demo_utils import handle_demo
 
 _logger = logging.getLogger(__name__)
 BATCH_SIZE = 50
+
+PPF_STATUS_FLOWS = {'2', '6'}
 
 CDAR_NSMAP = {
     'qdt': "urn:un:unece:uncefact:data:standard:QualifiedDataType:100",
@@ -56,16 +58,16 @@ RESPONSE_CODE_TO_PPF_STATE = {
 }
 
 
-def _parse_cdar_datetime(date_string):
-    if date_string is None:
+def _parse_cdar_datetime(date):
+    if date is None:
         return None
-    return datetime.strptime(date_string, '%Y%m%d%H%M%S')
+    return datetime.strptime(date, '%Y%m%d%H%M%S')
 
 
-def _parse_cdar_date(date_string):
-    if date_string is None:
+def _parse_cdar_date(date):
+    if date is None:
         return None
-    return datetime.strptime(date_string, '%Y%m%d')
+    return datetime.strptime(date, '%Y%m%d')
 
 
 def _parse_cdar_datetime_node(node):
@@ -114,7 +116,7 @@ class AccountEdiProxyClientUser(models.Model):
             return super()._get_proxy_identification(company, proxy_type)
         if not company.pdp_identifier:
             scheme = dict(self.env["res.partner"]._fields['peppol_eas']._description_selection(self.env))["0225"]
-            raise UserError(_("Please fill the Peppol Endpoint field with scheme '%s' on the company partner.", scheme))
+            raise UserError(self.env._("Please fill the Peppol Endpoint field with scheme '%s' on the company partner.", scheme))
         return f'0225:{company.pdp_identifier}'
 
     @handle_demo
@@ -166,7 +168,7 @@ class AccountEdiProxyClientUser(models.Model):
         if company.account_peppol_proxy_state in ('smp_registration', 'receiver'):
             # a participant can only try registering as a receiver if they are not registered
             proxy_state_translated = dict(company._fields['account_peppol_proxy_state'].selection)[company.account_peppol_proxy_state]
-            raise UserError(_('Cannot register a user with a %s application', proxy_state_translated))
+            raise UserError(self.env._('Cannot register a user with a %s application', proxy_state_translated))
 
         super()._peppol_register_receiver()
 
@@ -315,12 +317,11 @@ class AccountEdiProxyClientUser(models.Model):
         reference_moves = reference_moves.filtered(lambda rm: rm.pdp_can_send_response)
         if not reference_moves:
             return
-        if additional_info is None:
-            additional_info = {}
+        additional_info = additional_info or {}
 
         response_code_to_description_map = dict(self.env['pdp.response']._fields['response_code']._description_selection(self.env))
         if status not in response_code_to_description_map:
-            raise UserError(_("Unsupported response status: '%s'.", status))
+            raise UserError(self.env._("Unsupported response status: '%s'.", status))
         status_string = response_code_to_description_map[status]
 
         try:
@@ -331,7 +332,7 @@ class AccountEdiProxyClientUser(models.Model):
                 params={
                     'reference_uuids': reference_moves.mapped('peppol_message_uuid'),
                     'status': status,
-                    'additional_info': additional_info or {},
+                    'additional_info': additional_info,
                 },
             )
         except UserError as e:
@@ -355,12 +356,12 @@ class AccountEdiProxyClientUser(models.Model):
                 bodies={move.id: log_message for move in reference_moves},
             )
         else:
-            status_list = [{'note': additional_info.get('note')}]  # We only put the note since we have all other info
+            status_infos = [{'note': additional_info.get('note')}]  # We only put the note since we have all other info
             self.env['pdp.response'].create([
                 {
                     'peppol_message_uuid': message['message_uuid'],
                     'response_code': status,
-                    'status_info': "\n\n".join([self._format_status_dict(status) for status in status_list]),
+                    'status_info': "\n\n".join([self._format_status_info(status) for status in status_infos]),
                     'pdp_state': 'processing',
                     'move_id': move.id,
                     'issue_date': issue_time,
@@ -429,7 +430,7 @@ class AccountEdiProxyClientUser(models.Model):
                     continue
                 if response := self._pdp_import_tax_extract_lifecycle(uuid, content, origin_move[:1]):
                     processed_messages[uuid] = response
-            elif flow_number in ('2', '6'):
+            elif flow_number in PPF_STATUS_FLOWS:
                 origin_uuid = content['origin_peppol_message_uuid']
                 origin_move = original_moves.get(origin_uuid)
                 if not origin_uuid or not origin_move:
@@ -451,8 +452,8 @@ class AccountEdiProxyClientUser(models.Model):
         info = self._pdp_extract_response_info(decoded_document)
         response_code = info['response_code']
         issue_date = info['issue_date']
-        status_list = info['status_list']
-        markup_status_info = Markup('<br/><br/>').join([self._format_status_dict(status, separator=Markup('<br/>')) for status in status_list])
+        status_infos = info['status_infos']
+        markup_status_info = Markup('<br/><br/>').join([self._format_status_info(status, separator=Markup('<br/>')) for status in status_infos])
         response_code_to_description_map = dict(response._fields['ppf_state']._description_selection(self.env))
 
         ppf_state = RESPONSE_CODE_TO_PPF_STATE.get(response_code)
@@ -486,7 +487,7 @@ class AccountEdiProxyClientUser(models.Model):
             'pdp_state': content['state'],
             'ppf_state': ppf_state,
             'move_id': origin_move.id,
-            'status_info': '\n\n'.join([self._format_status_dict(status, separator=Markup('\n')) for status in status_list]),
+            'status_info': '\n\n'.join([self._format_status_info(status, separator=Markup('\n')) for status in status_infos]),
             'issue_date': issue_date,
             'flow_number': '1',
         })
@@ -516,8 +517,8 @@ class AccountEdiProxyClientUser(models.Model):
         info = self._pdp_extract_response_info(decoded_document)
         response_code = info['response_code']
         issue_date = info['issue_date']
-        status_list = info['status_list']
-        markup_status_info = Markup('<br/><br/>').join([self._format_status_dict(status, separator=Markup('<br/>')) for status in status_list])
+        status_infos = info['status_infos']
+        markup_status_info = Markup('<br/><br/>').join([self._format_status_info(status, separator=Markup('<br/>')) for status in status_infos])
         response_code_to_description_map = dict(response._fields['ppf_state']._description_selection(self.env))
         ref_status_code_to_description_map = dict(response._fields['response_code']._description_selection(self.env))
         ref_status_code_description = ref_status_code_to_description_map.get(origin_ref_status)
@@ -555,7 +556,7 @@ class AccountEdiProxyClientUser(models.Model):
             'pdp_state': content['state'],
             'ppf_state': ppf_state,
             'move_id': origin_move.id,
-            'status_info': '\n\n'.join([self._format_status_dict(status, separator=Markup('\n')) for status in status_list]),
+            'status_info': '\n\n'.join([self._format_status_info(status, separator=Markup('\n')) for status in status_infos]),
             'issue_date': issue_date,
             'flow_number': '6',
         })
@@ -585,8 +586,8 @@ class AccountEdiProxyClientUser(models.Model):
         info = self._pdp_extract_response_info(decoded_document)
         response_code = info['response_code']
         issue_date = info['issue_date']
-        status_list = info['status_list']
-        markup_status_info = Markup('<br/><br/>').join([self._format_status_dict(status, separator=Markup('<br/>')) for status in status_list])
+        status_infos = info['status_infos']
+        markup_status_info = Markup('<br/><br/>').join([self._format_status_info(status, separator=Markup('<br/>')) for status in status_infos])
         response_code_to_description_map = dict(response._fields['response_code']._description_selection(self.env))
         if response_code not in response_code_to_description_map or not issue_date:
             origin_move._message_log(
@@ -618,7 +619,7 @@ class AccountEdiProxyClientUser(models.Model):
             'response_code': response_code,
             'pdp_state': content['state'],
             'move_id': origin_move.id,
-            'status_info': '\n\n'.join([self._format_status_dict(status, separator=Markup('\n')) for status in status_list]),
+            'status_info': '\n\n'.join([self._format_status_info(status, separator=Markup('\n')) for status in status_infos]),
             'issue_date': issue_date,
         })
         # TODO: Maybe we should "sort" all the imported responses by `issue_date` before logging the messages?
@@ -641,7 +642,7 @@ class AccountEdiProxyClientUser(models.Model):
         xml_node = etree.fromstring(document)
         status_nodes = xml_node.findall("rsm:AcknowledgementDocument/ram:ReferenceReferencedDocument/ram:SpecifiedDocumentStatus", namespaces=CDAR_NSMAP)
         process_condition_code = xml_node.findtext("rsm:AcknowledgementDocument/ram:ReferenceReferencedDocument/ram:ProcessConditionCode", namespaces=CDAR_NSMAP)
-        status_list = [
+        status_infos = [
             {
               'index': node.findtext("./ram:SequenceNumeric", namespaces=CDAR_NSMAP),
               'reason_code': node.findtext("./ram:ReasonCode", namespaces=CDAR_NSMAP),
@@ -663,11 +664,11 @@ class AccountEdiProxyClientUser(models.Model):
             'process_condition_code': process_condition_code,
             'response_code': PROCESS_CONDITION_CODE_TO_RESPONSE_CODE.get(process_condition_code, process_condition_code),
             'issue_date': _parse_cdar_datetime_node(xml_node.find("rsm:AcknowledgementDocument/ram:IssueDateTime/udt:DateTimeString", namespaces=CDAR_NSMAP)),
-            'status_list': status_list,
+            'status_infos': status_infos,
         }
 
     @api.model
-    def _format_status_dict(self, status, separator='\n'):
+    def _format_status_info(self, status, separator='\n'):
         reason_code = status.get('reason_code')
         reason = status.get('reason')
         note = status.get('note')
@@ -719,7 +720,7 @@ class AccountEdiProxyClientUser(models.Model):
 
         move._extend_with_attachments(attachment, new=True)
         move._message_log(
-            body=_(
+            body=self.env._(
                 "French e-invoicing document (UUID: %(uuid)s) has been received successfully",
                 uuid=uuid,
             ),

@@ -1,4 +1,4 @@
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_repr, float_round, format_list
 
@@ -23,9 +23,6 @@ class PdpResponseWizard(models.TransientModel):
             ("refused", "Refused"),
             ("approved", "Approved"),
             ("in_hand", "In Hand"),
-            # Supported on IAP side:
-            # ("contested", "Contested"),
-            # ("payment_sent", "Payment Sent"),
         ],
     )
     available_statuses = fields.Char(
@@ -34,18 +31,18 @@ class PdpResponseWizard(models.TransientModel):
     )
     reason_code = fields.Selection(
         selection=[
-            ("TX_TVA_ERR", " Taux de TVA erroné"),
-            ("MONTANTTOTAL_ERR", "Montant Total Erroné"),
-            ("CALCUL_ERR", "Erreur de calcul de la facture"),
-            ("NON_CONFORME", "Facture en doublon (déjà émise / réçue)"),
-            ("DEST_ERR", "Erreur de destinataire"),
-            ("TRANSAC_INC", "Transaction inconnue"),
-            ("EMMET_INC", "Emetteur inconnu"),
-            ("CONTRAT_TERM", "Contrat terminé"),
-            ("DOUBLE_FACT", "DOUBLE FACTURE"),
-            ("CMD_ERR", "N° de COMMANDE Incorrect ou manquant"),
-            ("ADR_ERR", "L'adresse de facturation électronique erronée"),
-            ("REF_CT_ABSENT", "Référence contractuelle nécessaire pour le traitement de la facture manquante"),
+            ("TX_TVA_ERR", "Incorrect VAT rate"),
+            ("MONTANTTOTAL_ERR", "Incorrect Total Amount"),
+            ("CALCUL_ERR", "Billing calculation error"),
+            ("NON_CONFORME", "Legal information missing"),
+            ("DEST_ERR", "Wrong recipient"),
+            ("TRANSAC_INC", "Unknown transaction"),
+            ("EMMET_INC", "Unknown sender"),
+            ("CONTRAT_TERM", "Contract completed"),
+            ("DOUBLE_FACT", "Duplicate Invoice"),
+            ("CMD_ERR", "Order number is incorrect or missing"),
+            ("ADR_ERR", "Incorrect electronic billing address"),
+            ("REF_CT_ABSENT", "Contract reference required to process the missing invoice"),
         ],
     )
     show_reason_code = fields.Boolean(compute="_compute_show_reason_code", help="Technical field to hide / show the 'Reason Code' in the view.")
@@ -79,7 +76,7 @@ class PdpResponseWizard(models.TransientModel):
         company = move.company_id
 
         base_amls = move.line_ids.filtered(lambda x: x.display_type == 'product')
-        base_lines = [move._prepare_product_base_line_for_taxes_computation(x) for x in base_amls]
+        base_lines = [move._prepare_product_base_line_for_taxes_computation(aml) for aml in base_amls]
         epd_amls = move.line_ids.filtered(lambda line: line.display_type == 'epd')
         base_lines += [move._prepare_epd_base_line_for_taxes_computation(line) for line in epd_amls]
         cash_rounding_amls = move.line_ids \
@@ -116,19 +113,19 @@ class PdpResponseWizard(models.TransientModel):
         self.ensure_one()
 
         if not self.status:
-            raise UserError(_("Please select a Status."))
+            raise UserError(self.env._("Please select a Status."))
         # Note: `_compute_available_statuses` ensures that all moves are either sale or puchase documents
 
         if self.status == 'refused' and not self.reason_code:
-            raise UserError(_("To refuse an invoice please select a Reason Code."))
+            raise UserError(self.env._("To refuse an invoice please select a Reason Code."))
         if self.status == 'refused' and not self.note:
-            raise UserError(_("To refuse an invoice please enter a Note."))
+            raise UserError(self.env._("To refuse an invoice please enter a Note."))
         if self.status == 'paid' and (not_paid_moves := self.move_ids.filtered(lambda m: m.payment_state != 'paid')):
-            raise UserError(_("Some of the moves are not (fully) paid: %s", format_list(self.env, not_paid_moves.mapped('display_name'))))
+            raise UserError(self.env._("Some of the moves are not (fully) paid: %s", format_list(self.env, not_paid_moves.mapped('display_name'))))
         if self.status in ('cancelled', 'refused') and (not_cancelled_moves := self.move_ids.filtered(lambda m: m.state != 'cancel')):
-            raise UserError(_("Some of the moves are not cancelled: %s", format_list(self.env, not_cancelled_moves.mapped('display_name'))))
+            raise UserError(self.env._("Some of the moves are not cancelled: %s", format_list(self.env, not_cancelled_moves.mapped('display_name'))))
         if self.status == 'approved' and (not_approved_moves := self.move_ids.filtered(lambda m: m.state != 'posted')):
-            raise UserError(_("Some of the moves are not posted: %s", format_list(self.env, not_approved_moves.mapped('display_name'))))
+            raise UserError(self.env._("Some of the moves are not posted: %s", format_list(self.env, not_approved_moves.mapped('display_name'))))
 
         additional_info = {
             field: value for field in ['note', 'reason_code'] if (value := self[field])

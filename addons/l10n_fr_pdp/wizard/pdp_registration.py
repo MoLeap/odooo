@@ -64,7 +64,7 @@ class PdpRegistration(models.TransientModel):
             warnings = {}
             if (
                 wizard.pdp_identifier
-                and not wizard.company_id._check_pdp_identifier(wizard.pdp_identifier, warning=True)
+                and not self.env["res.company"]._check_pdp_identifier(wizard.pdp_identifier, warning=True)
             ):
                 warnings['company_pdp_identifier_warning'] = {
                     'level': 'warning',
