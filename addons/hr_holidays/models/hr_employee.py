@@ -802,3 +802,43 @@ class HrEmployee(models.Model):
         hour_to = max((att['hour_to'] for att in filtered_attendances), default=default_end)
 
         return (hour_from, hour_to)
+
+    @api.model
+    def get_avatar_leave_summary(self, employee_id):
+        employee = self.env['hr.employee'].browse(employee_id)
+
+        grouped_leaves = self.env['hr.leave']._read_group(
+            domain=[
+                ('employee_id', '=', employee.id),
+                ('state', 'in', ['confirm', 'validate1', 'validate']),
+            ],
+            groupby=['work_entry_type_id'],
+        )
+
+        work_entry_types = self.env['hr.work.entry.type'].browse([
+            work_entry_type.id
+            for work_entry_type, *_ in grouped_leaves
+            if work_entry_type
+        ])
+
+        if not work_entry_types:
+            return []
+
+        leave_data = work_entry_types.get_allocation_data(employee)[employee]
+
+        leave_summary = []
+        for leave_name, leave_stats, requires_allocation, type_id in leave_data:
+            leave_summary.append({
+                "display_name": leave_name,
+                "leaves_taken": leave_stats['leaves_taken'],
+                "virtual_remaining_leaves": leave_stats['virtual_remaining_leaves'],
+                "requires_allocation": requires_allocation,
+                "max_leaves": leave_stats['max_leaves'],
+                "request_unit": leave_stats['request_unit'],
+            })
+
+        return sorted(
+            leave_summary,
+            key=lambda summary: summary['leaves_taken'],
+            reverse=True
+        )
