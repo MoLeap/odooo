@@ -39,10 +39,6 @@ class ResCompany(models.Model):
     def _check_pdp_identifier(self, pdp_identifier, warning=False):
         return pdp_identifier and PDP_identifier_re.match(pdp_identifier)
 
-    def _get_pdp_webhook_endpoint(self):
-        self.ensure_one()
-        return urljoin(self.get_base_url(), '/pdp/webhook')
-
     def _peppol_supported_document_types(self):
         """Returns a flattened dictionary of all supported document types."""
         return {

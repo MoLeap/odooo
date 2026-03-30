@@ -1,4 +1,3 @@
-import uuid
 from base64 import b64encode
 from decorator import decorator
 

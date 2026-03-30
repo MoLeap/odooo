@@ -156,16 +156,6 @@ class AccountEdiProxyClientUser(models.Model):
             'refresh_token': response['refresh_token'],
         })
 
-    def _get_peppol_company_details(self):
-        self.ensure_one()
-        result = super()._get_peppol_company_details()
-        if self.proxy_type == 'pdp':
-            result.update({
-                'peppol_webhook_endpoint': self.company_id._get_pdp_webhook_endpoint(),
-                'peppol_webhook_token': self._generate_pdp_webhook_token(),
-            })
-        return result
-
     @handle_demo
     def _peppol_register_receiver(self):
         self.ensure_one()
@@ -182,37 +172,6 @@ class AccountEdiProxyClientUser(models.Model):
 
         datetime_in_1_hour = fields.Datetime.add(fields.Datetime.now(), hours=1)
         self.env.ref('account_peppol.ir_cron_peppol_get_participant_status')._trigger(at=datetime_in_1_hour)
-
-    def _generate_pdp_webhook_token(self):
-        # TODO: update with changes from peppol webhook (higher version)
-        self.ensure_one()
-        expiration = 30 * 24  # in 30 days
-        msg = [self.id, self.company_id._get_pdp_webhook_endpoint()]
-        payload = tools.hash_sign(self.sudo().env, 'account_pdp_webhook', msg, expiration_hours=expiration)
-        return payload
-
-    @api.model
-    def _get_pdp_user_from_token(self, token: str, url: str):
-        try:
-            if not (payload := tools.verify_hash_signed(self.sudo().env, 'account_pdp_webhook', token)):
-                return None
-        except ValueError:
-            return None
-        else:
-            user_id, endpoint = payload
-            if not url.startswith(endpoint):
-                return None
-            return self.browse(user_id).exists()
-
-    def _pdp_reset_webhook(self):
-        for edi_user in self:
-            edi_user._call_peppol_proxy(
-                '/api/pdp/1/set_webhook',
-                params={
-                    'webhook_url': edi_user.company_id._get_pdp_webhook_endpoint(),
-                    'token': edi_user._generate_pdp_webhook_token()
-                }
-            )
 
     def _peppol_get_new_documents(self):
         super()._peppol_get_new_documents()
@@ -769,11 +728,3 @@ class AccountEdiProxyClientUser(models.Model):
         move._autopost_bill()
         attachment.write({'res_model': 'account.move', 'res_id': move.id})
         return move
-
-    # -------------------------------------------------------------------------
-    # CRONS
-    # -------------------------------------------------------------------------
-
-    def _cron_pdp_webhook_keepalive(self):
-        edi_users = self.search([('proxy_type', '=', 'pdp'), ('company_id.account_peppol_proxy_state', '=', 'receiver')])
-        edi_users._pdp_reset_webhook()

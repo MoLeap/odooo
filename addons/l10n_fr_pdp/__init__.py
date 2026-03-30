@@ -1,6 +1,5 @@
 from odoo.tools.sql import column_exists, create_column
 
-from . import controllers
 from . import models
 from . import wizard
 from . import tools
