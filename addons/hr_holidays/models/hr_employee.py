@@ -564,7 +564,7 @@ class HrEmployee(models.Model):
         for allocation in allocations:
             allocation_data = allocations_leaves_consumed[allocation.employee_id][allocation.work_entry_type_id][allocation]
             future_leaves = 0
-            if allocation.allocation_type == 'accrual':
+            if allocation.accrual_plan_id:
                 future_leaves = allocation._get_future_leaves_on(target_date)
             max_leaves = allocation.number_of_hours_display\
                 if allocation.work_entry_type_id.unit_of_measure == 'hour'\
@@ -620,7 +620,7 @@ class HrEmployee(models.Model):
                     skip_excess = False
 
                     if leave.date_from.date() > target_date and sorted_leave_allocations.filtered(lambda a:
-                        a.allocation_type == 'accrual' and
+                        a.accrual_plan_id and
                         (not a.date_to or a.date_to >= target_date) and
                         a.date_from <= leave.date_to.date()
                     ):
