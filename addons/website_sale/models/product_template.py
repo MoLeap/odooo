@@ -4,13 +4,12 @@ import logging
 import random
 from collections import defaultdict
 
-from dateutil.relativedelta import relativedelta
 from werkzeug import urls
 
 from odoo import _, api, fields, models
 from odoo.fields import Domain
 from odoo.http import request
-from odoo.tools import float_is_zero, is_html_empty
+from odoo.tools import float_is_zero, is_html_empty, lazy
 from odoo.tools.sql import SQL, column_exists, create_column
 from odoo.tools.translate import adapt_translated_field_value, html_translate
 
@@ -306,92 +305,80 @@ class ProductTemplate(models.Model):
         domain = self.env["website"].sale_product_domain()
         return self.alternative_product_ids.filtered_domain(domain)
 
-    def _update_suggested_products(self, batch_size=None):
+    def _cron_update_suggested_products(self, batch_size=100):
+        if not self._is_automate_suggested_product_feature_enabled():
+            return  # Skip the automation if the cron was activated without the feature.
+
+        products_domain = Domain([("sale_ok", "=", True), ("is_published", "=", True)])
+        cron_domain = products_domain & (
+            Domain("suggested_products_last_update", "<", "-12H")
+            | Domain("suggested_products_last_update", "=", False)
+        )
+        # Order by last update (desc) to ensure the cron processes all products over time,
+        # starting with those that haven't been updated recently
+        products_to_update = self.search(
+            cron_domain, order="suggested_products_last_update", limit=batch_size
+        )
+
+        remaining = (
+            len(products_to_update)
+            if len(products_to_update) < batch_size
+            else self.search_count(cron_domain)
+        )
+        self.env["ir.cron"]._commit_progress(remaining=remaining)
+        products_to_update._update_suggested_products()
+        self.env["ir.cron"]._commit_progress(processed=len(products_to_update))
+
+    def action_update_suggested_products(self):
+        # If called from the server action, reset the suggest_ fields
+        self.write({
+            "suggest_optional_products": True,
+            "suggest_accessory_products": True,
+            "suggest_alternative_products": True,
+        })
+        self._update_suggested_products()
+
+    def _update_suggested_products(self):
         """Update the current product templates' optional, accessory, and alternative products.
 
-        Only salable and publish product templates are considered. The heuristics to find suggested
-        products are as follows:
+        Only salable and published product templates are considered. The heuristics to find
+        suggested products are as follows:
         - Optional products: Up to 2 products bought together with the main product.
         - Accessory products: Up to 1 product bought together with the main product.
         - Alternative products: Up to 4 products sharing similar characteristics (attributes and
           categories).
 
-        This method can be called by either the update suggested products cron or by a sever action.
-
-        :param int batch_size: The maximum number of products to process at once (for the cron).
         :rtype: None
         """
-        if not self._is_automate_suggested_product_feature_enabled():
-            return  # Skip the automation if the cron was activated without the feature.
-
-        now = fields.Datetime.now()
-        products_domain = Domain([("sale_ok", "=", True), ("is_published", "=", True)])
-        if self:  # Called from the server action
-            products_to_update = self
-            in_cron = False
-            # Reset the suggest_ fields
-            self.write({
-                "suggest_optional_products": True,
-                "suggest_accessory_products": True,
-                "suggest_alternative_products": True,
-            })
-        else:  # Called from the cron
-            last_12_hours = now - relativedelta(hours=12)
-            cron_domain = products_domain & (
-                Domain("suggested_products_last_update", "<", last_12_hours)
-                | Domain("suggested_products_last_update", "=", False)
-            )
-            # Order by last update (desc) to ensure the cron processes all products over time,
-            # starting with those that haven't been updated recently
-            products_to_update = self.search(
-                cron_domain, order="suggested_products_last_update", limit=batch_size
-            )
-            in_cron = True
-
-        if in_cron:
-            remaining = (
-                len(products_to_update)
-                if len(products_to_update) < batch_size
-                else self.search_count(cron_domain)
-            )
-            self.env["ir.cron"]._commit_progress(remaining=remaining)
-        for company, products in products_to_update.grouped("company_id").items():
-            products_by_categories = dict(
-                self._read_group(
-                    products_domain & Domain("company_id", "=", company.id),
-                    groupby=["public_categ_ids"],
-                    aggregates=["id:recordset"],
-                )
-            )
-            products_by_sales = products._get_products_by_sales(max_products=3)
-            for product in products:
-                if product.suggest_optional_products or product.suggest_accessory_products:
-                    optionals, accessories = product._get_suggested_optionals_and_accessories(
-                        products_by_sales, max_optionals=2
+        for company, products in self.grouped("company_id").items():
+            products_by_categories = lazy(lambda: products._get_products_by_categories(company))
+            products_by_sales = lazy(lambda: products._get_products_by_sales(max_products=3))
+            with self.env.protecting(
+                [
+                    self._fields[fname]
+                    for fname in (
+                        "suggest_optional_products",
+                        "suggest_accessory_products",
+                        "suggest_alternative_products",
                     )
-                    if product.suggest_optional_products:
-                        # Don't trigger compute from the _update_suggested_products method
-                        with product.env.protecting(
-                            [product._fields["suggest_optional_products"]], product
-                        ):
+                ],
+                products,
+            ):  # Avoid recomputing the suggest_* fields when the value isn't set manually.
+                for product in products:
+                    if product.suggest_optional_products or product.suggest_accessory_products:
+                        optionals, accessories = product._get_suggested_optionals_and_accessories(
+                            products_by_sales, max_optionals=2
+                        )
+                        if product.suggest_optional_products:
                             product.optional_product_ids = optionals
-                    if product.suggest_accessory_products:
-                        # Don't trigger compute from the _update_suggested_products method
-                        with product.env.protecting(
-                            [product._fields["suggest_accessory_products"]], product
-                        ):
+                        if product.suggest_accessory_products:
                             product.accessory_product_ids = accessories
-                if product.suggest_alternative_products:
-                    # Don't trigger compute from the _update_suggested_products method
-                    with product.env.protecting(
-                        [product._fields["suggest_alternative_products"]], product
-                    ):
+                    if product.suggest_alternative_products:
                         product.alternative_product_ids = product._get_suggested_alternatives(
                             products_by_categories, max_products=4
                         )
-            products.suggested_products_last_update = now
-        if in_cron:
-            self.env["ir.cron"]._commit_progress(processed=len(products_to_update))
+
+        self.suggested_products_last_update = self.env.cr.now()
 
     @api.model
     def _is_automate_suggested_product_feature_enabled(self):
@@ -430,6 +417,8 @@ class ProductTemplate(models.Model):
                            AND so.state      = 'sale'
                            AND so.date_order >= NOW() - INTERVAL '5 years'
                            AND pt2.active    = TRUE
+                           AND pt2.sale_ok   = TRUE
+                           AND pt2.is_published = TRUE
                            AND pt2.list_price < pt.list_price
                            AND sol2.combo_item_id IS NULL
                            AND pt2.id        != pt.id
@@ -445,6 +434,19 @@ class ProductTemplate(models.Model):
             products_by_sales[main_id].append(recommended_id)
 
         return products_by_sales
+
+    def _get_products_by_categories(self, company):
+        return dict(
+            self._read_group(
+                Domain([
+                    ("sale_ok", "=", True),
+                    ("is_published", "=", True),
+                    ("company_id", "=", company.id),
+                ]),
+                groupby=["public_categ_ids"],
+                aggregates=["id:recordset"],
+            )
+        )
 
     def _get_suggested_optionals_and_accessories(self, products_by_sales, max_optionals):
         """Get the records recommended as optional and accessory products for self."""

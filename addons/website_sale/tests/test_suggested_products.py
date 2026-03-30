@@ -123,7 +123,7 @@ class TestSuggestedProducts(WebsiteSaleCommon, CronMixinCase):
         # Write from cron
         with self.enter_registry_test_mode(), self.env.registry.cursor() as cr:
             env = self.env(context={'cron_id': 1}, cr=cr)
-            self.env['product.template'].with_env(env)._update_suggested_products(batch_size=100)
+            self.env['product.template'].with_env(env)._cron_update_suggested_products()
         self.assertTrue(self.template_desk.suggest_alternative_products)
         self.assertTrue(self.template_desk.suggest_optional_products)
 
@@ -145,13 +145,13 @@ class TestSuggestedProducts(WebsiteSaleCommon, CronMixinCase):
         self.template_desk.suggest_alternative_products = False
         self.template_desk.suggest_optional_products = False
         # Call from action
-        self.template_desk._update_suggested_products()
+        self.template_desk.action_update_suggested_products()
         self.assertTrue(self.template_desk.suggest_alternative_products)
         self.assertTrue(self.template_desk.suggest_optional_products)
 
     def test_cron_only_updates_outdated_products(self):
         """Test that cron only updates products not updated within the last 12 hours."""
-        now = fields.Datetime.now()
+        now = self.env.cr.now()
         recent_date = now - relativedelta(hours=6)
         old_date = now - relativedelta(hours=13)
         self.template_desk.suggested_products_last_update = recent_date
@@ -159,8 +159,8 @@ class TestSuggestedProducts(WebsiteSaleCommon, CronMixinCase):
         with patch.object(fields.Datetime, 'now', return_value=now):
             with self.enter_registry_test_mode(), self.env.registry.cursor() as cr:
                 env = self.env(context={'cron_id': 1}, cr=cr)
-                self.env['product.template'].with_env(env)._update_suggested_products(batch_size=100)
+                self.env['product.template'].with_env(env)._cron_update_suggested_products()
         # template_desk should not be updated (recently updated)
         self.assertEqual(self.template_desk.suggested_products_last_update, recent_date)
         # template_chair should be updated
-        self.assertEqual(self.template_chair.suggested_products_last_update, now)
+        self.assertNotEqual(self.template_chair.suggested_products_last_update, old_date)
