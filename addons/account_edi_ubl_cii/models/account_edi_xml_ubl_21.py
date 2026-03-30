@@ -51,6 +51,7 @@ class AccountEdiXmlUBL21(models.AbstractModel):
             'pint_jp': 'urn:peppol:pint:billing-1@jp-1',
             'pint_sg': 'urn:peppol:pint:billing-1@sg-1',
             'pint_my': 'urn:peppol:pint:billing-1@my-1',
+            'zugferd': 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0',
         }
 
     def _get_selfbilling_customization_ids(self):
