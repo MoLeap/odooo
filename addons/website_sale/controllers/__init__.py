@@ -7,6 +7,7 @@ from . import (
     delivery,
     main,
     payment,
+    portal,
     product_configurator,
     product_feed,
     reorder,
