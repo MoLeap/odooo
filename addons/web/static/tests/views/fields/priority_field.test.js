@@ -436,24 +436,3 @@ test("PriorityField - auto save record when field toggled", async () => {
     await animationFrame();
     expect.verifySteps(["web_save"]);
 });
-
-test("PriorityField - prevent auto save with autosave option", async () => {
-    onRpc("write", () => expect.step("write"));
-    await mountView({
-        type: "form",
-        resModel: "partner",
-        resId: 1,
-        arch: /* xml */ `
-            <form>
-                <sheet>
-                    <group>
-                        <field name="selection" widget="priority" options="{'autosave': False}"/>
-                    </group>
-                </sheet>
-            </form>`,
-    });
-
-    await click(".o_field_widget .o_priority button.o_priority_star.fa-star-o:last");
-    await animationFrame();
-    expect.verifySteps([]);
-});

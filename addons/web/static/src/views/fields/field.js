@@ -295,10 +295,6 @@ export class Field extends Component {
         if (widget === "handle") {
             fieldInfo.isHandle = true;
         }
-        if (isForceBooleanToggleField && !("autosave" in fieldInfo.options)) {
-            // Disable the default autosave default behavior to keep the same behavior has desktop
-            fieldInfo.options.autosave = false;
-        }
         if (X2M_TYPES.includes(fields[name].type)) {
             const views = {};
             let relatedFields = fieldInfo.field.relatedFields;

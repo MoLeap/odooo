@@ -505,30 +505,6 @@ test("StateSelectionField - auto save record when field toggled", async () => {
     expect.verifySteps(["web_save"]);
 });
 
-test("StateSelectionField -  prevent auto save with autosave option", async () => {
-    onRpc("write", ({ method }) => expect.step(method));
-    await mountView({
-        type: "form",
-        resModel: "partner",
-        arch: /* xml */ `
-            <form>
-                <sheet>
-                    <group>
-                        <field name="selection" widget="state_selection" options="{'autosave': False}"/>
-                    </group>
-                </sheet>
-            </form>
-        `,
-        resId: 1,
-    });
-
-    await click(".o_field_widget.o_field_state_selection .o_status");
-    await animationFrame();
-    await click(".dropdown-menu .dropdown-item:last-child");
-    await animationFrame();
-    expect.verifySteps([]);
-});
-
 test("StateSelectionField - hotkey handling when there are more than 3 options available", async () => {
     Partner._fields.selection = fields.Selection({
         string: "Selection",
@@ -549,7 +525,7 @@ test("StateSelectionField - hotkey handling when there are more than 3 options a
             <form>
                 <sheet>
                     <group>
-                        <field name="selection" widget="state_selection" options="{'autosave': False}"/>
+                        <field name="selection" widget="state_selection"/>
                     </group>
                 </sheet>
             </form>

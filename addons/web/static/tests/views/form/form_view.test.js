@@ -13774,3 +13774,25 @@ test("twice same many2one, one invisible, one with widget with related field", a
     expect(".o_field_widget[name=product_id] input").toHaveValue("xphone");
     expect(".o_field_widget[name=product_id] .date").toHaveText("13/02/2023");
 });
+
+test("widgets in form view: verify no autosave", async () => {
+    let saveCount = 0;
+    onRpc("web_save", () => {
+        saveCount++;
+    });
+
+    await mountView({
+        type: "form",
+        resModel: "partner",
+        resId: 1,
+        arch: `
+            <form edit="1" editable="bottom">
+                <field name="name"/>
+                <field name="bar" widget="boolean_toggle" readonly="0"/>
+            </form>`,
+    });
+
+    await click(".o_field_boolean_toggle .form-check-input");
+    expect(saveCount).toBe(0);
+    expect.verifySteps([]);
+});

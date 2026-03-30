@@ -94,37 +94,6 @@ test("FavoriteField saves changes by default", async () => {
     expect.verifySteps(["save"]);
 });
 
-test("FavoriteField does not save if autosave option is set to false", async () => {
-    onRpc("web_save", () => {
-        expect.step("save");
-    });
-
-    await mountView({
-        resModel: "partner",
-        domain: [["id", "=", 1]],
-        type: "kanban",
-        arch: `
-            <kanban>
-                <templates>
-                    <t t-name="card">
-                        <field name="bar" widget="boolean_favorite" options="{'autosave': False}"/>
-                    </t>
-                </templates>
-            </kanban>
-        `,
-    });
-
-    // click on favorite
-    await contains(`.o_field_widget .o_favorite`).click();
-    expect(`.o_kanban_record .o_field_widget .o_favorite i.fa.fa-star`).toHaveCount(0, {
-        message: "should not be favorite",
-    });
-    expect(`.o_kanban_record .o_field_widget .o_favorite`).toHaveText("Add to Favorites", {
-        message: `the label should say "Add to Favorites"`,
-    });
-    expect.verifySteps([]);
-});
-
 test("FavoriteField in form view", async () => {
     onRpc("web_save", () => {
         expect.step("save");
@@ -176,7 +145,7 @@ test("FavoriteField in editable list view without label", async () => {
         type: "list",
         arch: `
             <list editable="bottom">
-                <field name="bar" widget="boolean_favorite" nolabel="1" options="{'autosave': False}"/>
+                <field name="bar" widget="boolean_favorite" nolabel="1"/>
             </list>
         `,
     });

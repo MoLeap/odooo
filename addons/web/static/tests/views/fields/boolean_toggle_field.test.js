@@ -73,16 +73,3 @@ test("BooleanToggleField - auto save record when field toggled", async () => {
     await animationFrame();
     expect.verifySteps(["web_save"]);
 });
-
-test("BooleanToggleField - autosave option set to false", async () => {
-    onRpc("web_save", () => expect.step("web_save"));
-    await mountView({
-        resModel: "partner",
-        resId: 1,
-        type: "form",
-        arch: `<form><field name="bar" widget="boolean_toggle" options="{'autosave': false}"/></form>`,
-    });
-    await click(`.o_field_widget[name='bar'] input`);
-    await animationFrame();
-    expect.verifySteps([]);
-});

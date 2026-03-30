@@ -13,17 +13,6 @@ export const booleanToggleFieldLabeled = {
     ...booleanToggleField,
     component: BooleanToggleFieldLabeled,
     displayName: _t("ToggleLabeled"),
-    supportedOptions: [
-        {
-            label: _t("Autosave"),
-            name: "autosave",
-            type: "boolean",
-            default: true,
-            help: _t(
-                "If checked, the record will be saved immediately when the field is modified."
-            ),
-        },
-    ],
 };
 
 registry.category("fields").add("boolean_toggle_labeled", booleanToggleFieldLabeled);
