@@ -6,7 +6,6 @@
         <field name="inherit_id" ref="account_peppol.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//div[@id='account_peppol']/div/div/field[@name='account_peppol_proxy_state']" position="replace">
-                <field name="account_peppol_eas" invisible="1"/>
                 <span> </span>
                 <field invisible="account_peppol_eas == '0225' and account_peppol_proxy_state == 'smp_registration'" name="account_peppol_proxy_state" class="oe_inline o_form_label text-lowercase" readonly="1"/>
                 <span invisible="account_peppol_eas != '0225' or account_peppol_proxy_state != 'smp_registration'" class="o_form_label">is pending; you can not yet send or receive</span>

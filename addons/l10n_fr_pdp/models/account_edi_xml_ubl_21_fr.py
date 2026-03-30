@@ -1,17 +1,9 @@
-from odoo import _, models
+from odoo import models
 
 from odoo.addons.account_edi_ubl_cii.models.account_edi_xml_ubl_20 import UBL_NAMESPACES
 from odoo.addons.account_edi_ubl_cii.models.account_edi_common import FloatFmt
 
-# PDP_CUSTOMIZATION_ID = 'urn:cen.eu:en16931:2017#compliant#urn:peppol:france:billing:cius:1.0'  # Not accepted by SuperPDP due to missing validator
-PDP_CUSTOMIZATION_ID = 'urn:cen.eu:en16931:2017'
-
-# Default French notes content [BR-FR-05]
-FR_DEFAULT_NOTES = {
-    'PMT': "En cas de retard de paiement, une indemnité forfaitaire de 40€ pour frais de recouvrement sera exigée (art. L.441-10 et D.441-5 du Code de commerce).",
-    'PMD': "Pénalités de retard au taux annuel de 10% en cas de paiement après la date d'échéance.",
-    'AAB': "Pas d'escompte pour paiement anticipé.",
-}
+PDP_CUSTOMIZATION_ID = 'urn:cen.eu:en16931:2017'  # Not accepted by SuperPDP due to missing validator
 
 
 class AccountEdiXmlUbl21Fr(models.AbstractModel):
@@ -38,14 +30,14 @@ class AccountEdiXmlUbl21Fr(models.AbstractModel):
             partner = vals[partner_type]
             commercial_partner = partner.commercial_partner_id
             if partner.peppol_eas != '0225' or not partner.peppol_endpoint:
-                constraints[f"ubl_21_fr_{partner_type}_pdp_identifier_required"] = _("The following partner's PDP identifier is missing: %s", partner.display_name)
+                constraints[f"ubl_21_fr_{partner_type}_pdp_identifier_required"] = self.env._("The following partner's PDP identifier is missing: %s", partner.display_name)
             if not partner.siret:
-                constraints[f"ubl_21_fr_{partner_type}_siret_required"] = _("The following partner's SIRET is missing: %s", partner.display_name)
+                constraints[f"ubl_21_fr_{partner_type}_siret_required"] = self.env._("The following partner's SIRET is missing: %s", partner.display_name)
             if not commercial_partner.vat or commercial_partner.vat == '/':
-                constraints[f"ubl_21_fr_{partner_type}_vat_required"] = _("The following partner's VAT is missing: %s", commercial_partner.display_name)
+                constraints[f"ubl_21_fr_{partner_type}_vat_required"] = self.env._("The following partner's VAT is missing: %s", commercial_partner.display_name)
 
         if 'refund' in vals['invoice'].move_type and not (invoice.reversed_entry_id.name or invoice.reversed_entry_id.invoice_date):
-            constraints[f"ubl_21_fr_{partner_type}_refund_invoice_reference"] = _("The original move's name or issue date are missing: %s", vals['invoice'].name)
+            constraints[f"ubl_21_fr_{partner_type}_refund_invoice_reference"] = self.env._("The original move's name or issue date are missing: %s", vals['invoice'].name)
 
         return constraints
 
@@ -94,14 +86,13 @@ class AccountEdiXmlUbl21Fr(models.AbstractModel):
             'cbc:ProfileID': {'_text': profile_id},
         })
 
-        # TODO: adapted from BAJE PR
         # [BR-FR-05] Add mandatory notes with defaults if not already present
         # Initialize / Listify 'cbc:Note'
         existing_note = document_node.get('cbc:Note')
         if not existing_note or not isinstance(document_node.get('cbc:Note'), list):
             document_node['cbc:Note'] = [existing_note] if existing_note else []
         # Add default notes
-        for code, default_content in FR_DEFAULT_NOTES.items():
+        for code, default_content in invoice._l10n_fr_pdp_get_default_notes().items():
             document_node['cbc:Note'].append({
                 '_text': f"#{code}#{default_content}",
             })

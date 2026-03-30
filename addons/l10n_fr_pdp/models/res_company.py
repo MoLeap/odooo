@@ -1,4 +1,3 @@
-from urllib.parse import urljoin
 import re
 
 from odoo import api, fields, models

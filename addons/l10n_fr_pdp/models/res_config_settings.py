@@ -1,4 +1,4 @@
-from odoo import _, fields, models
+from odoo import fields, models
 from odoo.exceptions import ValidationError
 
 from odoo.addons.l10n_fr_pdp.tools.demo_utils import handle_demo
@@ -34,7 +34,7 @@ class ResConfigSettings(models.TransientModel):
             return super().button_update_peppol_user_data()
 
         if not self.account_peppol_contact_email:
-            raise ValidationError(_("The contact email is required."))
+            raise ValidationError(self.env._("The contact email is required."))
 
         params = {
             'update_data': {

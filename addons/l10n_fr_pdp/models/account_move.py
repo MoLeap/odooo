@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 from odoo.addons.account_peppol.models.account_move import UNSENT_PEPPOL_MOVE_STATES
@@ -78,6 +78,35 @@ class AccountMove(models.Model):
             ):
                 move.peppol_move_state = False
 
+    @api.depends('pdp_response_ids', 'pdp_response_ids.pdp_state', 'pdp_response_ids.ppf_state')
+    def _compute_ppf_state(self):
+        for move in self:
+            move.ppf_move_state = move._pdp_get_tax_extract_state()
+            move.ppf_lifecycle_state = move._pdp_get_lifecycle_state()
+
+    @api.depends('peppol_move_state', 'peppol_message_uuid')
+    def _compute_pdp_can_send_response(self):
+        for move in self:
+            move.pdp_can_send_response = bool(move.peppol_message_uuid) and move.peppol_move_state not in UNSENT_PEPPOL_MOVE_STATES
+
+    def _pdp_get_response_status(self):
+        """Return the PDP response status of the message"""
+        self.ensure_one()
+        # Non-PDP messages do not have a response status
+        if not self.peppol_message_uuid:
+            return None
+
+        # Take the latest response status if we have any
+        # TODO: I suppose "partially paid" is possible? Since 'paid' lifecyle does not have to be the full amount
+        response_message = self.pdp_response_ids.filtered(lambda l: l.flow_number == '2' and l.pdp_state == 'done')
+        latest_response = response_message.sorted(
+            lambda l: (l.issue_date or datetime.min, STATUS_TO_PROCESS_CONDITION_CODE.get(l.response_code, '0'), l.id), reverse=True
+        )[:1]
+        if latest_response:
+            return latest_response.response_code
+
+        return None
+
     def _pdp_get_tax_extract_state(self):
         self.ensure_one()
         if not self.peppol_message_uuid or self.peppol_move_state in UNSENT_PEPPOL_MOVE_STATES:
@@ -106,31 +135,14 @@ class AccountMove(models.Model):
             return 'error'
         return 'sent'
 
-    @api.depends('pdp_response_ids', 'pdp_response_ids.pdp_state', 'pdp_response_ids.ppf_state')
-    def _compute_ppf_state(self):
-        for move in self:
-            move.ppf_move_state = move._pdp_get_tax_extract_state()
-            move.ppf_lifecycle_state = move._pdp_get_lifecycle_state()
-
-    @api.depends('peppol_move_state', 'peppol_message_uuid')
-    def _compute_pdp_can_send_response(self):
-        for move in self:
-            move.pdp_can_send_response = bool(move.peppol_message_uuid) and move.peppol_move_state not in UNSENT_PEPPOL_MOVE_STATES
-
-    def _pdp_get_response_status(self):
-        """Return the PDP response status of the message"""
+    def _l10n_fr_pdp_get_default_notes(self):
         self.ensure_one()
-        # Non-PDP messages do not have a response status
-        if not self.peppol_message_uuid:
-            return False
-
-        # Take the latest response status if we have any
-        # TODO: I suppose "partially paid" is possible? Since 'paid' lifecyle does not have to be the full amount
-        response_message = self.pdp_response_ids.filtered(lambda l: l.flow_number == '2' and l.pdp_state == 'done')
-        if latest_status := response_message.sorted(lambda l: (l.issue_date or datetime.min, STATUS_TO_PROCESS_CONDITION_CODE.get(l.response_code, '0'), l.id), reverse=True)[:1].response_code:
-            return latest_status
-
-        return False
+        # Mandatory / default notes for French e-invoicing [BR-FR-05]
+        return {
+            'PMT': self.env._("In the event of late payment, a flat-rate fee of €40 for collection costs will be charged (Articles L.441-10 and D.441-5 of the Code de commerce)."),
+            'PMD': self.env._("Late payment penalties at an annual rate of 10% are applied if the payment is made after the due date."),
+            'AAB': self.env._("No discount for early payment."),  # TODO: Early payment discount information
+        }
 
     @api.model
     def _get_ubl_cii_builder_from_xml_tree(self, tree):
@@ -148,6 +160,6 @@ class AccountMove(models.Model):
         # TODO: what about peppol (via PDP) moves? And business response?
         pdp_moves = self.filtered('pdp_can_send_response')
         if not pdp_moves:
-            raise UserError(_("Cannot send response for any of the journal entries."))
+            raise UserError(self.env._("Cannot send response for any of the journal entries."))
         wizard = self.env['pdp.response.wizard'].create({'move_ids': pdp_moves.ids})
         return wizard._get_records_action(name="Send Response Message", target='new')
