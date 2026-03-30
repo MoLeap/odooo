@@ -13,8 +13,8 @@
                         <field name="name"/>
                         <field name="type"/>
                     </group>
-                    <group string="Explication">
-                        <field name="explication" nolabel="1"/>
+                    <group string="Explanation">
+                        <field name="explanation" nolabel="1"/>
                     </group>
                     </sheet>                </form>
             </field>
@@ -106,9 +106,9 @@
                                     <field name="attachment"/>
                                 </group>
                             </page>
-                            <page name="explication" string="Explication">
+                            <page name="explanation" string="Explanation">
                                 <group>
-                                    <field name="explication" nolabel="1"/>
+                                    <field name="explanation" nolabel="1"/>
                                 </group>
                             </page>
                         </notebook>
@@ -178,8 +178,8 @@
                         <group name="help" string="Help">
                             <field name="help" nolabel="1" class="oe-bordered-editor"/>
                         </group>
-                        <group name="explication" string="Explication">
-                            <field name="explication" nolabel="1" class="oe-bordered-editor"/>
+                        <group name="explanation" string="Explanation">
+                            <field name="explanation" nolabel="1" class="oe-bordered-editor"/>
                         </group>
                     </sheet>
                 </form>
@@ -510,8 +510,8 @@ env['res.partner'].create({'name': partner_name})
     </pre>
                                     </div>
                                 </page>
-                                <page string="Explication" name="explication">
-                                    <field name="explication" nolabel="1" class="oe-bordered-editor"/>
+                                <page string="Explanation" name="explanation">
+                                    <field name="explanation" nolabel="1" class="oe-bordered-editor"/>
                                 </page>
                                 <page string="Usage" name="usage" invisible="1"/>
                             </notebook>
