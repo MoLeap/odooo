@@ -1,32 +1,33 @@
 import { useState } from "@web/owl2/utils";
-import { serializeDateTime } from "@web/core/l10n/dates";
+import { serializeDateTime, serializeDate } from "@web/core/l10n/dates";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useRecordObserver } from "@web/model/relational_model/utils";
 import { formatFloatTime } from "@web/views/fields/formatters";
 import { Component, onWillStart } from "@odoo/owl";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
-import { KanbanMany2OneAvatarEmployeeField } from "@hr/views/fields/many2one_avatar_employee_field/kanban_many2one_avatar_employee_field";
+import { _t } from "@web/core/l10n/translation";
+import { ColorPickerField } from "@web/views/fields/color_picker/color_picker_field";
 const { DateTime } = luxon;
 
 export class LeaveStatsComponent extends Component {
     static template = "hr_holidays.LeaveStatsComponent";
     static components = {
-        KanbanMany2OneAvatarEmployeeField
+        ColorPickerField
     };
     static props = { ...standardWidgetProps};
 
     setup() {
         this.orm = useService("orm");
-
+        this.action = useService("action");
         this.state = useState({
             leaves: [],
-            departmentLeaves: [],
+            departmentLeavesIds: [],
+            nbEmployee: 0,
             date: DateTime,
             department: null,
             employee: null,
             type: null,
-            has_parent_department: null,
             department_name: null,
         });
         this.date_format = {year: "numeric", month: "2-digit", day: "2-digit"};
@@ -73,7 +74,6 @@ export class LeaveStatsComponent extends Component {
             if (this.state.department) {
                 const department_name_array = this.state.department.display_name.split('/');
                 this.state.department_name = department_name_array.pop();
-                this.state.has_parent_department = department_name_array.length > 0;
             }
         });
     }
@@ -84,7 +84,8 @@ export class LeaveStatsComponent extends Component {
 
     async loadDepartmentLeaves(department, employee) {
         if (!(department && employee)) {
-            this.state.departmentLeaves = [];
+            this.state.departmentLeavesIds = [];
+            this.state.nbEmployee = 0;
             return;
         }
 
@@ -102,15 +103,33 @@ export class LeaveStatsComponent extends Component {
             {
                 specification: {
                     employee_id: { fields: { display_name: {} } },
-                    date_from: {},
-                    date_to: {},
-                    number_of_days: {},
-                    number_of_hours: {},
-                    work_entry_type_request_unit: {},
+                    id: {}
                 },
             }
         );
-        this.state.departmentLeaves = this.arrangeData(leaves.records)
+        if (!leaves) {
+            return;
+        }
+        this.state.departmentLeavesIds = leaves.records.map((leave) => leave.id);
+        this.state.nbEmployee = new Set(leaves.records.map((leave) => leave.employee_id )).size;
+    }
+
+    async action_department_leaves(){
+        if (!this.state.departmentLeavesIds) {
+            return;
+        }
+        return this.action.doAction({
+            name: _t("View Overlaps"),
+            type: "ir.actions.act_window",
+            res_model: "hr.leave",
+            views: [[false, "gantt"]],
+            domain: [["id", "in", this.state.departmentLeavesIds]],
+            context: {
+                default_start_date: serializeDate(this.props.record.data.request_date_from),
+                default_stop_date: serializeDate(this.props.record.data.request_date_to),
+            },
+            target: "current",
+        });
     }
 
     async loadLeaves(employee) {
@@ -132,10 +151,11 @@ export class LeaveStatsComponent extends Component {
             {
                 specification: {
                     work_entry_type_id: { fields: { display_name: {} } },
-                    date_from: {},
-                    date_to: {},
                     number_of_days: {},
                     number_of_hours: {},
+                    color: {},
+                    max_leaves: {},
+                    virtual_remaining_leaves: {},
                     work_entry_type_request_unit: {},
                 },
             }
@@ -143,22 +163,20 @@ export class LeaveStatsComponent extends Component {
         this.state.leaves = this.arrangeData(leaves.records);
     }
     arrangeData(leaves) {
-        leaves.forEach((leave) => {
-            const date_from = DateTime.fromSQL(leave.date_from, { zone: "utc" });
-            const date_to = DateTime.fromSQL(leave.date_to, { zone: "utc" });
-            const date_from_string = date_from.toLocal();
-            const date_to_string = date_to.toLocal();
-
-            leave.date_from = date_from_string.toLocaleString(this.date_format);
-            leave.hour_from = date_from_string.toLocaleString(this.hour_format);
-
-            leave.date_to = date_to_string.toLocaleString(this.date_format);
-            leave.hour_to = date_to_string.toLocaleString(this.hour_format);
-            leave.number_of_hours = formatFloatTime(Number(leave.number_of_hours.toFixed(2)));
-            leave.number_of_days = Number(leave.number_of_days.toFixed(2));
+        return leaves.map((leave) => {
+            let resultLeave = {};
+            resultLeave.data = {
+                id: leave.id,
+                color: leave.color,
+                work_entry_type_id: leave.work_entry_type_id,
+                work_entry_type_request_unit: leave.work_entry_type_request_unit,
+                number_of_hours: formatFloatTime(Number(leave.number_of_hours.toFixed(2))),
+                number_of_days: Number(leave.number_of_days.toFixed(2)),
+                max_leaves: leave.max_leaves,
+                virtual_remaining_leaves: leave.virtual_remaining_leaves,
+            }
+            return resultLeave;
         })
-        return leaves
-
     }
 }
 

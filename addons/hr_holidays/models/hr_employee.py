@@ -46,6 +46,7 @@ class HrEmployee(models.Model):
         ('presence_holiday_absent', 'On leave'),
         ('presence_holiday_present', 'Present but on leave')])
     member_of_department = fields.Boolean('Member of Department', compute='_compute_member_of_department', search='_search_part_of_department')
+    leave_ids = fields.One2many('hr.leave', 'employee_id', groups="hr.group_hr_user")
 
     departure_do_cancel_time_off_requests = fields.Boolean(related='version_id.departure_do_cancel_time_off_requests',
         inherited=True, readonly=False, groups="hr.group_hr_user")
