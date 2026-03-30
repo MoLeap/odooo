@@ -202,23 +202,37 @@ class IrHttp(models.AbstractModel):
 
     @classmethod
     def _match(cls, path):
-        website_id = request.env['ir.http']._get_current_website_id()
-        fallback_website_id = website_id or request.env['ir.http']._get_current_website_fallback()
+        env = request.env
+        context = dict(env.context)
+
+        # Get 'website_id' from query arg
+        query_website_id = None
+        with contextlib.suppress(TypeError, ValueError):
+            # Warning! The user is not guaranteed; authentication has not yet been called.
+            # We need to test for the route auth="user"
+            query_website_id = int(request.httprequest.args.get('website_id'))
+            if query_website_id not in env['website'].get_all().ids:
+                query_website_id = None
+
+        website_id = env['ir.http']._get_current_website_id()
+        fallback_website_id = website_id or env['ir.http']._get_current_website_fallback()
 
         if not hasattr(request, 'website_routing'):
-            request.website_routing = website_id or fallback_website_id
+            request.website_routing = fallback_website_id
 
         # set website into the context, used by match for the default lang
-        if website_id:
-            request.update_context(website_id=website_id)
-        elif fallback_website_id:
+        if query_website_id or fallback_website_id:
+            request.update_context(website_id=query_website_id or fallback_website_id)
+        if query_website_id != fallback_website_id:
+            # We purpose a fallback (even if it's none).
             request.update_context(fallback_website_id=fallback_website_id)
 
         rule, args = super()._match(path)
 
         # remove website_id from the context if it's not a website route
-        if website_id and not rule.endpoint.routing.get('website', False):
-            request.update_context(website_id=None, fallback_website_id=fallback_website_id)
+        if not rule.endpoint.routing.get('website', False) and not query_website_id and fallback_website_id:
+            context['fallback_website_id'] = fallback_website_id
+            request.update_env(context=context)
 
         return rule, args
 
@@ -226,21 +240,26 @@ class IrHttp(models.AbstractModel):
     def _pre_dispatch(cls, rule, arguments):
         super()._pre_dispatch(rule, arguments)
         env = request.env
-        website_id = env.context.get('website_id') or env.context.get('fallback_website_id')
-        if not website_id:
-            website_id = env['ir.http']._get_current_website_fallback()
-        if expected_website_id := env['ir.http']._get_expected_website_id(website_id):
-            request.update_context(website_id=expected_website_id)
-        if website_id and not env.context.get('website_id'):
-            if request.is_frontend and not expected_website_id:
-                request.update_context(website_id=website_id)
-            else:
-                request.update_context(fallback_website_id=website_id)
 
+        # Check access to 'website_id' from query arg (set by _match)
+        with contextlib.suppress(TypeError, ValueError):
+            expected_website_id = int(request.httprequest.args.get('website_id'))
+            # If the person is now authenticated, you need to test for the route auth="user"
+            if ('fallback_website_id' in env.context
+                and expected_website_id == env.context.get('website_id')
+                and expected_website_id != env.context['fallback_website_id']
+                and not (
+                    (user := env.user or env['res.users'].sudo().browse(request.session.uid))
+                    and user.has_group('website.group_multi_website')
+                    and user.has_group('website.group_website_restricted_editor')
+                )):
+                raise AccessError(env._("You do not have access to the website introduced in the URL."))
+
+        # Check records access
         for record in arguments.values():
             if isinstance(record, models.BaseModel) and hasattr(record, 'can_access_from_current_website'):
                 try:
-                    if not record.can_access_from_current_website():
+                    if not record.with_env(env).can_access_from_current_website():
                         raise werkzeug.exceptions.NotFound()
                 except AccessError:
                     # record.website_id might not be readable as
@@ -248,24 +267,6 @@ class IrHttp(models.AbstractModel):
                     # 403 instead of using `sudo()` for perfs as this is
                     # low level.
                     raise werkzeug.exceptions.Forbidden()
-
-    @api.model
-    def _get_expected_website_id(self, current_id):
-        try:
-            expected_website_id = int(request.httprequest.args.get('website_id'))
-        except TypeError:
-            return False
-        if not expected_website_id:
-            return False
-        if current_id == expected_website_id:
-            return current_id
-        if expected_website_id not in self.env['website'].get_all().ids:
-            return False
-        user = self.env.user or self.env['res.users'].sudo().browse(request.session.uid)
-        if (user and user.has_group('website.group_multi_website')
-                    and user.has_group('website.group_website_restricted_editor')):
-            return expected_website_id
-        return False
 
     @api.model
     def _get_current_website_id(self):
@@ -394,19 +395,13 @@ class IrHttp(models.AbstractModel):
             with contextlib.suppress(ZoneInfoNotFoundError):
                 request.update_context(tz=ZoneInfo(tz).key)
 
-        context = cls._get_editor_context()
-
-        if website_id := request.env['ir.http']._get_current_website_id():
-            context['website_id'] = website_id
-        elif website_id := request.env['ir.http']._get_current_website_fallback():
-            context['fallback_website_id'] = website_id
-
         # This is mainly to avoid access errors in website controllers
         # where there is no context (eg: /shop), and it's not going to
         # propagate to the global context of the tab. If the company of
         # the website is not in the allowed companies of the user, set
         # the main company of the user.
-        website = request.env['website'].browse(website_id)
+        context = cls._get_editor_context()
+        website = request.env['website'].browse(request.env.context['website_id'])
         user = request.env.user
         website_company_id = website.company_id.id
         if user == website.user_id:
@@ -497,6 +492,8 @@ class IrHttp(models.AbstractModel):
             return parent
 
         # minimal setup to serve frontend pages
+        if not request.env.context.get('website_id'):
+            request.update_context(website_id=request.env.context.get('fallback_website_id'))
         cls._frontend_pre_dispatch()
         cls._handle_debug()
 
