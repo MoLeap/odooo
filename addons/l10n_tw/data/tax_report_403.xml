@@ -922,7 +922,7 @@
                 <field name="name@zh_TW">稅額計算</field>
                 <field name="code">TW_403_TC</field>
                 <field name="hierarchy_level">0</field>
-                <field name="foldable" eval="True"/>
+                <field name="foldable">foldable</field>
                 <field name="children_ids">
                     <record id="l10n_tw_tax_report_403_tw_403_101" model="account.report.line">
                         <field name="name">101 Total Output Tax for the Current Period (Month) ②</field>
