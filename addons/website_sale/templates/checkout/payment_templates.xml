@@ -3,7 +3,7 @@
 
     <!-- /shop/payment route -->
     <template id="website_sale.payment" name="Payment">
-        <t t-set="hide_payment_button" t-value="True" t-if="errors or (website_sale_order.amount_total and not (payment_methods_sudo or tokens_sudo))"/>
+        <t t-set="hide_payment_button" t-value="True" t-if="not cart_ready or (website_sale_order.amount_total and not (payment_methods_sudo or tokens_sudo))"/>
         <t t-set="oe_structure">
             <!-- This is the drag-and-drop area for website building blocs at the end of each
                  checkout page. This is append at the of the page in `checkout_layout`. The
@@ -19,7 +19,7 @@
             oe_structure="oe_structure">
             <div class="oe_structure clearfix" id="oe_structure_website_sale_payment_1"/>
 
-            <div t-if="not errors and website_sale_order.amount_total" name="website_sale_non_free_cart">
+            <div t-if="cart_ready and website_sale_order.amount_total" name="website_sale_non_free_cart">
                 <div id="payment_method" class="o_not_editable mb-3">
                     <t t-call="payment.form"/>
                 </div>

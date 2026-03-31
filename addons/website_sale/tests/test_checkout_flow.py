@@ -44,12 +44,14 @@ class TestCheckoutFlow(WebsiteSaleCommon, PaymentCommon, HttpCase):
         self.assert_redirected_to(response, "/shop")
 
     def test_impossible_to_checkout_without_cart_in_draft(self):
-        self.cart.action_confirm()
-
         with self.mock_request(path="/shop/checkout", sale_order_id=self.cart.id):
-            response = self.CheckoutController.shop_checkout()
+            for state in ("sent", "sale", "cancel"):
+                with self.subTest(state=state):
+                    self.cart.state = state
 
-        self.assert_redirected_to(response, "/shop")
+                    response = self.CheckoutController.shop_checkout()
+
+                    self.assert_redirected_to(response, "/shop")
 
     def test_impossible_to_checkout_with_empty_cart(self):
         self.cart.order_line = False
@@ -185,16 +187,14 @@ class TestCheckoutFlow(WebsiteSaleCommon, PaymentCommon, HttpCase):
             patch_check("_check_shop_cart_completion") as check_shop_cart_completion,
             patch_check("_check_shop_address_completion") as check_shop_address_completion,
             patch_check("_check_shop_checkout_completion") as check_shop_checkout_completion,
+            patch_check("_check_shop_payment_completion") as check_shop_payment_completion,
         ):
             self.url_open("/shop/payment")
 
             check_shop_cart_completion.assert_called_once()
             check_shop_address_completion.assert_called_once()
             check_shop_checkout_completion.assert_called_once()
-            self.assertFalse(
-                check_shop_checkout_completion.call_args[1].get("block_on_price_change"),
-                msg="price changes should not be blocking when loading the payment page",
-            )
+            check_shop_payment_completion.assert_not_called()
 
             self.make_jsonrpc_request(
                 f"/shop/payment/transaction/{self.cart.id}",
@@ -212,10 +212,7 @@ class TestCheckoutFlow(WebsiteSaleCommon, PaymentCommon, HttpCase):
             self.assertEqual(check_shop_cart_completion.call_count, 2)
             self.assertEqual(check_shop_address_completion.call_count, 2)
             self.assertEqual(check_shop_checkout_completion.call_count, 2)
-            self.assertTrue(
-                check_shop_checkout_completion.call_args[1].get("block_on_price_change"),
-                msg="price changes should be blocking when starting the payment",
-            )
+            check_shop_payment_completion.assert_called()
 
     def test_redirect_on_price_change_on_payment(self):
         self.cart.partner_id.write(self.dummy_partner_address_values.copy())

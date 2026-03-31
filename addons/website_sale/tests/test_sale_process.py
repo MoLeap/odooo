@@ -197,7 +197,7 @@ class TestSaleProcess(HttpCaseWithUserDemo, WebsiteSaleCommon, HttpCaseWithWebsi
         self.assertEqual(
             len(
                 root.xpath(
-                    '//a[@name="website_sale_main_button"][not(@href)]//span[text()="Checkout"]'
+                    '//a[@name="website_sale_main_button"][not(@href)]//span[text()="Confirm"]'
                 )
             ),
             2,

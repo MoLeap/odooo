@@ -65,8 +65,7 @@ class ResPartner(models.Model):
 
     def _needs_address(self, **kwargs):
         if cart := kwargs.get("order_sudo"):
-            # NOTE VFE: we don't care about super here???
-            return cart._needs_customer_address()  # or super()._need_address(**kwargs)
+            return cart._needs_customer_address()
         return super()._needs_address(**kwargs)
 
     def _get_order_fiscal_position_recompute_domain(self):

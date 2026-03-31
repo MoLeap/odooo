@@ -677,19 +677,22 @@ class SaleOrder(models.Model):
 
         return values
 
-    def _check_combo_quantities(self, line) -> str | None:  # noqa: PLR6301
+    def _check_combo_quantities(self, line) -> str:  # noqa: PLR6301
         """Ensure all combo item lines have the same quantity.
 
-        :returns: A reason if the combo quantities had to be updated; otherwise None.
+        :returns: A reason if the combo quantities had to be updated; otherwise an empty string.
         """
         # Ensure all combo lines have the same quantity
         if not (combo_lines := line.linked_line_ids):
-            return None
+            return ""
 
         available_combo_quantity = min(line.product_uom_qty for line in combo_lines)
         if available_combo_quantity < line.product_uom_qty:
+            reason = line._get_shop_warning_stock(line.product_uom_qty, available_combo_quantity)
             (line + combo_lines).product_uom_qty = available_combo_quantity
-            return line._get_shop_warning_stock(line.product_uom_qty, available_combo_quantity)
+            return reason
+
+        return ""
 
     def _verify_cart_after_update(self):
         """Global checks on the cart after updates.
@@ -1048,19 +1051,36 @@ class SaleOrder(models.Model):
             )
             return False
 
-        if self.commitment_date and (
-            self.commitment_date.date().isoformat()
-            not in self.carrier_id._get_estimate_delivery_days()
-        ):
-            self._add_blocking_alert(
-                self.env._(
-                    "The selected delivery date is no longer available."
-                    " Please pick another delivery date."
-                )
-            )
-            return False
-
         return True
+
+    def _is_commitment_date_valid(self):
+        """Whether the commitment date is still up to date with the carrier constraints."""
+        self.ensure_one()
+        allowed_commitment_dates = (
+            self.commitment_date and self.carrier_id._get_estimate_delivery_days()
+        ) or []
+        if (
+            not allowed_commitment_dates  # No allowed date means any date is acceptable.
+            or self.commitment_date.date().isoformat() in allowed_commitment_dates
+        ):
+            return True
+
+        # The commitment date is normally set by :meth:`_set_delivery_method`. Since the customer
+        # has already selected a delivery method, update it manually.
+        self.commitment_date = allowed_commitment_dates[0]
+
+        if len(allowed_commitment_dates) > 1:
+            message = self.env._(
+                "The selected delivery date was no longer available."
+                " Please pick another delivery date."
+            )
+        else:
+            message = self.env._(
+                "The estimated delivery date was no longer possible."
+                " We apologize for any inconvenience."
+            )
+        self._add_blocking_alert(message)
+        return False
 
     def _update_cart_taxes_and_prices(self):
         """Update the taxes and prices and return True if the total amount changed.

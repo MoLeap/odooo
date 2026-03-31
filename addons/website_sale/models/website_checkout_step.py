@@ -2,7 +2,6 @@
 
 from odoo import api, fields, models
 from odoo.fields import Domain
-from odoo.http import request
 
 from odoo.addons.website_sale import const
 
@@ -89,8 +88,9 @@ class WebsiteCheckoutStep(models.Model):
                 return self._check_shop_address_completion(order_sudo, **kwargs)
             case "/shop/checkout":
                 return self._check_shop_checkout_completion(order_sudo, **kwargs)
+            case "/shop/payment":
+                return self._check_shop_payment_completion(order_sudo, **kwargs)
 
-    # NOTE VFE: model or not model? we don't care about self here...
     @api.model
     def _check_shop_cart_completion(self, order_sudo, **kwargs):
         """Check whether the `/shop/cart` step is valid and complete, and return the incomplete page
@@ -101,12 +101,7 @@ class WebsiteCheckoutStep(models.Model):
         :return: The incomplete or invalid step href if any; otherwise, None.
         :rtype: str | None
         """
-        # Check that the cart exists and is in the draft state.
-        if not order_sudo or order_sudo.state != "draft":
-            # NOTE VFE: I guess this will be replaced by some method on the website?
-            request.session["sale_order_id"] = None
-            # NOTE VFE: where is sale_transaction_id ever stored or used?
-            request.session["sale_transaction_id"] = None
+        if not order_sudo:
             return const.SHOP_PATH
 
         # Check that public orders are allowed.
@@ -134,8 +129,6 @@ class WebsiteCheckoutStep(models.Model):
         # Check that the delivery address is complete.
         delivery_partner_sudo = order_sudo.partner_shipping_id
         if (
-            # NOTE VFE: should this condition be in _needs_address or something? say we split
-            # _needs_customer_address into _needs_billing_address and _needs_delivery_address
             order_sudo._has_deliverable_products()
             and delivery_partner_sudo._can_be_edited_by_current_customer(order_sudo=order_sudo)
             and not delivery_partner_sudo._check_delivery_address(order_sudo=order_sudo)
@@ -162,7 +155,7 @@ class WebsiteCheckoutStep(models.Model):
             return f"/shop/address?partner_id={invoice_partner_sudo.id}&address_type=billing"
 
     @api.model
-    def _check_shop_checkout_completion(self, order_sudo, **kwargs):
+    def _check_shop_checkout_completion(self, order_sudo, **_kwargs):
         """Check whether the `/shop/checkout` step is valid and complete, and return the incomplete
         page otherwise.
 
@@ -174,6 +167,20 @@ class WebsiteCheckoutStep(models.Model):
         if not order_sudo._is_cart_ready_for_payment():
             return "/shop/checkout"
 
-        # Ensure prices are correct before /shop/payment
-        if order_sudo._update_cart_taxes_and_prices() and kwargs.get("block_on_price_change"):
+    @api.model
+    def _check_shop_payment_completion(self, order_sudo, **_kwargs):
+        """Check whether the `/shop/payment` step is valid and complete, and return the incomplete
+        page otherwise.
+
+        :param sale.order order_sudo: The current cart, sudoed.
+        :param dict kwargs: Additional arguments for overrides.
+        :return: The incomplete or invalid step href if any; otherwise, None.
+        :rtype: str | None
+        """
+        # The commitment date might have been promised days before the actual payment.
+        if not order_sudo._is_commitment_date_valid():
+            return "/shop/checkout"
+
+        # Ensure prices are still correct after /shop/payment
+        if order_sudo._update_cart_taxes_and_prices():
             return "/shop/payment"

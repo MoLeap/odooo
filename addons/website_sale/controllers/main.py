@@ -1,7 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import itertools
-import json
 from datetime import datetime
 from urllib.parse import parse_qs, urlencode, urlparse
 
@@ -1317,7 +1316,8 @@ class WebsiteSale(payment_portal.PaymentPortal):
         )
 
         if feedback_dict.get("invalid_fields"):
-            return json.dumps(feedback_dict)  # Return if error when creating/updating partner.
+            # Return if error when creating/updating partner.
+            return request.make_json_response(feedback_dict)
 
         is_anonymous_cart = order_sudo._is_anonymous_cart()
         is_main_address = is_anonymous_cart or order_sudo.partner_id.id == partner_sudo.id
@@ -1345,7 +1345,7 @@ class WebsiteSale(payment_portal.PaymentPortal):
             # Redirect after the address is complete and saved
             return request.make_json_response(redirect_dict)
 
-        return json.dumps(feedback_dict)
+        return request.make_json_response(feedback_dict)
 
     def _prepare_address_update(self, order_sudo, partner_id=None, address_type=None):
         """Find the partner whose address to update and return it along with its address type.
@@ -1639,7 +1639,7 @@ class WebsiteSale(payment_portal.PaymentPortal):
         checkout_page_values = {
             "sale_order": order,
             "website_sale_order": order,
-            "errors": not order._is_cart_ready(),
+            "cart_ready": order._is_cart_ready(),
             "partner": order.partner_invoice_id,
             "order": order,
             "only_services": order.only_services,
@@ -1654,7 +1654,7 @@ class WebsiteSale(payment_portal.PaymentPortal):
             "landing_route": "/shop/payment/validate",
             "sale_order_id": order.id,  # Allow Stripe to check if tokenization is required.
         }
-        if checkout_page_values["errors"]:
+        if not checkout_page_values["cart_ready"]:
             payment_form_values.pop("payment_methods_sudo", "")
             payment_form_values.pop("tokens_sudo", "")
         return checkout_page_values | payment_form_values
@@ -1676,13 +1676,16 @@ class WebsiteSale(payment_portal.PaymentPortal):
            did go to a payment.provider website but closed the tab without
            paying / canceling.
         """
+        order_sudo = request.cart
         if redirect := self.env["website.checkout.step"].validate_checkout_progress(
-            "/shop/payment", request.cart
+            "/shop/payment", order_sudo
         ):
             return request.redirect(redirect)
 
+        # Ensure the prices are up to date and final
+        order_sudo._update_cart_taxes_and_prices()
         return request.render(
-            "website_sale.payment", self._get_shop_payment_values(request.cart, **post)
+            "website_sale.payment", self._get_shop_payment_values(order_sudo, **post)
         )
 
     @route("/shop/payment/validate", type="http", auth="public", website=True, sitemap=False)
@@ -1713,7 +1716,7 @@ class WebsiteSale(payment_portal.PaymentPortal):
             # Customer didn't go though /shop/payment/transaction since there is nothing to pay,
             # confirm the order if it is valid.
             if redirect := self.env["website.checkout.step"].validate_checkout_progress(
-                "/shop/payment", order_sudo, block_on_price_change=True
+                "/shop/payment/transaction", order_sudo
             ):
                 return request.redirect(redirect)
 

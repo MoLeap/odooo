@@ -993,15 +993,14 @@ class Website(models.Model):
             step.copy({"website_id": self.id, "is_published": is_published})
 
     def _get_checkout_step_values(self, href):
+        next_href = self._get_next_breadcrumb_step_href(href)
+
         # /shop/address is a "hidden" step of /shop/checkout
         if href == "/shop/address":
-            current_step_sudo = self._get_checkout_step("/shop/checkout")
-        else:
-            current_step_sudo = self._get_checkout_step(href)
-
+            href = "/shop/checkout"
+        current_step_sudo = self._get_checkout_step(href)
         next_step_sudo = current_step_sudo.browse(self._get_next_breadcrumb_step_id(href))
         previous_step_sudo = current_step_sudo.browse(self._get_previous_breadcrumb_step_id(href))
-        next_href = self._get_next_breadcrumb_step_href(href)
 
         return {
             "current_website_checkout_step_href": current_step_sudo.step_href,

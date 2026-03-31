@@ -39,4 +39,11 @@
         <field name="main_button_label">Confirm</field>
     </record>
 
+    <record id="website_sale.checkout_step_confirmation" model="website.checkout.step">
+        <field name="name">Payment Confirmation</field>
+        <field name="sequence">1500</field>
+        <field name="step_href">/shop/payment/transaction</field>
+        <field name="show_in_breadcrumb">False</field>
+    </record>
+
 </odoo>

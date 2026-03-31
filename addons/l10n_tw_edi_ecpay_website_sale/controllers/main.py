@@ -19,8 +19,6 @@ class WebsiteSaleL10nTW(WebsiteSale):
         invoicing_step = request.website._get_checkout_step(
             '/shop/l10n_tw_invoicing_info'
         )
-        # NOTE VFE: the invoicing_step is global to all customers, if one customer enables it,
-        # every one will see it. bug? ^^
         invoicing_info_needed = invoicing_step.sudo().is_published = (
             order_sudo.company_id._is_ecpay_enabled() and not order_sudo.partner_id.l10n_tw_edi_require_paper_format
         )

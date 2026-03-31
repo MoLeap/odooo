@@ -46,7 +46,7 @@
                     t-call="payment.express_checkout"
                 />
                 <t t-if="current_website_checkout_step_href == '/shop/payment'">
-                    <div t-if="not errors and not website_sale_order.amount_total"
+                    <div t-if="cart_ready and not website_sale_order.amount_total"
                          name="o_website_sale_free_cart">
                         <form name="o_wsale_confirm_order"
                               class="d-flex flex-column"

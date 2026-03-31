@@ -53,7 +53,7 @@ class PaymentPortal(payment_portal.PaymentPortal):
 
         # Ensure the cart is still valid before proceeding any further.
         if redirect := self.env["website.checkout.step"].validate_checkout_progress(
-            "/shop/payment", order_sudo, block_on_price_change=True
+            "/shop/payment/transaction", order_sudo
         ):
             return {
                 "state": "error",
