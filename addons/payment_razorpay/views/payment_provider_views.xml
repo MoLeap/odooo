@@ -6,13 +6,31 @@
         <field name="model">payment.provider</field>
         <field name="inherit_id" ref="payment.payment_provider_form"/>
         <field name="arch" type="xml">
-            <group name="provider_credentials" position="before">
-                <div class="text-muted mb-2" invisible="not razorpay_account_id">
-                    This provider is linked with your Razorpay account.
+            <sheet position="before">
+                <header invisible="code != 'razorpay'">
+                    <div >
+                    <button
+                        string="Connect"
+                        type="object"
+                        name="action_start_onboarding"
+                        class="btn-primary"
+                        invisible="razorpay_account_id"
+                    />
+                    <button
+                        string="Disconnect"
+                        type="object"
+                        name="action_reset_credentials"
+                        class="btn-secondary"
+                        confirm="Are you sure you want to disconnect?"
+                        invisible="not razorpay_account_id"
+                        readonly="True"
+                    />
                 </div>
-            </group>
-            <group name="provider_credentials" position='inside'>
+                </header>
+            </sheet>
+            <group name="payment_form" position='before'>
                 <group
+                    string="Credentials"
                     name="razorpay_credentials"
                     invisible="code != 'razorpay'"
                     groups="base.group_no_one"
@@ -20,26 +38,18 @@
                     <label for="razorpay_account_id"/>
                     <div class="o_row">
                         <field name="razorpay_account_id" string="Account ID" readonly="True"/>
-                        <button
-                            string="Reset Your Razorpay Account"
-                            type="object"
-                            name="action_reset_credentials"
-                            class="btn-secondary ms-2"
-                            confirm="Are you sure you want to disconnect?"
-                            invisible="not razorpay_account_id"
-                            readonly="True"
-                        />
+
                     </div>
                     <field
                         name="razorpay_key_id"
                         string="Key Id"
-                        decoration-muted="razorpay_account_id"
+                        readonly="razorpay_account_id"
                     />
                     <field
                         name="razorpay_key_secret"
                         string="Key Secret"
+                        readonly="razorpay_account_id"
                         password="True"
-                        decoration-muted="razorpay_account_id"
                     />
                     <label for="razorpay_webhook_secret"/>
                     <div class="o_row">
@@ -56,10 +66,7 @@
                             invisible="not razorpay_account_id or razorpay_webhook_secret"
                         />
                     </div>
-                </group>
-            </group>
-            <group name="provider_credentials" position="after">
-                <div
+                    <div
                     class="alert alert-warning"
                     role="alert"
                     invisible="code != 'razorpay' or not razorpay_key_id or razorpay_account_id"
@@ -68,14 +75,11 @@
                     deprecated. Click the "Connect" button below to use the recommended OAuth
                     method.
                 </div>
-                <div invisible="code != 'razorpay' or razorpay_account_id">
-                    <button
-                        string="Connect"
-                        type="object"
-                        name="action_start_onboarding"
-                        class="btn-primary"
-                    />
+                    <div class="text-muted mb-2" invisible="not razorpay_account_id">
+                    This provider is linked with your Razorpay account.
                 </div>
+
+                </group>
             </group>
             <field name="allow_tokenization" position="after">
                 <div invisible="code != 'razorpay' or not allow_tokenization" colspan="2">
