@@ -229,6 +229,7 @@ class AccountEdiProxyClientUser(models.Model):
                 document_content = content["document"]
                 filename = content["filename"] or 'attachment'  # default to attachment, which should not usually happen
                 decoded_document = edi_user._decrypt_data(document_content, enc_key)
+<<<<<<< a6b542e680abf4b7c169fd2abcbe4fc2d09486fa
                 attachment = self.env["ir.attachment"].create(
                     {
                         "name": f"{filename}.xml",
@@ -240,6 +241,131 @@ class AccountEdiProxyClientUser(models.Model):
                 if edi_user._peppol_import_invoice(attachment, None, content["state"], uuid):
                     # Only acknowledge when we saved the document somewhere
                     proxy_acks.append(uuid)
+||||||| b9978323ac62a5f01559f3c852bfef23870d38a7
+                attachment_vals = {
+                    'name': f'{filename}.xml',
+                    'raw': decoded_document,
+                    'type': 'binary',
+                    'mimetype': 'application/xml',
+                }
+
+                try:
+                    attachment = self.env['ir.attachment'].create(attachment_vals)
+                    xml_tree = etree.fromstring(attachment.raw)
+                    invoice_type_code = xml_tree.findtext('.//{*}InvoiceTypeCode')
+                    credit_note_type_code = xml_tree.findtext('.//{*}CreditNoteTypeCode')
+
+                    if invoice_type_code in ['389', '527'] or credit_note_type_code == '261':
+                        # 389/527: Self-billing invoice; 261: Self-billing credit note
+                        journal = self.env['account.journal'].search(
+                            [
+                                *self.env['account.journal']._check_company_domain(self.company_id),
+                                ('type', '=', 'sale'),
+                            ],
+                            limit=1,
+                        )
+                        move_type = 'out_invoice' if invoice_type_code else 'out_refund'
+                    else:
+                        # use the first purchase journal if the Peppol journal is not set up
+                        # to create the move anyway
+                        journal = company.peppol_purchase_journal_id or self.env['account.journal'].search([
+                            *self.env['account.journal']._check_company_domain(company),
+                            ('type', '=', 'purchase')
+                        ], limit=1)
+                        move_type = 'in_invoice'
+
+                    move = journal\
+                        .with_company(company) \
+                        .with_context(
+                            default_move_type=move_type,
+                            default_peppol_move_state=content['state'],
+                            default_peppol_message_uuid=uuid,
+                            default_journal_id=journal.id,
+                        )\
+                        ._create_document_from_attachment(attachment.id)
+                    move._message_log(body=_('Peppol document has been received successfully'))
+                # pylint: disable=broad-except
+                except Exception:  # noqa: BLE001
+                    # if the invoice creation fails for any reason,
+                    # we want to create an empty invoice with the attachment
+                    move = self.env['account.move'].create({
+                        'move_type': 'in_invoice',
+                        'peppol_move_state': 'done',
+                        'company_id': company.id,
+                        'peppol_message_uuid': uuid,
+                    })
+                    attachment_vals.update({
+                        'res_model': 'account.move',
+                        'res_id': move.id,
+                    })
+                    self.env['ir.attachment'].create(attachment_vals)
+                if 'is_in_extractable_state' in move._fields:
+                    move.is_in_extractable_state = False
+
+                proxy_acks.append(uuid)
+=======
+                attachment_vals = {
+                    'name': f'{filename}.xml',
+                    'raw': decoded_document,
+                    'type': 'binary',
+                    'mimetype': 'application/xml',
+                }
+
+                try:
+                    attachment = self.env['ir.attachment'].create(attachment_vals)
+                    xml_tree = etree.fromstring(attachment.raw)
+                    invoice_type_code = xml_tree.findtext('.//{*}InvoiceTypeCode')
+                    credit_note_type_code = xml_tree.findtext('.//{*}CreditNoteTypeCode')
+
+                    if invoice_type_code in ['389', '527'] or credit_note_type_code == '261':
+                        # 389/527: Self-billing invoice; 261: Self-billing credit note
+                        journal = self.env['account.journal'].search(
+                            [
+                                *self.env['account.journal']._check_company_domain(company),
+                                ('type', '=', 'sale'),
+                            ],
+                            limit=1,
+                        )
+                        move_type = 'out_invoice' if invoice_type_code else 'out_refund'
+                    else:
+                        # use the first purchase journal if the Peppol journal is not set up
+                        # to create the move anyway
+                        journal = company.peppol_purchase_journal_id or self.env['account.journal'].search([
+                            *self.env['account.journal']._check_company_domain(company),
+                            ('type', '=', 'purchase')
+                        ], limit=1)
+                        move_type = 'in_invoice'
+
+                    move = journal\
+                        .with_company(company) \
+                        .with_context(
+                            default_move_type=move_type,
+                            default_peppol_move_state=content['state'],
+                            default_peppol_message_uuid=uuid,
+                            default_journal_id=journal.id,
+                        )\
+                        ._create_document_from_attachment(attachment.id)
+                    move._message_log(body=_('Peppol document has been received successfully'))
+                # pylint: disable=broad-except
+                except Exception:  # noqa: BLE001
+                    # if the invoice creation fails for any reason,
+                    # we want to create an empty invoice with the attachment
+                    move = self.env['account.move'].create({
+                        'move_type': 'in_invoice',
+                        'peppol_move_state': 'done',
+                        'company_id': company.id,
+                        'peppol_message_uuid': uuid,
+                    })
+                    attachment_vals.update({
+                        'res_model': 'account.move',
+                        'res_id': move.id,
+                    })
+                    self.env['ir.attachment'].create(attachment_vals)
+                if 'is_in_extractable_state' in move._fields:
+                    move.is_in_extractable_state = False
+
+                proxy_acks.append(uuid)
+>>>>>>> c752d464a6b6f3f6c0d8267b975813bfc55a721e
 
             if not tools.config['test_enable']:
                 self.env.cr.commit()
