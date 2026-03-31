@@ -685,12 +685,19 @@ class DiscussChannel(models.Model):
         self.ensure_one()
         parts = []
         previous_message_author = None
-        # sudo - mail.message: visitors can access messages on chats they have access to
-        messages = self.sudo().chatbot_message_ids.mail_message_id or self.message_ids
+        # sudo - chatbot.message: visitors can access messages on chats they have access to
+        first_chatbot_message = self.sudo().chatbot_message_ids.sorted("id")[:1]
         # sudo - mail.message: getting empty/notification messages to exclude them is allowed.
         filtered_messages = (
-            messages.sudo().filtered(lambda m: m.message_type != "notification")
-            - messages.sudo()._filter_empty()
+            self.message_ids.sudo().filtered(
+                lambda m: m.message_type != "notification"
+                and (
+                    m.id >= first_chatbot_message.mail_message_id.id
+                    if first_chatbot_message
+                    else True
+                )
+            )
+            - self.message_ids.sudo()._filter_empty()
         )
         for message in filtered_messages.sorted("id"):
             # sudo - res.partner: accessing livechat username or name is allowed to visitor
@@ -818,6 +825,22 @@ class DiscussChannel(models.Model):
             post_joined_message=post_joined_message,
             inviting_partner=inviting_partner,
         )
+        if not self.env.context.get("skip_chatbot_current_step_reset"):
+            if agents := all_new_members.filtered(
+                lambda m: m.livechat_member_type == "agent"
+            ):
+                # This creates a race condition to stop a chatbot script
+                # as soon as an agent joins.
+                #
+                # In case of a concurrent step trigger of a chatbot and a new agent joining,
+                # - either the trigger is committed first, the agent joining will fail,
+                #   retry and be added to the channel,
+                #   any subsequent trigger will see the new agent and stop the script.
+                # - or the agent joining is committed first,
+                #   the trigger will fail, retry, see the new agent and stop the script.
+                #
+                # sudo: discuss.channel - updating the current step when an agent joins is acceptable
+                agents.channel_id.sudo().chatbot_current_step_id = False
         for channel in all_new_members.channel_id:
             # sudo: discuss.channel - accessing livechat_status in internal code is acceptable
             if channel.sudo().livechat_status == "need_help":
@@ -991,7 +1014,9 @@ class DiscussChannel(models.Model):
             if chatbot_script_step.operator_expertise_ids:
                 create_member_params['agent_expertise_ids'] = chatbot_script_step.operator_expertise_ids.ids
                 channel_sudo.livechat_expertise_ids |= chatbot_script_step.operator_expertise_ids
-            channel_sudo._add_members(
+            channel_sudo.with_context(
+                skip_chatbot_current_step_reset=True,
+            )._add_members(
                 create_member_params=create_member_params,
                 inviting_partner=bot_partner_id,
                 users=human_operator,
