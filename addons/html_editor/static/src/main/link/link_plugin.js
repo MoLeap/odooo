@@ -6,7 +6,7 @@ import { _t } from "@web/core/l10n/translation";
 import { LinkPopover } from "./link_popover";
 import { DIRECTIONS, leftPos, nodeSize, rightPos } from "@html_editor/utils/position";
 import { EMAIL_REGEX, URL_REGEX, cleanZWChars, deduceURLfromText } from "./utils";
-import { isElement, isVisible, isZwnbsp } from "@html_editor/utils/dom_info";
+import { isElement, isContentEditable, isVisible, isZwnbsp } from "@html_editor/utils/dom_info";
 import { KeepLast } from "@web/core/utils/concurrency";
 import { rpc } from "@web/core/network/rpc";
 import { memoize } from "@web/core/utils/functions";
@@ -445,7 +445,8 @@ export class LinkPlugin extends Plugin {
             // Prevent a link across sibling blocks:
             targetedBlocks.every((node) =>
                 targetedNodes.every((other) => node.contains(other) || other.contains(node))
-            )
+            ) &&
+            targetedNodes.every(isContentEditable)
         );
     }
 
