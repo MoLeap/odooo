@@ -15,7 +15,6 @@
         'views/pdp_flow_views.xml',
         'views/account_dashboard_pdp.xml',
         'views/pdp_send_wizard_views.xml',
-        'views/res_config_settings_views.xml',
     ],
     'installable': True,
     'license': 'LGPL-3',

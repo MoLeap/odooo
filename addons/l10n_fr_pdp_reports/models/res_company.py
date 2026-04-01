@@ -4,10 +4,6 @@ from odoo import api, fields, models
 class ResCompany(models.Model):
     _inherit = 'res.company'
 
-    l10n_fr_pdp_reports_enabled = fields.Boolean(
-        string="Enable PDP E-reporting",
-        help="Activate Flux 10 e-reporting generation for this company.",
-    )
     l10n_fr_pdp_declarant_siren = fields.Char(
         string="PDP Declarant SIREN Override",
         help="Optional SIREN override used in Flux 10 headers for qualification test datasets.",
@@ -56,7 +52,7 @@ class ResCompany(models.Model):
         Journal = self.env['account.journal']
 
         for company in self:
-            if company.country_code != 'FR' or not company.l10n_fr_pdp_reports_enabled:
+            if company.country_code != 'FR' or not company.l10n_fr_pdp_send_to_ppf:
                 continue
 
             existing = Journal.search([
@@ -78,15 +74,15 @@ class ResCompany(models.Model):
     def create(self, vals_list):
         companies = super().create(vals_list)
         for company in companies:
-            if company.country_code == 'FR' and company.l10n_fr_pdp_reports_enabled:
+            if company.country_code == 'FR' and company.l10n_fr_pdp_send_to_ppf:
                 company._l10n_fr_pdp_ensure_journal()
         return companies
 
     def write(self, vals):
         res = super().write(vals)
 
-        if 'l10n_fr_pdp_reports_enabled' in vals:
-            enabled = self.filtered(lambda c: c.l10n_fr_pdp_reports_enabled and c.country_code == 'FR')
+        if 'l10n_fr_pdp_send_to_ppf' in vals:
+            enabled = self.filtered(lambda c: c.l10n_fr_pdp_send_to_ppf and c.country_code == 'FR')
             enabled._l10n_fr_pdp_ensure_journal()
 
         return res

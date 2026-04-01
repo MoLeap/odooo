@@ -10,6 +10,6 @@ def post_init_hook(env):
 
     companies = Company.search([
         ('account_fiscal_country_id', '=', 'FR'),
-        ('l10n_fr_pdp_reports_enabled', '=', True),
+        ('l10n_fr_pdp_send_to_ppf', '=', True),
     ])
     companies._l10n_fr_pdp_ensure_journal()

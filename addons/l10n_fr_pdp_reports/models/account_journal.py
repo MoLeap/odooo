@@ -13,7 +13,7 @@ class AccountJournal(models.Model):
             lambda j: (
                 j.type == 'sale'
                 and j.company_id.country_code == 'FR'
-                and j.company_id.l10n_fr_pdp_reports_enabled
+                and j.company_id.l10n_fr_pdp_send_to_ppf
             ),
         )
         if not pdp_enabled_journals:

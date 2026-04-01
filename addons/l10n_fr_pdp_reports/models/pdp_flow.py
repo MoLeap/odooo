@@ -759,7 +759,7 @@ class PdpFlow(models.Model):
     @api.model
     def _cron_sync_transport_statuses(self):
         """Poll proxy message states and synchronize flow transport statuses."""
-        companies = self.env['res.company'].search([('l10n_fr_pdp_reports_enabled', '=', True)])
+        companies = self.env['res.company'].search([('l10n_fr_pdp_send_to_ppf', '=', True)])
         if not companies:
             return True
 
@@ -828,7 +828,7 @@ class PdpFlow(models.Model):
         """Cron job to send ready flows within their send window."""
         today = fields.Date.context_today(self)
         companies = self.env['res.company'].search([
-            ('l10n_fr_pdp_reports_enabled', '=', True),
+            ('l10n_fr_pdp_send_to_ppf', '=', True),
             ('l10n_fr_pdp_send_mode', '=', 'auto'),
         ])
         if not companies:
