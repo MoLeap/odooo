@@ -65,16 +65,18 @@ class TestUserLivechatUsername(TestGetOperatorCommon):
                 "user_ids": [fields.Command.link(john.id), fields.Command.link(operator.id)],
             }
         )
-        channel = self.env["discuss.channel"].with_user(operator).create(
-            {
-                "name": "Livechat session",
-                "channel_type": "livechat",
-                "livechat_channel_id": livechat_channel.id,
-            }
+        channel = (
+            self.env["discuss.channel"]
+            .with_user(operator)
+            .create(
+                {
+                    "name": "Livechat session",
+                    "channel_type": "livechat",
+                    "livechat_channel_id": livechat_channel.id,
+                }
+            )
         )
-        data = operator.partner_id.with_user(operator).search_for_channel_invite("fr_FR", channel.id)["store_data"]
-        john_data = next(filter(lambda partner: partner["id"] == john.partner_id.id, data["res.partner"]))
-        self.assertEqual(
-            john_data["user_livechat_username"],
-            "ELOPERADOR",
-        )
+        res = operator.partner_id.with_user(operator).search_for_channel_invite("fr_FR", channel.id)
+        data = res["store_data"]
+        john_data = next(filter(lambda user: user["id"] == john.id, data["res.users"]))
+        self.assertEqual(john_data["livechat_username"], "ELOPERADOR")
