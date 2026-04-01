@@ -183,7 +183,6 @@ export class ListPlugin extends Plugin {
         on_step_added_handlers: this.updateToolbarButtons.bind(this),
         on_deleted_handlers: this.adjustListPaddingOnDelete.bind(this),
         on_will_insert_separator_handlers: this.exitList.bind(this),
-        on_will_format_selection_handlers: this.applyFormatToListItem.bind(this),
 
         /** Processors */
         normalize_processors: this.normalize.bind(this),
@@ -198,6 +197,7 @@ export class ListPlugin extends Plugin {
         shift_tab_overrides: this.handleShiftTab.bind(this),
         split_element_block_overrides: this.handleSplitBlock.bind(this),
         color_apply_overrides: this.applyColorToListItem.bind(this),
+        format_apply_overrides: this.applyFormatToListItem.bind(this),
         triple_click_overrides: this.handleTripleClick.bind(this),
 
         is_node_fully_selected_predicates: (node, selection, range) => {
@@ -215,6 +215,14 @@ export class ListPlugin extends Plugin {
                         return true;
                     }
                 }
+            }
+        },
+
+        /** Providers */
+        color_node_providers: (node) => {
+            const li = closestElement(node, isListItem);
+            if (li && this.dependencies.selection.areNodeContentsFullySelected(li)) {
+                return li;
             }
         },
     };
@@ -1118,7 +1126,7 @@ export class ListPlugin extends Plugin {
         );
     }
 
-    applyColorToListItem(color, mode) {
+    applyColorToListItem(color, mode, coloredNodes) {
         this.dependencies.split.splitSelection();
         const targetedNodes = this.dependencies.selection.getTargetedNodes();
         const listItems = new Set(
@@ -1130,9 +1138,10 @@ export class ListPlugin extends Plugin {
         const cursors = this.dependencies.selection.preserveSelection();
         for (const listItem of listItems) {
             if (this.dependencies.selection.areNodeContentsFullySelected(listItem)) {
+                const listItemDescendants = descendants(listItem);
                 for (const node of [
                     listItem,
-                    ...descendants(listItem).filter(
+                    ...listItemDescendants.filter(
                         (n) => isElement(n) && closestElement(n, "LI") === listItem
                     ),
                 ]) {
@@ -1147,9 +1156,13 @@ export class ListPlugin extends Plugin {
                     }
                 }
 
+                const sublists = childNodes(listItem).filter(isListElement);
+                coloredNodes.add(listItem);
+                listItemDescendants
+                    .filter((n) => !sublists.some((list) => list.contains(n)))
+                    .forEach((n) => coloredNodes.add(n));
                 if (color) {
                     this.dependencies.color.colorElement(listItem, color, mode);
-                    const sublists = childNodes(listItem).filter(isListElement);
                     for (const list of sublists) {
                         list.classList.add("o_default_color");
                     }
@@ -1177,7 +1190,7 @@ export class ListPlugin extends Plugin {
         cursors.restore();
     }
 
-    applyFormatToListItem(formatName, { formatProps, applyStyle } = {}) {
+    applyFormatToListItem(formatName, formattedNodes, { formatProps, applyStyle } = {}) {
         if (!["setFontSizeClassName", "fontSize"].includes(formatName)) {
             return;
         }
@@ -1206,9 +1219,10 @@ export class ListPlugin extends Plugin {
             }
 
             if (this.dependencies.selection.areNodeContentsFullySelected(listItem)) {
+                const listItemDescendants = descendants(listItem);
                 for (const node of [
                     listItem,
-                    ...descendants(listItem).filter(
+                    ...listItemDescendants.filter(
                         (n) => isElement(n) && closestElement(n, "LI") === listItem
                     ),
                 ]) {
@@ -1218,13 +1232,17 @@ export class ListPlugin extends Plugin {
                     }
                 }
 
+                const sublists = childNodes(listItem).filter(isListElement);
+                formattedNodes.add(listItem);
+                listItemDescendants
+                    .filter((n) => !sublists.some((list) => list.contains(n)))
+                    .forEach((n) => formattedNodes.add(n));
                 if (applyStyle) {
                     if (formatName === "setFontSizeClassName") {
                         listItem.classList.add(formatProps.className);
                     } else if (formatName === "fontSize") {
                         listItem.style.fontSize = formatProps.size;
                     }
-                    const sublists = childNodes(listItem).filter(isListElement);
                     for (const list of sublists) {
                         list.classList.add("o_default_font_size");
                     }
@@ -1250,7 +1268,6 @@ export class ListPlugin extends Plugin {
         for (const list of listsSet) {
             this.adjustListPadding(list);
         }
-        return true;
     }
 
     /**
