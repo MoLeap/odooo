@@ -31,7 +31,7 @@ class AccountMove(models.Model):
             ('error', 'Error'),
         ],
         compute='_compute_ppf_state',
-        # store=True,  # TODO:
+        store=True,
         string='PPF Invoice Status',
         copy=False,
     )
@@ -43,7 +43,7 @@ class AccountMove(models.Model):
             ('error', 'Error'),
         ],
         compute='_compute_ppf_state',
-        # store=True,  # TODO:
+        store=True,
         string='PPF Lifeycle Status',
         copy=False,
     )
