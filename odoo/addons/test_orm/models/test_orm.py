@@ -262,7 +262,13 @@ class TestOrmPartner(models.Model):
     _name = 'test_orm.partner'
     _description = 'Discussion Partner'
 
-    name = fields.Char(string='Name')
+    name = fields.Char()
+    email = fields.Char()
+    phone = fields.Char()
+    function = fields.Char()
+    website = fields.Char()
+    parent_id = fields.Many2one('test_orm.partner')
+    child_ids = fields.One2many('test_orm.partner', 'parent_id')
 
 
 class TestOrmMulti(models.Model):
@@ -273,7 +279,7 @@ class TestOrmMulti(models.Model):
     _description = 'Test ORM Multi'
 
     name = fields.Char(related='partner.name', readonly=True)
-    partner = fields.Many2one('res.partner')
+    partner = fields.Many2one('test_orm.partner')
     lines = fields.One2many('test_orm.multi.line', 'multi')
     partners = fields.One2many(related='partner.child_ids')
     tags = fields.Many2many('test_orm.multi.tag', domain=[('name', 'ilike', 'a')])

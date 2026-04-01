@@ -10,5 +10,6 @@ from . import (
     test_performance,
     test_read_group,
     test_schema,
+    test_search,
     test_unity_read,
 )
