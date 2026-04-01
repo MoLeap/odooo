@@ -280,9 +280,47 @@ registerRoute("/discuss/channel/members", discuss_channel_members);
 async function discuss_channel_members(request) {
     /** @type {import("mock_models").DiscussChannel} */
     const DiscussChannel = this.env["discuss.channel"];
+    /** @type {import("mock_models").DiscussChannelMember} */
+    const DiscussChannelMember = this.env["discuss.channel.member"];
+    /** @type {import("mock_models").MailGuest} */
+    const MailGuest = this.env["mail.guest"];
+    /** @type {import("mock_models").ResPartner} */
+    const ResPartner = this.env["res.partner"];
 
-    const { channel_id, known_member_ids } = await parseRequestParams(request);
-    return DiscussChannel._load_more_members([channel_id], known_member_ids);
+    const { channel_id, known_member_ids = [], search_term } = await parseRequestParams(request);
+    let memberIds;
+    if (search_term) {
+        const lowerTerm = search_term.toLowerCase();
+        const allMemberIds = DiscussChannelMember.search(
+            [["channel_id", "=", channel_id]],
+            makeKwArgs({ limit: 100 })
+        );
+        memberIds = DiscussChannelMember.browse(allMemberIds)
+            .filter((member) => {
+                if (member.partner_id) {
+                    const [partner] = ResPartner.browse(member.partner_id);
+                    return partner?.name?.toLowerCase().includes(lowerTerm);
+                }
+                if (member.guest_id) {
+                    const [guest] = MailGuest.browse(member.guest_id);
+                    return guest?.name?.toLowerCase().includes(lowerTerm);
+                }
+                return false;
+            })
+            .map((member) => member.id);
+    } else {
+        memberIds = DiscussChannelMember.search(
+            [
+                ["channel_id", "=", channel_id],
+                ["id", "not in", known_member_ids],
+            ],
+            makeKwArgs({ limit: 100 })
+        );
+    }
+    const member_count = DiscussChannelMember.search_count([["channel_id", "=", channel_id]]);
+    return new mailDataHelpers.Store(DiscussChannel.browse(channel_id), { member_count })
+        .add(DiscussChannelMember.browse(memberIds))
+        .get_result();
 }
 
 registerRoute("/discuss/channel/sub_channel/create", discuss_channel_sub_channel_create);

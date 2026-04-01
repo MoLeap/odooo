@@ -585,6 +585,14 @@ export class DiscussChannel extends Record {
         this.store.insert(data);
     }
 
+    async searchChannelMembers(searchTerm) {
+        const data = await rpc("/discuss/channel/members", {
+            channel_id: this.id,
+            search_term: searchTerm,
+        });
+        this.store.insert(data);
+    }
+
     async fetchPinnedMessages() {
         if (["loaded", "loading"].includes(this.pinnedMessagesState)) {
             return;
