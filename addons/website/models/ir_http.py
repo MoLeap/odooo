@@ -202,20 +202,17 @@ class IrHttp(models.AbstractModel):
 
     @classmethod
     def _match(cls, path):
-        env = request.env
-        context = dict(env.context)
-
         # Get 'website_id' from query arg
         query_website_id = None
         with contextlib.suppress(TypeError, ValueError):
             # Warning! The user is not guaranteed; authentication has not yet been called.
             # We need to test for the route auth="user"
             query_website_id = int(request.httprequest.args.get('website_id'))
-            if query_website_id not in env['website'].get_all().ids:
+            if query_website_id not in request.env['website'].get_all().ids:
                 query_website_id = None
 
-        website_id = env['ir.http']._get_current_website_id()
-        fallback_website_id = website_id or env['ir.http']._get_current_website_fallback()
+        website_id = request.env['ir.http']._get_current_website_id()
+        fallback_website_id = website_id or request.env['ir.http']._get_current_website_fallback()
 
         if not hasattr(request, 'website_routing'):
             request.website_routing = fallback_website_id
@@ -231,7 +228,9 @@ class IrHttp(models.AbstractModel):
 
         # remove website_id from the context if it's not a website route
         if not rule.endpoint.routing.get('website', False) and not query_website_id and fallback_website_id:
+            context = dict(request.env.context)
             context['fallback_website_id'] = fallback_website_id
+            del context['website_id']
             request.update_env(context=context)
 
         return rule, args
