@@ -2,7 +2,7 @@ import re
 
 from odoo import api, fields, models
 
-PDP_identifier_re = re.compile(r'([0-9]{9})(_[0-9]{14})?(_.+)?$')
+PDP_identifier_re = re.compile(r'^([0-9]{9})(_[0-9]{14})?(_.+)?$')
 
 
 class ResCompany(models.Model):

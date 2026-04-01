@@ -34,7 +34,7 @@ class PeppolSettingsButtons extends Component {
     }
 
     get ediIdentification() {
-        return this.props.record.data.account_peppol_edi_identification;
+        return this.props.record.data.account_peppol_edi_identification || "";
     }
 
     get migrationPrepared() {
@@ -67,6 +67,9 @@ class PeppolSettingsButtons extends Component {
         if (['not_registered', 'in_verification'].includes(this.proxyState)) {
             return _t("Discard");
         }
+        if (this.ediIdentification.startsWith('0225:')) {
+            return _t("Remove from PA");
+        }
         return _t("Remove from Peppol");
     }
 
@@ -83,7 +86,7 @@ class PeppolSettingsButtons extends Component {
 
     showConfirmation(warning, methodName) {
         const message = _t(warning);
-        const confirmMessage = _t("You will not be able to send or receive Peppol documents in Odoo anymore. Are you sure you want to proceed?");
+        const confirmMessage = this.ediIdentification.startsWith('0225:') ? _t("You will not be able to send or receive documents from the Odoo approved platform anymore. Are you sure you want to proceed?") : _t("You will not be able to send or receive Peppol documents in Odoo anymore. Are you sure you want to proceed?");
         this.dialogService.add(ConfirmationDialog, {
             body: markup(
                 `<div class="text-danger">${escape(message)}</div>
@@ -103,7 +106,7 @@ class PeppolSettingsButtons extends Component {
             this.props.record._discard();
         } else if (['sender', 'smp_registration', 'receiver'].includes(this.proxyState)) {
             this.showConfirmation(
-                "This will delete your Peppol registration.",
+                this.ediIdentification.startsWith('0225:') ? "This will delete your PA registration." : "This will delete your Peppol registration.",
                 "button_deregister_peppol_participant"
             )
         }
