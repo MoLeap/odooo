@@ -927,10 +927,13 @@ class TestEventRegistrationData(TestEventInternalsCommon):
         })
         self.assertEqual(multi_entry_registration.remaining_entries, multi_entry_event_ticket.entry_limit)
         multi_entry_registration.action_attend_event()
+        multi_entry_registration._compute_remaining_entries()
         self.assertEqual(multi_entry_registration.remaining_entries, multi_entry_event_ticket.entry_limit - 1)
         self.assertEqual(multi_entry_registration.state, 'open')
         multi_entry_registration.action_attend_event()
+        multi_entry_registration._compute_remaining_entries()
         multi_entry_registration.action_attend_event()
+        multi_entry_registration._compute_remaining_entries()
         self.assertEqual(multi_entry_registration.remaining_entries, 0)
         self.assertEqual(multi_entry_registration.state, 'done')
 

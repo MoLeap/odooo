@@ -1,13 +1,13 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import logging
 import os
-from datetime import UTC, datetime
+from datetime import UTC
 from zoneinfo import ZoneInfo
 
 from odoo import _, api, fields, models, SUPERUSER_ID
 from odoo.fields import Domain
 from odoo.tools import email_normalize, format_date, formataddr
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import ValidationError
 _logger = logging.getLogger(__name__)
 
 
@@ -85,7 +85,7 @@ class EventRegistration(models.Model):
              'Cancelled: registrations cancelled manually')
     remaining_entries = fields.Integer(string="Remaining Entries", compute="_compute_remaining_entries", tracking=True)
     ticket_entry_limit = fields.Integer(string="Initial Entry Limit", related="event_ticket_id.entry_limit", tracking=True)
-    attendances_ids = fields.One2many('event.registration.attendance', 'registration_id', string='Attendances', tracking=True)
+    main_registration_id = fields.Many2one('event.registration', string='Main Registration')
     # questions
     registration_answer_ids = fields.One2many('event.registration.answer', 'registration_id', string='Attendee Answers')
     registration_answer_choice_ids = fields.One2many('event.registration.answer', 'registration_id', string='Attendee Selection Answers',
@@ -199,10 +199,14 @@ class EventRegistration(models.Model):
         for registration in self:
             registration.event_end_date = registration.event_slot_id.end_datetime or registration.event_id.date_end
 
-    @api.depends("ticket_entry_limit", "attendances_ids")
+    @api.depends("ticket_entry_limit")
     def _compute_remaining_entries(self):
+        sub_registrations = self.env['event.registration'].search([('main_registration_id', 'in', self.ids), ('state', '=', 'done')])
         for registration in self:
-            registration.remaining_entries = (registration.ticket_entry_limit - len(registration.attendances_ids)) if registration.ticket_entry_limit else 0
+            if registration.ticket_entry_limit and not registration.main_registration_id and registration.state != 'done':
+                registration.remaining_entries = (registration.ticket_entry_limit - len(sub_registrations.filtered(lambda r: r.main_registration_id.id == registration.id)))
+            else:
+                registration.remaining_entries = 0
 
     @api.model
     def _search_event_end_date(self, operator, value):
@@ -222,16 +226,6 @@ class EventRegistration(models.Model):
     def _check_event_ticket(self):
         if any(registration.event_id != registration.event_ticket_id.event_id for registration in self if registration.event_ticket_id):
             raise ValidationError(_('Invalid event / ticket choice'))
-
-    @api.constrains('attendances_ids')
-    def _constrains_attendances_ids(self):
-        for registration in self:
-            if registration.remaining_entries < 0:
-                raise UserError(self.env._(
-                    'You cannot have more attendances than the ticket entry limit. '
-                    'Please check registration %(registration_name)s',
-                    registration_name=registration.name
-                ))
 
     def _synchronize_partner_values(self, partner, fnames=None):
         if fnames is None:
@@ -280,8 +274,8 @@ class EventRegistration(models.Model):
             if event_id and attendee.event_id.id != event_id:
                 status = 'need_manual_confirmation'
             else:
-                status = 'confirmed_registration'
                 attendee.action_attend_event()
+                status = 'confirmed_registration'
         else:
             status = 'already_registered'
         res.update({'status': status})
@@ -344,18 +338,28 @@ class EventRegistration(models.Model):
         self.write({'state': 'open'})
 
     def cancel_last_attendance(self):
+        sub_registrations = self.env['event.registration'].search([('main_registration_id', 'in', self.ids), ('state', '=', 'done')])
         for record in self:
-            record.attendances_ids = [(2, record.attendances_ids[-1].id)]
+            related_registrations_sorted = sub_registrations.filtered(lambda r: r.main_registration_id.id == record.id).sorted('date_closed desc')
+            if related_registrations_sorted:
+                related_registrations_sorted[0].action_cancel()
 
     def action_attend_event(self):
         for record in self:
-            self.env['event.registration.attendance'].create({
-                'registration_id': record.id,
-                'attendance_date': datetime.today(),
-            })
-            if record.remaining_entries > 0:
-                continue
-            record.action_set_done()
+            if record.remaining_entries > 1:
+                new_registration = record.with_context(install_mode=True).copy({
+                    'main_registration_id': record.id,
+                })
+                new_registration.action_set_done()
+                sub_registration_link = new_registration._get_html_link(title=f"{new_registration.name}")
+                record._message_log(
+                    body=_(
+                        "A related sub-registration is validated to represent the attendance of one entry for this main registration: %s", sub_registration_link
+                    ),
+                    message_type='comment',
+                )
+            else:
+                record.action_set_done()
 
     def action_set_done(self):
         """ Close Registration """

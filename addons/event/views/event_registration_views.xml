@@ -82,7 +82,8 @@
                             <field name="date_closed" groups="base.group_no_one"/>
                         </group>
                         <group string="Transaction" name="transaction">
-                            <field name="remaining_entries" invisible="not ticket_entry_limit"/>
+                            <field name="remaining_entries" invisible="not ticket_entry_limit or main_registration_id"/>
+                            <field name="main_registration_id" readonly="true" invisible="not main_registration_id"/>
                         </group>
                         <group string="Marketing" name="utm_link" groups="base.group_no_one">
                             <field name="utm_campaign_id"/>
@@ -117,14 +118,6 @@
                                         </t>
                                     </templates>
                                 </kanban>
-                            </field>
-                        </page>
-                        <page string="Attendances" name="attendances">
-                            <field name="attendances_ids" widget="one2many">
-                                <list editable="bottom">
-                                    <field name="attendance_date"/>
-                                    <field name="create_uid"/>
-                                </list>
                             </field>
                         </page>
                     </notebook>
