@@ -12,6 +12,7 @@ from odoo import Command, _, api, fields, models, tools
 from odoo.exceptions import UserError
 
 from ..utils.vat import is_valid_vat
+from .pdp_payload import PdpPayloadBuilder
 
 _logger = logging.getLogger(__name__)
 
@@ -252,31 +253,24 @@ class PdpFlow(models.Model):
     # Business Methods - Validation
     # -------------------------------------------------------------------------
 
-    def _filter_valid_moves(self):
+    def _filter_valid_moves(self, moves, invalid_collector=None, log_event=False):
         """Separate valid moves from invalid ones, updating error tracking."""
         self.ensure_one()
-        invalid_moves_error_map = {
+        invalid_moves = {
             move.id: errors
-            for move in self.move_ids
+            for move in moves
             if (errors := self._get_move_validation_errors(move))
         }
-        self.error_move_ids = self.env['account.move'].browse(list(invalid_moves_error_map))
-        flow_errors_messages = []
-        for error_move in self.error_move_ids:
-            error_messages = invalid_moves_error_map.get(error_move.id)
-            flow_errors_messages.append(f'{error_move.display_name}: {"; ".join(error_messages)}')
-            # Only post on the move if the content differs to limit spam.
-            errors_html = Markup('').join(Markup(f'<li>{tools.html_escape(message)}</li>') for message in error_messages)
-            head = tools.html_escape(_(
-                "Excluded from PDP flow %(flow)s due to validation errors:",
-                flow=self.display_name,
-            ))
-            body = Markup(f'{head} <ul>{errors_html}</ul>')
-            last_body = error_move.message_ids[:1].body if error_move.message_ids else None
-            if not last_body or last_body.striptags() != body.striptags():  # last_body has <p> tags added, remove all tags for safe comparaison
-                error_move.message_post(body=body)
-        self.error_move_message = '\n'.join(flow_errors_messages)
-        self.error_move_message = False
+        valid_moves = moves.filtered(lambda m: m.id not in invalid_moves)
+        if invalid_moves:
+            if invalid_collector is not None:
+                invalid_collector.update(invalid_moves)
+            else:
+                self._update_error_moves(invalid_moves, log_event=log_event)
+        else:
+            if invalid_collector is None:
+                self._clear_error_moves()
+        return valid_moves, invalid_moves
 
     def _get_move_validation_errors(self, move):
         """Return list of validation errors for a move, empty if valid."""
@@ -333,13 +327,41 @@ class PdpFlow(models.Model):
         taxes = move.invoice_line_ids.filtered(lambda line: line.display_type == 'product').mapped('tax_ids')
         return any((tax.l10n_fr_pdp_vatex_code or '').strip() for tax in taxes)
 
+    def _update_error_moves(self, invalid_moves, log_event=False):
+        self.ensure_one()
+        invalid_ids = list(invalid_moves)
+        invalid_move_records = self.env['account.move'].browse(invalid_ids)
+        self.error_move_ids = [Command.set(invalid_ids)]
+        details = []
+        for move_id, reasons in invalid_moves.items():
+            move = self.env['account.move'].browse(move_id)
+            # details.append('%s: %s' % (move.display_name, '; '.join(reasons)))
+            details.append(f'{move.display_name}: {"; ".join(reasons)}')
+            # Only post on the move if the content differs to limit spam.
+            errors_html = Markup('').join(Markup('<li>%s</li>' % (tools.html_escape(reason))) for reason in reasons)
+            body = tools.html_escape(
+                _("Excluded from PDP flow %(flow)s due to validation errors:", flow=self.display_name)
+            )
+            if errors_html:
+                body = Markup('%s <ul>%s</ul>' % (body, errors_html))
+            last_body = move.message_ids[:1].body if move.message_ids else None
+            if not last_body or last_body.striptags() != body.striptags():  # last_body has <p> tags added, remove all tags for safe comparaison
+                move.message_post(body=body)
+        self.error_move_message = '\n'.join(details)
+        if log_event:
+            self._log_cron_event(
+                _("Flow contains %(count)s invalid invoice(s) that were excluded.", count=len(invalid_move_records)),
+            )
+
+    def _clear_error_moves(self):
+        self.error_move_ids = [Command.clear()]
+        self.error_move_message = False
 
     # -------------------------------------------------------------------------
     # Business Methods - Payload Building
     # -------------------------------------------------------------------------
 
     def _build_payload(self):
-        # TODO: untangle this, 'buil_payload' should only build payload ...
         """Build single XML payload for the entire flow period."""
         for flow in self:
             if flow.state not in FLOW_OPEN_STATES:
@@ -348,14 +370,24 @@ class PdpFlow(models.Model):
             flow.state = 'building'
 
             # Validate all moves in the flow
-            flow._filter_valid_moves()
+            invalid_acc = {}
+            valid_moves, _invalids = flow._filter_valid_moves(
+                flow.move_ids, invalid_collector=invalid_acc, log_event=True,
+            )
+
+            # Update error moves tracking
+            if invalid_acc:
+                flow._update_error_moves(invalid_acc)
+            else:
+                flow._clear_error_moves()
 
             # Determine state based on period status and validation errors
+            has_errors = bool(invalid_acc)
             period_status = flow._get_period_status()
             if period_status == 'open':
                 # During open period, always stay in pending state
                 new_state = 'pending'
-            elif flow.error_move_ids:
+            elif has_errors:
                 # During grace/closed period with errors
                 new_state = 'error'
             else:
@@ -364,7 +396,6 @@ class PdpFlow(models.Model):
 
             # If no valid moves, keep flow in computed functional state and DON'T set transport status.
             # Note: we intentionally keep "error" in closed periods so users can still fix and rebuild.
-            valid_moves = flow.move_ids - flow.error_move_ids
             if not valid_moves:
                 flow.write({
                     **flow._payload_reset(),
@@ -373,8 +404,7 @@ class PdpFlow(models.Model):
                 flow._message_post_once(_("Payload build failed: no valid invoices."))
                 continue
 
-            payload = self.env['pdp.flow.10.builder']._build_payload(flow)
-                        # Build single XML payload for ALL moves (entire period)
+            # Build single XML payload for ALL moves (entire period)
             builder = PdpPayloadBuilder(flow)
             build_result = builder.build(valid_moves, slice_date=None, invalid_collector=invalid_acc)
 
@@ -443,7 +473,7 @@ class PdpFlow(models.Model):
 
                 # Rebuild payload with only valid moves
                 builder = PdpPayloadBuilder(flow)
-                build_result = builder.build(valid_moves)
+                build_result = builder.build(valid_moves, slice_date=None, invalid_collector={})
                 flow.write({
                     'payload': build_result['payload'],
                     'payload_filename': build_result['filename'],
@@ -1148,6 +1178,14 @@ class PdpFlow(models.Model):
     # -------------------------------------------------------------------------
     # Business Methods - Utilities
     # -------------------------------------------------------------------------
+
+    def _format_date(self, value):
+        """Format date as YYYYMMDD string."""
+        if not value:
+            return ''
+        if isinstance(value, str):
+            value = fields.Date.from_string(value)
+        return value.strftime('%Y%m%d')
 
     def _format_amount(self, amount):
         """Round amount to currency precision."""
