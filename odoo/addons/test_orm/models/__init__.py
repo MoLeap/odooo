@@ -1,4 +1,5 @@
 from . import (
+    common,
     test_access_rights,
     test_action_bindings,
     test_config,
