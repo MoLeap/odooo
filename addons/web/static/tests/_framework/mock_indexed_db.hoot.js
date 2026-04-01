@@ -50,7 +50,7 @@ export function mockIndexedDBFactory(name, { fn }) {
             }
 
             async delete(table, key) {
-                delete this.mockIndexedDB[table][key];
+                delete this.mockIndexedDB[table]?.[key];
             }
 
             async invalidate(tables = null) {
