@@ -1,4 +1,5 @@
 import logging
+import re
 import requests
 
 from markupsafe import Markup
@@ -11,6 +12,8 @@ from odoo.addons.l10n_fr_pdp.tools.demo_utils import handle_demo
 
 TIMEOUT = 10
 _logger = logging.getLogger(__name__)
+
+siren_siret_re = re.compile(r'^(\d{9}|\d{14})$')
 
 
 class ResPartner(models.Model):
@@ -71,7 +74,7 @@ class ResPartner(models.Model):
 
     def _get_suggested_pdp_identifier(self):
         self.ensure_one()
-        siret = self.siret or ''
+        siret = self.siret or (self.company_registry if siren_siret_re.match(self.company_registry) else '')
         siren = siret[:9]
         if len(siret) == 9:
             return siret[:9]
@@ -81,10 +84,9 @@ class ResPartner(models.Model):
 
     def _get_peppol_endpoint_value(self, country_code, field):
         self.ensure_one()
-        if country_code != 'FR' or field != 'peppol_endpoint':
-            return super()._get_peppol_endpoint_value(country_code, field)
-
-        return self._get_suggested_pdp_identifier()
+        if country_code == 'FR' and field == 'peppol_endpoint':
+            return self._get_suggested_pdp_identifier()
+        return super()._get_peppol_endpoint_value(country_code, field)
 
     def _build_error_peppol_endpoint(self, eas, endpoint):
         # Extend 'account_edi_ubl_cii' for '0225' endpoint

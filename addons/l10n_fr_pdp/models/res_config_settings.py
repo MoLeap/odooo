@@ -19,10 +19,8 @@ class ResConfigSettings(models.TransientModel):
 
     def action_open_peppol_form(self):
         self.ensure_one()
-        # TODO: Maybe just having multiple buttons is better?
-        #       Or a button in the PDP wizard to switch to the "normal" peppol?
         if self.country_code != 'FR' and self.account_peppol_eas != '0225':
-            return self.action_open_peppol_form()
+            return super().action_open_peppol_form()
         return self.action_open_pdp_form()
 
     @handle_demo
