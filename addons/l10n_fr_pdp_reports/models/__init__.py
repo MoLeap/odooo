@@ -9,5 +9,4 @@ from . import pdp_payload
 from . import pdp_payment_event
 from . import pdp_send_wizard
 from . import res_company
-from . import res_config_settings
 from . import res_partner
