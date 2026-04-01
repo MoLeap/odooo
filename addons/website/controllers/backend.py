@@ -1,10 +1,33 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-
 from odoo import http
+from odoo.exceptions import AccessError
 from odoo.http import request
 
+from odoo.addons.web.controllers.home import Home
+from odoo.addons.web.controllers.webclient import WebClient
 
-class WebsiteBackend(http.Controller):
+def _add_context_from_query_website_id(env, website_id):
+    if website_id is None:
+        return
+
+    website_id = int(website_id)
+    if website_id not in env['website'].get_all().ids:
+        return
+
+    if (website_id != env.context.get('website_id')
+        and website_id != env.context.get('fallback_website_id')
+        and not (
+            (user := env.user or env['res.users'].sudo().browse(request.session.uid))
+            and user.has_group('website.group_multi_website')
+            and user.has_group('website.group_website_restricted_editor')
+        )
+    ):
+        raise AccessError(env._("You do not have access to the website introduced in the URL."))
+
+    request.update_context(website_id=website_id)
+
+
+class WebsiteBackend(Home):
 
     @http.route('/website/fetch_dashboard_data', type="jsonrpc", auth='user', readonly=True)
     def fetch_dashboard_data(self, website_id):
@@ -54,3 +77,16 @@ class WebsiteBackend(http.Controller):
             'nbInstalled': total_features - len(features_not_installed)
         }
         return features_info
+
+    @http.route('/odoo/action-website.website_preview', type='http', auth='user', readonly=True)
+    def action_website_preview(self, website_id=None, **kw):
+        _add_context_from_query_website_id(self.env, website_id)
+        return self.web_client('action-website.website_preview', **kw)
+
+
+class WebsiteWebClient(WebClient):
+
+    @http.route('/web/bundle/<string:bundle_name>', auth='public', methods=['GET'], readonly=True)
+    def bundle(self, bundle_name, website_id=None, **bundle_params):
+        _add_context_from_query_website_id(self.env, website_id)
+        return super().bundle(bundle_name, **bundle_params)

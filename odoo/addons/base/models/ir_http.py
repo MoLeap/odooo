@@ -330,7 +330,10 @@ class IrHttp(models.AbstractModel):
                     check(request.session, request)
                 except SessionExpiredException as exc:
                     session_expired_exc = exc  # save the traceback
-                    request.env = api.Environment(request.env.cr, None, request.session.context)
+                    context = dict(request.env.context)
+                    context.update(request.session.context)
+                    request.env = api.Environment(request.env.cr, None, context)
+
             getattr(cls, f'_auth_method_{auth}')()
         except SessionExpiredException as exc:
             if session_expired_exc:
