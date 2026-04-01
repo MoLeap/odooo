@@ -15,3 +15,18 @@ class TestWebsiteProfile(HttpCaseGamification):
             'email': 'mitchell.admin@example.com',
         })
         self.start_tour("/", 'website_profile_description', login="admin")
+
+
+@odoo.tests.tagged('post_install', '-at_install')
+class TestWebsiteProfileMobile(HttpCaseGamification):
+    browser_size = '375x667'
+
+    def test_save_change_description_mobile(self):
+        odoo.tests.new_test_user(
+            self.env, 'test_user',
+            karma=100, website_published=True
+        )
+        self.env.ref('base.user_admin').write({
+            'email': 'mitchell.admin@example.com',
+        })
+        self.start_tour("/", 'website_profile_description_mobile', login="admin")
