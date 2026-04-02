@@ -16,6 +16,7 @@ export class CartTotal extends Component {
             currency_id: null,
             has_carrier: false,
             has_deliverable_products: false,
+            tax_included: false,
         });
         this.cartService = useService('cart');
 

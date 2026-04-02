@@ -576,16 +576,18 @@ class Cart(PaymentPortal):
             "product_price": line._get_cart_display_price(),
             "base_unit_price": line.product_id.base_unit_price,
             "product_uom_qty": line.product_uom_qty,
-            "product_base_unit_price": line.product_id._get_base_unit_price(
-                line._get_cart_display_price() / line.product_uom_qty
+            "product_base_unit_price": (
+                line.product_id._get_base_unit_price(
+                    line._get_cart_display_price() / line.product_uom_qty
+                )
             ),
             "website_url": line.product_id.website_url,
             "is_combo": line.product_type == "combo",
             "is_sellable": line._is_sellable(),
             "product_type": line.product_type,
-            "image_uri": image_data_uri(line.product_id.image_128)
-            if line.product_id.image_128
-            else False,
+            "image_uri": (
+                image_data_uri(line.product_id.image_128) if line.product_id.image_128 else False
+            ),
             "combination_name": line._get_combination_name(),
             "has_multiple_uoms": line.product_template_id._has_multiple_uoms(),
             "should_show_strikethrough_price": line._should_show_strikethrough_price(),
@@ -620,10 +622,15 @@ class Cart(PaymentPortal):
             "has_deliverable_products": order_sudo._has_deliverable_products(),
             "amount_delivery": order_sudo.amount_delivery,
             "amount_untaxed": order_sudo.amount_untaxed,
-            "tax_subtotals": order_sudo.tax_totals["subtotals"]
-            if order_sudo.tax_totals and order_sudo.tax_totals["subtotals"]
-            else False,
+            "tax_subtotals": (
+                order_sudo.tax_totals["subtotals"]
+                if order_sudo.tax_totals and order_sudo.tax_totals["subtotals"]
+                else False
+            ),
             "amount_total": order_sudo.amount_total,
+            "tax_included": (
+                order_sudo.website_id.show_line_subtotals_tax_selection == "tax_included"
+            ),
         }
 
     @route(route="/shop/cart/accessories", type="jsonrpc", auth="public", website=True)

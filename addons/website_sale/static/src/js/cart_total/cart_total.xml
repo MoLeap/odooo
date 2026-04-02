@@ -26,10 +26,14 @@
                     />
                 </td>
             </tr>
-            <tr name="o_order_total_untaxed">
+            <tr
+                t-if="!this.state.tax_included"
+                name="o_order_total_untaxed"
+            >
                 <td
-                    class="border-0 pb-2 ps-0 pt-0 text-start text-muted"
-                    colspan="2">
+                    class="border-0 pb-2 ps-0 pt-0 text-muted"
+                    colspan="2"
+                >
                     Subtotal
                 </td>
                 <td class="text-end border-0 pb-2 pe-0 pt-0">
@@ -40,17 +44,24 @@
                     />
                 </td>
             </tr>
-            <t t-if="showTaxLines" t-call="website_sale.OrderTaxLines"/>
+            <t t-if="showTaxLines and !this.state.tax_included" t-call="website_sale.OrderTaxLines"/>
             <tr name="o_order_total" class="border-top">
-                <td colspan="2" class="border-0 p-0 pe-3 pb-2 fw-bold">Total</td>
-                <td class="text-end border-0 ps-3 pb-2">
-                    <span
+                <td
+                    colspan="2"
+                    t-attf-class="border-0 ps-0 pt-2 #{this.state.tax_included ? 'pb-1' : 'pb-2'}"
+                >
+                    Total
+                </td>
+                <td t-attf-class="text-end border-0 px-0 pt-2 #{this.state.tax_included ? 'pb-1' : 'pb-2'}">
+                    <strong
                         t-out="this.formatPrice(this.state.amount_total)"
-                        class="monetary_field fw-bold"
+                        class="monetary_field"
                         style="white-space: nowrap;"
                     />
                 </td>
             </tr>
+            <!-- Tax included view -->
+            <t t-if="this.state.tax_included" t-call="website_sale.OrderTaxLines"/>
         </table>
     </t>
 
@@ -60,16 +71,35 @@
                 <t t-foreach="this.state.tax_subtotals" t-as="line" t-key="line.id">
                     <t t-foreach="line['tax_groups']" t-as="tax_line" t-key="tax_line.id">
                         <tr name="o_order_total_taxes">
-                            <td colspan="2" class="text-muted border-0 p-0 pe-3 pb-2">
-                                <t t-out="tax_line['group_name']"/>
+                            <td
+                                t-if="this.state.tax_included"
+                                class="border-0 p-0 pb-2 small"
+                                colspan="3"
+                            >
+                                <p class="text-muted mb-0">
+                                    Including
+                                    <span
+                                        t-out="this.formatPrice(tax_line['tax_amount_currency'])"
+                                        class="monetary_field"
+                                    />
+                                    <t t-out="tax_line['group_name']"/>
+                                </p>
                             </td>
-                            <td class="text-end border-0 p-0 ps-3 pb-2">
-                                <span
-                                    t-out="this.formatPrice(tax_line['tax_amount_currency'])"
-                                    class="monetary_field"
-                                    style="white-space: nowrap;"
-                                />
-                            </td>
+                            <t t-else="">
+                                <td
+                                    class="text-muted border-0 p-0 pe-3 pb-2"
+                                    colspan="2"
+                                >
+                                    <t t-out="tax_line['group_name']"/>
+                                </td>
+                                <td class="text-end border-0 p-0 ps-3 pb-2">
+                                    <span
+                                        t-out="this.formatPrice(tax_line['tax_amount_currency'])"
+                                        class="monetary_field"
+                                        style="white-space: nowrap;"
+                                    />
+                                </td>
+                            </t>
                         </tr>
                     </t>
                 </t>
