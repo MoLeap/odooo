@@ -363,7 +363,7 @@ class IrHttp(models.AbstractModel):
         # the website is not in the allowed companies of the user, set
         # the main company of the user.
         context = cls._get_editor_context()
-        website = request.env['website'].browse(request.env.context['website_id'])
+        website = request.env['website'].get_current_website()
         user = request.env.user
         website_company_id = website.company_id.id
         if user == website.user_id:
