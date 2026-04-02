@@ -78,7 +78,7 @@ class WebsiteBackend(Home):
         }
         return features_info
 
-    @http.route('/odoo/action-website.website_preview', type='http', auth='user', readonly=True)
+    @http.route('/odoo/action-website.website_preview', type='http', auth="user", readonly=Home._web_client_readonly)
     def action_website_preview(self, website_id=None, **kw):
         _add_context_from_query_website_id(self.env, website_id)
         return self.web_client('action-website.website_preview', **kw)
