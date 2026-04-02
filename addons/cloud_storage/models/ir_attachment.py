@@ -43,11 +43,13 @@ class IrAttachment(models.Model):
             if not self.env['ir.config_parameter'].sudo().get_str('cloud_storage_provider'):
                 raise UserError(_('Cloud Storage is not enabled'))
             for record in self:
-                record.write({
+                vals = {
+                    'mimetype': record.mimetype,
                     'raw': False,
                     'type': 'cloud_storage',
                     'url': record._generate_cloud_storage_url(),
-                })
+                }
+                record.write(vals)
 
     def _migrate_remote_to_local(self):
         if self.type != 'cloud_storage':
