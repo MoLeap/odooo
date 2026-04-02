@@ -2,6 +2,10 @@
 <templates xml:space="preserve">
 
 <t t-inherit="website.BuilderOptions" t-inherit-mode="extension">
+    <xpath expr="//t[@id='context_hook']" position="before">
+        <t t-set="tagImageSelector" t-value="'.o_wsale_product_tag_image img'"/>
+    </xpath>
+
     <xpath expr="//t[@id='image_options']" position="before">
         <product_image_option
             template="website_sale.ProductImageOption"
@@ -10,6 +14,12 @@
     </xpath>
     <xpath expr="//replace_media_option" position="attributes">
         <attribute name="t-attf-exclude" add=".o_wsale_product_images :is({{replaceMediaOptionSelector}})" separator=", "/>
+    </xpath>
+    <xpath expr="//image_pop_up_option" position="attributes">
+        <attribute name="t-attf-exclude" add="{{tagImageSelector}}" separator=", "/>
+    </xpath>
+    <xpath expr="//replace_media_option" position="attributes">
+        <attribute name="t-attf-exclude" add="{{tagImageSelector}}" separator=", "/>
     </xpath>
 
     <xpath expr="//t[@id='page_options_hook']" position="after">
@@ -64,13 +74,32 @@
             title="Product"
             editableOnly="false"
             groups='["website.group_website_designer"]'/>
-    </xpath>
-
-    <xpath expr="//navbar_logo_option" position="after">
         <products_ribbon_option
-            t-attf-selector="#products_grid .oe_product, {{this.productPageOptionSelector}}"
+            t-attf-selector="#products_grid .oe_product, {{productTemplateOptionSelector}}"
             editableOnly="false"
             groups='["website.group_website_designer"]'/>
+        <product_template_option
+            t-att-selector="productTemplateOptionSelector"
+            editableOnly="false"
+            title=" "/>
+        <product_variant_ribbon_option
+            t-attf-selector="{{productVariantOptionSelector}}"
+            editableOnly="false"
+            groups='["website.group_website_designer"]'/>
+        <product_variant_option
+            t-att-selector="productVariantOptionSelector"
+            editableOnly="false"
+            title=" "/>
+        <product_tag_option
+            template="website_sale.ProductTagOption"
+            selector="#product_detail .o_wsale_product_tag"
+            editableOnly="false"
+            title="Tag"
+            reloadTarget="true"
+            groups='["website.group_website_designer"]'/>
+        <product_tag_image_option
+            template="website_sale.ProductTagImageOption"
+            t-att-selector="tagImageSelector"/>
     </xpath>
 
     <xpath expr="//header_elements_option" position="after">
