@@ -4,17 +4,24 @@
         <div t-if="this.state.employee and this.state.leaves.length !== 0" id="o_leave_stats_employee" class="sub_table px-3 py-2 mb-3">
             <div>
                 <h4 class="d-flex">
-                    Summary (<t t-out="thisYear"/>)
+                    Summary <t t-out="thisYear"/>
                 </h4>
             </div>
             <div class="d-flex flex-column mb-1">
-                <div t-foreach="state.leaves" t-as="record_leave" t-key="record_leave.data.id" class="d-flex mb-2 gap-1">
+                <div t-foreach="state.leaves" t-as="record_leave" t-key="record_leave.data.id" class="d-flex mb-2 gap-2">
                     <ColorPickerField name="'color'" canToggle="false" readonly="true" record="record_leave"/>
                     <t t-set="leave" t-value="record_leave.data"/>
-                    <span class="col-3" t-out="leave.work_entry_type_id.display_name"/>
-                    <div class="col-3 flex-wrap">
-                        <span t-if="leave.work_entry_type_request_unit == 'hour'"><t t-out="leave.number_of_hours"/> hours</span>
-                        <span t-else=""><t t-out="leave.number_of_days"/> days</span>
+                    <div t-out="leave.name" class="col-5 fw-bold"/>
+                    <div class="d-flex mb-1">
+                        <span t-out="record_leave.leaves_approved" class="me-1"/>
+                        <div t-if="record_leave.max_leaves">
+                            / <span t-out="record_leave.max_leaves" class="mx-1"/>
+                        </div>
+                        <span t-if="record_leave.unit_of_measure == 'day'">days</span>
+                    </div>
+                    <div t-if="record_leave.remaining_leaves > 0" class="text-muted ms-2">
+                        (<span t-out="record_leave.remaining_leaves" class="mx-1"/>
+                        <span t-if="record_leave.unit_of_measure == 'day'">days</span> remainings )
                     </div>
                     <div>
                     </div>
