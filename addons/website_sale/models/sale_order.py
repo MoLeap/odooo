@@ -276,6 +276,52 @@ class SaleOrder(models.Model):
     def _get_amount_total_excluding_delivery(self):
         return sum(self._get_non_delivery_lines().mapped("price_total"))
 
+    def _get_order_tracking_lines(self):
+        """Return order lines to include in GA4 tracking payloads.
+
+        :rtype: sale.order.line recordset
+        """
+        self.ensure_one()
+        return self.order_line.filtered(lambda line: not line.is_delivery and line.product_id)
+
+    def _get_order_tracking_items(self):
+        """Return GA4 items array for an order.
+
+        :rtype: list[dict]
+        """
+        self.ensure_one()
+        items = []
+        for line in self._get_order_tracking_lines().with_context(display_default_code=False):
+            tracking_data = line.product_id.product_tmpl_id._get_google_analytics_data(
+                line.product_id,
+                {
+                    "display_name": line.product_id.display_name,
+                    "currency": line.currency_id,
+                    "list_price": line.product_id.list_price,
+                },
+            )
+            items.append({
+                **tracking_data,
+                "price": line.price_reduce_taxexcl,
+                "discount": round(line.price_unit - line.price_reduce_taxexcl, 2),
+                "quantity": line.product_uom_qty,
+            })
+        return items
+
+    def _get_order_tracking_value(self):
+        """Return the GA4 event value for the order — sum of item subtotals excluding delivery.
+
+        :rtype: float
+        """
+        self.ensure_one()
+        return round(
+            sum(
+                line.price_reduce_taxexcl * line.product_uom_qty
+                for line in self.order_line.filtered(lambda line: not line.is_delivery)
+            ),
+            2,
+        )
+
     def _get_confirmation_template(self):
         """Override of `sale` to use the website specific order confirmation email template if
         set."""

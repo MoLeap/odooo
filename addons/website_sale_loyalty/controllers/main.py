@@ -125,3 +125,15 @@ class WebsiteSale(main.WebsiteSale):
             else:
                 order._remove_delivery_line()
         return True
+
+    def _get_payment_tracking_info(self, order):
+        result = super()._get_payment_tracking_info(order)
+        if coupon := order._get_applied_coupon_codes():
+            result["coupon"] = coupon
+        return result
+
+    def order_2_return_dict(self, order):
+        result = super().order_2_return_dict(order)
+        if coupon := order._get_applied_coupon_codes():
+            result["coupon"] = coupon
+        return result

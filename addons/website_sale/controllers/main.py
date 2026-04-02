@@ -510,6 +510,14 @@ class WebsiteSale(payment_portal.PaymentPortal):
             attributes = ProductAttribute.browse(attribute_ids).sorted()
 
         products_prices = products._get_sales_prices(website)
+        product_tracking_infos = (
+            products._get_google_analytics_list_data_batch(
+                product_variants, products_prices, website
+            )
+            if website.google_analytics_key
+            else {}
+        )
+
         product_query_params = self._get_product_query_params(**post)
 
         grouped_attributes_values = (
@@ -553,6 +561,7 @@ class WebsiteSale(payment_portal.PaymentPortal):
             "previewed_attribute_values": lazy(
                 lambda: products._get_previewed_attribute_values(category, product_query_params)
             ),
+            "product_tracking_infos": product_tracking_infos,
         }
         if filter_by_price_enabled:
             values["min_price"] = min_price or available_min_price
@@ -1629,6 +1638,7 @@ class WebsiteSale(payment_portal.PaymentPortal):
             "errors": self._get_shop_payment_errors(order),
             "partner": order.partner_invoice_id,
             "order": order,
+            "payment_tracking_info": self._get_payment_tracking_info(order),
         }
         payment_form_values = {
             **sale_portal.CustomerPortal._get_payment_values(
@@ -2027,35 +2037,36 @@ class WebsiteSale(payment_portal.PaymentPortal):
         if modified_options:
             category.write(modified_options)
 
-    def order_lines_2_google_api(self, order_lines):
-        """Transform a list of order lines into a dict for google analytics."""
-        ret = []
-        for line in order_lines.filtered(lambda line: not line.is_delivery):
-            product = line.product_id
-            ret.append({
-                "item_id": product.barcode or product.id,
-                "item_name": product.name or "-",
-                "item_category": product.categ_id.name or "-",
-                "price": line.price_unit,
-                "quantity": line.product_uom_qty,
-            })
-        return ret
+    def _get_payment_tracking_info(self, order):
+        """Return GA4 tracking data for the add_payment_info event.
+
+        :param sale.order order: The sales order.
+        :rtype: dict
+        """
+        return {
+            "currency": order.currency_id.name,
+            "value": order._get_order_tracking_value(),
+            "items": order._get_order_tracking_items(),
+        }
 
     def order_2_return_dict(self, order):
-        """Return the tracking_cart dict of the order for Google analytics basically defined to
-        be inherited."""
-        tracking_cart_dict = {
-            "transaction_id": order.id,
-            "affiliation": order.company_id.name,
-            "value": order.amount_total,
+        """Return GA4 tracking data for the purchase event.
+
+        :param sale.order order: The sales order.
+        :rtype: dict
+        """
+        tracking_dict = {
+            "transaction_id": order.name,
+            "affiliation": order.website_id.name,
+            "value": order._get_order_tracking_value(),
             "tax": order.amount_tax,
             "currency": order.currency_id.name,
-            "items": self.order_lines_2_google_api(order.order_line),
+            "items": order._get_order_tracking_items(),
         }
         delivery_line = order.order_line.filtered("is_delivery")
         if delivery_line:
-            tracking_cart_dict["shipping"] = delivery_line.price_unit
-        return tracking_cart_dict
+            tracking_dict["shipping"] = delivery_line.price_reduce_taxexcl
+        return tracking_dict
 
     # --------------------------------------------------------------------------
     # Products Recently Viewed

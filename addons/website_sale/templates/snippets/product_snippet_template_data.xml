@@ -48,6 +48,7 @@
                     t-att-aria-label="product.display_name"
                     t-att-data-add2cart-rerender="data.get('_add2cart_rerender')"
                     t-att-data-publish="product.website_published and 'on' or 'off'"
+                    t-att-data-product-tracking-info="json.dumps(product.product_tmpl_id._get_google_analytics_list_data() if product.is_product_variant else product._get_google_analytics_list_data())"
                 >
                     <t
                         t-set="ribbon"

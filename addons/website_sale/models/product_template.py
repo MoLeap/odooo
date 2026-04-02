@@ -1006,6 +1006,48 @@ class ProductTemplate(models.Model):
             "price": combination_info["list_price"],
         }
 
+    def _get_google_analytics_list_data(self):
+        """Return the Google Analytics tracking data for this product in a list context
+        (shop page, snippets).
+        """
+        self.ensure_one()
+        combination_info = self._get_combination_info()
+        return combination_info.get("product_tracking_info", {})
+
+    def _get_google_analytics_list_data_batch(self, product_variants, products_prices, website):
+        """Compute GA tracking data for all products in batch for list contexts (shop, snippets).
+        Uses already-computed variants and prices to avoid extra queries per product.
+
+        :param dict product_variants: mapping of product.template -> product.product
+        :param dict products_prices: mapping of product.template.id -> price vals
+        :param website: current website record
+        :rtype: dict
+        :return: mapping of product.template.id -> GA tracking dict
+        """
+        result = {}
+        currency = website.currency_id
+        for template in self:
+            variant = product_variants.get(template)
+            price_vals = products_prices.get(template.id, {})
+            price = price_vals.get("price_reduce", template.list_price)
+            list_price = price_vals.get("base_price", price)
+            item_variant = (
+                (variant.product_template_attribute_value_ids._get_combination_name() or None)
+                if variant
+                else None
+            )
+            tracking_data = {
+                "item_id": (variant and (variant.barcode or str(variant.id))) or str(template.id),
+                "item_name": template.with_context(display_default_code=False).display_name,
+                "item_category": template.categ_id.name,
+                "currency": currency.name,
+                "price": price,
+                "discount": round(list_price - price, 2),
+                "item_variant": item_variant,
+            }
+            result[template.id] = tracking_data
+        return result
+
     def _get_contextual_pricelist(self):
         """Override to fallback on website current pricelist."""
         pricelist = super()._get_contextual_pricelist()

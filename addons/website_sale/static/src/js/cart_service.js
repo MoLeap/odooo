@@ -487,10 +487,6 @@ export class CartService {
         if (!data) {
             return 0;
         }
-        if (shouldRedirectToCart || session.add_to_cart_action === 'go_to_cart') {
-            redirect('/shop/cart');
-            return data.quantity;
-        }
         if (data.cart_quantity && (
             data.cart_quantity !== browser.sessionStorage.getItem('website_sale_cart_quantity')
         )) {
@@ -501,6 +497,10 @@ export class CartService {
         }
         if (data.quantity) {
             this._trackProducts(data.tracking_info);
+        }
+        if (shouldRedirectToCart || session.add_to_cart_action === 'go_to_cart') {
+            redirect('/shop/cart');
+            return data.quantity;
         }
         return data.quantity;
     }

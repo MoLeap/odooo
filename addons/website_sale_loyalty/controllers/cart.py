@@ -18,3 +18,9 @@ class Cart(WebsiteSaleCart):
         product = self.env["product.product"].browse(int(kwargs["trigger_product_id"]))
         self.add_to_cart(product.product_tmpl_id.id, product.id, 1)
         return request.redirect("/shop/cart")
+
+    def _get_cart_tracking_info(self, order):
+        result = super()._get_cart_tracking_info(order)
+        if coupon := order._get_applied_coupon_codes():
+            result["coupon"] = coupon
+        return result
