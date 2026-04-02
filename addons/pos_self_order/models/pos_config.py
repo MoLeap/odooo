@@ -10,6 +10,7 @@ from urllib.parse import unquote
 from odoo.exceptions import UserError, ValidationError, AccessError
 
 from odoo import api, fields, models, _, service
+from odoo.tools.translate import get_translation
 from odoo.tools import file_open, split_every
 
 
@@ -151,17 +152,25 @@ class PosConfig(models.Model):
 
     def _prepare_self_order_custom_btn(self):
         for record in self:
-            exists = record.env['pos_self_order.custom_link'].search_count([
+            links = record.env['pos_self_order.custom_link'].search([
                 ('pos_config_ids', 'in', record.id),
                 ('url', '=', f'/pos-self/{record.id}/products')
             ])
 
-            if not exists:
-                record.env['pos_self_order.custom_link'].create({
+            if not links:
+                links = record.env['pos_self_order.custom_link'].create({
                     'name': _('Order Now'),
                     'url': f'/pos-self/{record.id}/products',
                     'pos_config_ids': [(4, record.id)],
                 })
+
+            for link in links.filtered(lambda l: l.name == 'Order Now'):
+                translations = {
+                    lang.code: get_translation('pos_self_order', lang.code, link.name, ())
+                    for lang in record.self_ordering_available_language_ids
+                    if link.with_context(lang=lang.code).name == link.name
+                }
+                link.update_field_translations('name', translations)
 
     def write(self, vals):
         self._prepare_self_order_splash_screen([vals])
