@@ -42,8 +42,7 @@ class IrHttp(models.AbstractModel):
     _inherit = 'ir.http'
 
     def routing_map(self, key=None):
-        if not key and request:
-            key = request.website_routing
+        key = self.env['website'].get_current_website().id
         return super().routing_map(key=key)
 
     @classmethod
@@ -80,7 +79,7 @@ class IrHttp(models.AbstractModel):
         if (
             path
             # don't try to match route if we know that no rewrite has been loaded.
-            and request.env['ir.http']._rewrite_len(request.website_routing)
+            and request.env['ir.http']._rewrite_len(request.env['website'].get_current_website().id)
             and (
                 len(path) > 1
                 and path.startswith('/')
@@ -117,7 +116,7 @@ class IrHttp(models.AbstractModel):
         if not request:
             yield from super()._generate_routing_rules(modules, converters)
             return
-        website_id = request.website_routing
+        website_id = self.env['website'].get_current_website().id
         logger.debug("_generate_routing_rules for website: %s", website_id)
         rewrites = self._get_rewrites(website_id)
         self._rewrite_len.__cache__.add_value(self, website_id, cache_value=len(rewrites))
@@ -213,9 +212,6 @@ class IrHttp(models.AbstractModel):
 
         website_id = request.env['ir.http']._get_current_website_id()
         fallback_website_id = website_id or request.env['ir.http']._get_current_website_fallback()
-
-        if not hasattr(request, 'website_routing'):
-            request.website_routing = fallback_website_id
 
         # set website into the context, used by match for the default lang
         if query_website_id or fallback_website_id:
@@ -426,8 +422,8 @@ class IrHttp(models.AbstractModel):
         # route, hence the default True. Elsewhere, request.is_frontend
         # is set.
         irHttp = self
-        if website_id := (self.env['website'].sudo().get_current_website().id or request.website_routing):
-            irHttp = irHttp.with_context(website_id=website_id)
+        if not self.env.context.get('website_id'):
+            irHttp = irHttp.with_context(website_id=self.env.context.get('fallback_website_id'))
         return super(IrHttp, irHttp).get_nearest_lang(lang_code)
 
     @api.model
