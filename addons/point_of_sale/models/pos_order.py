@@ -219,7 +219,10 @@ class PosOrder(models.Model):
     @api.model
     def _get_invoice_lines_values(self, line_values, pos_line, move_type):
         # correct quantity sign based on move type and if line is refund.
-        is_refund_order = bool(pos_line.order_id.refunded_order_id or move_type == 'out_refund')
+        # Refund invoices created from the Refund flow have `refunded_order_id` set.
+        # Do not use `move_type == 'out_refund'` here: it would also match manual negative
+        # qty orders and can invert invoice line signs twice.
+        is_refund_order = bool(pos_line.order_id.refunded_order_id)
         qty_sign = -1 if (
             (move_type == 'out_invoice' and is_refund_order)
             or (move_type == 'out_refund' and not is_refund_order)
@@ -521,9 +524,8 @@ class PosOrder(models.Model):
                 company=order.company_id,
                 cash_rounding=cash_rounding,
             )
-            refund_factor = -1 if order.refunded_order_id else 1
-            order.amount_tax = refund_factor * tax_totals['tax_amount_currency']
-            order.amount_total = refund_factor * tax_totals['total_amount_currency']
+            order.amount_tax = tax_totals['tax_amount_currency']
+            order.amount_total = tax_totals['total_amount_currency']
             order.amount_difference = order.amount_paid - order.amount_total
 
     @api.depends('lines.is_edited', 'has_deleted_line')
@@ -849,23 +851,26 @@ class PosOrder(models.Model):
     def action_pos_order_paid(self):
         self.ensure_one()
 
-        # "Fully paid" means remaining amount (total - paid) is zero; works for both sales and refunds (negative total).
-        remaining = self.amount_total - self.amount_paid
-        isPaid = float_is_zero(remaining, precision_rounding=self.currency_id.rounding)
+        # TODO: add support for mix of cash and non-cash payments when both cash_rounding and only_round_cash_method are True
+        if not self.config_id.cash_rounding \
+           or self.config_id.only_round_cash_method \
+           and not any(p.payment_method_id.is_cash_count for p in self.payment_ids):
+            total = self.amount_total
+        else:
+            total = float_round(self.amount_total, precision_rounding=self.config_id.rounding_method.rounding, rounding_method=self.config_id.rounding_method.rounding_method)
+
+        isPaid = float_is_zero(total - self.amount_paid, precision_rounding=self.currency_id.rounding)
 
         if not isPaid and not self.config_id.cash_rounding:
             raise UserError(_("Order %s is not fully paid.", self.name))
         elif not isPaid and self.config_id.cash_rounding:
-            # TODO: add support for mix of cash and non-cash payments when both cash_rounding and only_round_cash_method are True
-            if self.config_id.only_round_cash_method and not any(p.payment_method_id.is_cash_count for p in self.payment_ids):
-                raise UserError(_("Order %s is not fully paid.", self.name))
             currency = self.currency_id
             if self.config_id.rounding_method.rounding_method == "HALF-UP":
                 maxDiff = currency.round(self.config_id.rounding_method.rounding / 2)
             else:
                 maxDiff = currency.round(self.config_id.rounding_method.rounding)
 
-            diff = currency.round(remaining)
+            diff = currency.round(self.amount_total - self.amount_paid)
             if not abs(diff) <= maxDiff:
                 raise UserError(_("Order %s is not fully paid.", self.name))
 
@@ -1880,10 +1885,10 @@ class PosOrderLine(models.Model):
         if fiscal_position:
             account = fiscal_position.map_account(account)
 
-        if self.env.context.get('invoicing'):
-            is_refund_order = bool(line.order_id.refunded_order_id or line.order_id.amount_total < 0.0)
-        else:
-            is_refund_order = bool(line.order_id.refunded_order_id)
+        # Refund orders are identified by their linkage to an original order.
+        # Do NOT rely on `amount_total < 0` here: negative totals can happen
+        # for non-refund PoS orders and can break session/accounting sign consistency.
+        is_refund_order = bool(line.order_id.refunded_order_id)
 
         is_refund_line = line.qty * line.price_unit < 0
         # Only flip quantity for returned product lines (qty < 0); top-up lines (e.g. eWallet) keep positive qty.
