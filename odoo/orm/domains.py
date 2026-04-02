@@ -1378,8 +1378,10 @@ def _optimize_in_required(condition, model):
     field = condition._field(model)
     if (
         field.falsy_value is None
-        and (field.required or field.name == 'id')
-        and field in model.env.registry.not_null_fields
+        and (
+            (field.required and field in model.env.registry.not_null_fields)
+            or field.name == 'id'
+        )
         # only optimize if there are no NewId's
         and all(model._ids)
     ):
@@ -1425,6 +1427,7 @@ def _optimize_any_domain_at_level(level: OptimizationLevel, condition, model):
     except KeyError:
         condition._raise("Cannot determine the comodel relation")
 
+    context = {'search_from_field': field}
     if isinstance(search_domain := model.env.context.get('search_domain'), Domain):
         # model with search_domain like (field, 'any', comodel_domain)
         # => comodel with comodel_domain
@@ -1436,9 +1439,10 @@ def _optimize_any_domain_at_level(level: OptimizationLevel, condition, model):
         if comodel_domain.is_false():
             # we don't know the condition, accept all
             comodel_domain = Domain.TRUE
-        comodel = comodel.with_context(search_domain=comodel_domain)
-
+        context['search_domain'] = comodel_domain
+    comodel = comodel.with_context(**context)
     domain = domain._optimize(comodel, level)
+
     # const if the domain is empty, the result is a constant
     # if the domain is True, we keep it as is
     if domain.is_false():
@@ -1900,6 +1904,8 @@ def _operator_access_rule_domain(condition, model):
         condition._raise("The 'access' operator works only for many2one and 'id' fields")
         assert False, "no return above"  # for pylint
 
+    if operation == 'read' and field in model.env.registry.field_inverses.get(model.env.context.get('search_from_field'), ()):
+        return Domain.TRUE
     comodel = comodel.sudo(False)
     access_domain = comodel._access_domain(operation)
     if access_domain.is_false():
@@ -1907,7 +1913,7 @@ def _operator_access_rule_domain(condition, model):
         return Domain.FALSE
     if access_domain.is_true() or comodel.env.su:
         # access to all or edge-case for super user
-        return Domain.TRUE
+        return DomainCondition(field.name, '!=', False)
 
     def filtered_access(record):
         if field.name == 'id':

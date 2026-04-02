@@ -188,7 +188,7 @@ class _Relational(Field[BaseModel]):
             assert isinstance(value, Domain)
             if operator == 'any' and records.env.context.get('filter_function_reset_sudo'):
                 corecords = corecords.sudo(False)._filtered_access('read')
-            corecords = corecords.filtered_domain(value)
+            corecords = corecords.with_context(search_from_field=self).filtered_domain(value)
         elif operator == 'in' and isinstance(value, COLLECTION_TYPES):
             value = set(value)
             if False in value:
@@ -867,7 +867,7 @@ class _RelationalMulti(_Relational):
         field_domain = self.get_comodel_domain(model)
         if isinstance(value, Domain):
             domain = value & field_domain
-            comodel = comodel.with_context(**self.context)
+            comodel = comodel.with_context(**self.context, search_from_field=self)
             bypass_access = self.bypass_search_access or operator in ('any!', 'not any!')
             query = comodel._search(domain, bypass_access=bypass_access)
             assert isinstance(query, Query)
@@ -984,7 +984,7 @@ class One2many(_RelationalMulti):
 
     def read(self, records):
         # retrieve the lines in the comodel
-        context = {'active_test': False}
+        context = {'active_test': False, 'search_from_field': self}
         context.update(self.context)
         comodel = records.env[self.comodel_name].with_context(**context)
         inverse = self.inverse_name
@@ -1435,7 +1435,7 @@ class Many2many(_RelationalMulti):
             )
 
     def read(self, records):
-        context = {'active_test': False}
+        context = {'active_test': False, 'search_from_field': self}
         context.update(self.context)
         comodel = records.env[self.comodel_name].with_context(**context)
 
