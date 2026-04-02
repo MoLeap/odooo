@@ -461,6 +461,12 @@ class HrAttendanceOvertimeRule(models.Model):
                 for (start, stop, attendance) in intersetion_interval_for_attendance:
                     overtime_interval_list[attendance].append((start, stop, rules))
                 for attendance, attendance_intervals_list in overtime_interval_list.items():
+                    total_hours = sum(
+                        _time_delta_hours(stop - start)
+                        for start, stop, _ in attendance_intervals_list
+                    )
+                    if float_compare(total_hours, rules.employer_tolerance, precision_digits=5) != 1:
+                        continue
                     overtime_by_employee_by_attendance[employee][attendance] |= Intervals(attendance_intervals_list)
 
         def _build_day_rule_intervals(employees, rule, intervals):

@@ -1309,3 +1309,33 @@ class TestHrAttendanceOvertime(HttpCase):
         self.assertEqual(att.overtime_hours, -6)
         self.assertEqual(att.validated_overtime_hours, 10)
         self.assertEqual(att.expected_hours, 8)
+
+    def test_overtime_timing_rule_employer_tolerance(self):
+        """
+        Test that employer tolerance is correctly applied for timing-based overtime rules.
+        An attendance below the tolerance threshold should not generate any overtime,
+        while one above it should generate overtime for the full duration.
+        """
+        ruleset = self.env['hr.attendance.overtime.ruleset'].create({
+            'name': 'Test Timing Tolerance Ruleset',
+            'rule_ids': [
+                Command.create({
+                    'name': 'Weekend Rule',
+                    'base_off': 'timing',
+                    'timing_type': 'non_work_days',
+                    'employer_tolerance': 0.25,
+                }),
+            ],
+        })
+        self.employee.ruleset_id = ruleset
+
+        self.env['hr.attendance'].create({
+            'employee_id': self.employee.id,
+            'check_in': datetime(2021, 1, 2, 8, 0),
+            'check_out': datetime(2021, 1, 2, 8, 10),
+        })
+        overtime = self.env['hr.attendance.overtime.line'].search([
+            ('employee_id', '=', self.employee.id),
+            ('date', '=', date(2021, 1, 2)),
+        ])
+        self.assertFalse(overtime, 'No overtime should be created when below employer tolerance.')
