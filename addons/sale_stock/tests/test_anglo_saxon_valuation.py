@@ -1585,3 +1585,86 @@ class TestAngloSaxonValuation(TestStockValuationCommon, TestSaleStockCommon):
             {'account_id': self.account_stock_valuation.id, 'debit': 0.0, 'credit': 60.0},
             {'account_id': self.account_expense.id, 'debit': 60.0, 'credit': 0.0},
         ])
+
+    def test_cogs_fifo_multiple_sale_lines(self):
+        """
+        Ensure that multiple order line for the same product does not negatively impact the COGS computation.
+        When generating the COGS for the new sale.order.line, the COGS from the other lines
+        must not be taken into account.
+        """
+        self._make_in_move(self.product_fifo_auto, 1, 1)
+        self._make_in_move(self.product_fifo_auto, 1, 2)
+
+        moves = self.env['stock.move'].search([('product_id', '=', self.product_fifo_auto.id)])
+        self.assertEqual(moves.mapped("value"), [1, 2])
+
+        sale_order = self._so_deliver(self.product_fifo_auto, 1, 5)
+        invoice1 = sale_order._create_invoices()
+        invoice1.action_post()
+
+        new_line_vals = {
+            'order_id': sale_order.id,
+            'name': self.product_fifo_auto.name,
+            'product_id': self.product_fifo_auto.id,
+            'product_uom_qty': 1,
+            'price_unit': 5,
+            'tax_ids': False,
+        }
+        so_line = self.env['sale.order.line'].create(new_line_vals)
+
+        so_line.move_ids.write({'quantity': 1, 'picked': True})
+        so_line.move_ids.picking_id.button_validate()
+
+        invoice2 = sale_order._create_invoices()
+        invoice2.action_post()
+
+        cogs_line_1 = invoice1.line_ids.filtered(lambda l: l.display_type == 'cogs').sorted('debit')
+        cogs_line_2 = invoice2.line_ids.filtered(lambda l: l.display_type == 'cogs').sorted('debit')
+        self.assertRecordValues((cogs_line_1 | cogs_line_2), [
+            {'account_id': self.account_stock_valuation.id, 'debit': 0.0, 'credit': 1.0},
+            {'account_id': self.account_expense.id, 'debit': 1.0, 'credit': 0.0},
+            {'account_id': self.account_stock_valuation.id, 'debit': 0.0, 'credit': 2.0},
+            {'account_id': self.account_expense.id, 'debit': 2.0, 'credit': 0.0},
+        ])
+
+    def test_cogs_fifo_multiple_invoice_uom(self):
+        """
+        Ensure that multiple COGS lines with different UoM do not negatively impact the COGS computation.
+        Each COGS line quantity must be individually converted to the product UoM using its own UoM.
+        """
+        unit_6 = self.env['uom.uom'].create({
+            'name': 'Pack of 6',
+            'relative_factor': 6,
+            'relative_uom_id': self.env.ref('uom.product_uom_unit').id,
+        })
+        self.product_fifo_auto.write({"uom_ids": [Command.link(unit_6.id)]})
+
+        self._make_in_move(self.product_fifo_auto, 12, 1)
+
+        moves = self.env['stock.move'].search([('product_id', '=', self.product_fifo_auto.id)])
+        self.assertEqual(moves.value, 12)
+
+        sale_order = self._so_deliver(self.product_fifo_auto, 6, 5)
+        invoice1 = sale_order._create_invoices()
+        invoice1.action_post()
+
+        order_line = sale_order.order_line
+        order_line.product_uom_qty = 12
+
+        move = order_line.move_ids.filtered(lambda sm: sm.state != "done")
+        move.write({'quantity': 6, 'picked': True})
+        move.picking_id.button_validate()
+
+        invoice2 = sale_order._create_invoices()
+        # Change invoice UoM from 6 Units to 1 Pack of 6 (because why not?)
+        invoice2.invoice_line_ids.write({"quantity": 1, "product_uom_id": unit_6.id})
+        invoice2.action_post()
+
+        cogs_line_1 = invoice1.line_ids.filtered(lambda l: l.display_type == 'cogs').sorted('debit')
+        cogs_line_2 = invoice2.line_ids.filtered(lambda l: l.display_type == 'cogs')
+        self.assertRecordValues((cogs_line_1 | cogs_line_2), [
+            {'account_id': self.account_stock_valuation.id, 'debit': 0.0, 'credit': 6.0},
+            {'account_id': self.account_expense.id, 'debit': 6.0, 'credit': 0.0},
+            {'account_id': self.account_stock_valuation.id, 'debit': 0.0, 'credit': 6.0},
+            {'account_id': self.account_expense.id, 'debit': 6.0, 'credit': 0.0},
+        ])
