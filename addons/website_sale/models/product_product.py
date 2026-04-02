@@ -10,6 +10,18 @@ class ProductProduct(models.Model):
     _inherit = "product.product"
     _mail_post_access = "read"
 
+    # === DEFAULT METHODS ===#
+
+    @api.model
+    def _default_website_sequence(self):
+        self.env.cr.execute("SELECT MAX(website_sequence) FROM %s" % self._table)
+        max_sequence = self.env.cr.fetchone()[0]
+        if max_sequence is None:
+            return 10000
+        return max_sequence + 5
+
+    # === FIELDS ===#
+
     variant_ribbon_id = fields.Many2one(string="Variant Ribbon", comodel_name="product.ribbon")
     website_id = fields.Many2one(related="product_tmpl_id.website_id", readonly=False)
 
@@ -25,6 +37,16 @@ class ProductProduct(models.Model):
         compute="_compute_product_website_url",
     )
 
+    website_sequence = fields.Integer(
+        string="Website Sequence",
+        help="Determine the display order of variants in the Website eCommerce",
+        default=_default_website_sequence,
+        copy=False,
+        index=True,
+    )
+    website_size_x = fields.Integer(string="Size X", default=1)
+    website_size_y = fields.Integer(string="Size Y", default=1)
+
     # === COMPUTE METHODS ===#
 
     @api.depends_context("lang")
@@ -36,6 +58,78 @@ class ProductProduct(models.Model):
                 pav_ids = [str(pav.id) for pav in pavs]
                 url = f"{url}?attribute_values={','.join(pav_ids)}"
             product.website_url = url
+
+    # === SEQUENCE METHODS ===#
+
+    def set_sequence_top(self):
+        sibling = self.sudo().search(
+            [("product_tmpl_id", "=", self.product_tmpl_id.id), ("id", "!=", self.id)],
+            order="website_sequence ASC, id ASC",
+            limit=1,
+        )
+        if sibling:
+            self.website_sequence = sibling.website_sequence - 5
+        else:
+            self.product_tmpl_id.set_sequence_top()
+
+    def set_sequence_bottom(self):
+        sibling = self.sudo().search(
+            [("product_tmpl_id", "=", self.product_tmpl_id.id), ("id", "!=", self.id)],
+            order="website_sequence DESC, id DESC",
+            limit=1,
+        )
+        if sibling:
+            self.website_sequence = sibling.website_sequence + 5
+        else:
+            self.product_tmpl_id.set_sequence_bottom()
+
+    def set_sequence_up(self):
+        previous_in_tmpl = self.sudo().search(
+            [
+                ("product_tmpl_id", "=", self.product_tmpl_id.id),
+                "|",
+                ("website_sequence", "<", self.website_sequence),
+                "&",
+                ("website_sequence", "=", self.website_sequence),
+                ("id", "<", self.id),
+            ],
+            order="website_sequence DESC, id DESC",
+            limit=1,
+        )
+        if previous_in_tmpl:
+            if previous_in_tmpl.website_sequence == self.website_sequence:
+                self.website_sequence = previous_in_tmpl.website_sequence - 1
+            else:
+                previous_in_tmpl.website_sequence, self.website_sequence = (
+                    self.website_sequence,
+                    previous_in_tmpl.website_sequence,
+                )
+        else:
+            self.product_tmpl_id.set_sequence_up()
+
+    def set_sequence_down(self):
+        next_in_tmpl = self.sudo().search(
+            [
+                ("product_tmpl_id", "=", self.product_tmpl_id.id),
+                "|",
+                ("website_sequence", ">", self.website_sequence),
+                "&",
+                ("website_sequence", "=", self.website_sequence),
+                ("id", ">", self.id),
+            ],
+            order="website_sequence ASC, id ASC",
+            limit=1,
+        )
+        if next_in_tmpl:
+            if next_in_tmpl.website_sequence == self.website_sequence:
+                self.website_sequence = next_in_tmpl.website_sequence + 1
+            else:
+                next_in_tmpl.website_sequence, self.website_sequence = (
+                    self.website_sequence,
+                    next_in_tmpl.website_sequence,
+                )
+        else:
+            self.product_tmpl_id.set_sequence_down()
 
     # === BUSINESS METHODS ===#
 
@@ -76,6 +170,54 @@ class ProductProduct(models.Model):
         return self.product_tmpl_id._get_combination_info(
             combination=self.product_template_attribute_value_ids, product_id=self.id, **kwargs
         )
+
+    def _get_sales_prices(self, website, pricelist, fiscal_position):
+        """Variant-level equivalent of product.template._get_sales_prices."""
+        if not self:
+            return {}
+
+        currency = website.currency_id
+        date = fields.Date.context_today(self)
+
+        pricelist_prices = pricelist._compute_price_rule(self, 1.0)
+        comparison_prices_enabled = self.env["res.groups"]._is_feature_enabled(
+            "website_sale.group_product_price_comparison"
+        )
+
+        res = {}
+        for variant in self:
+            pricelist_price, pricelist_rule_id = pricelist_prices[variant.id]
+
+            product_taxes = variant.sudo().taxes_id._filter_taxes_by_company(self.env.company)
+            taxes = fiscal_position.map_tax(product_taxes)
+
+            base_price = None
+            variant_price_vals = {
+                "price_reduce": variant.product_tmpl_id._apply_taxes_to_price(
+                    pricelist_price, currency, product_taxes, taxes, variant, website=website
+                )
+            }
+            pricelist_item = variant.env["product.pricelist.item"].browse(pricelist_rule_id)
+            if pricelist_item._show_discount_on_shop():
+                pricelist_base_price = pricelist_item._compute_price_before_discount(
+                    product=variant, quantity=1.0, date=date, uom=variant.uom_id, currency=currency
+                )
+                if currency.compare_amounts(pricelist_base_price, pricelist_price) == 1:
+                    base_price = pricelist_base_price
+                    variant_price_vals["base_price"] = (
+                        variant.product_tmpl_id._apply_taxes_to_price(
+                            base_price, currency, product_taxes, taxes, variant, website=website
+                        )
+                    )
+
+            if not base_price and comparison_prices_enabled and variant.compare_list_price:
+                variant_price_vals["base_price"] = variant.currency_id._convert(
+                    variant.compare_list_price, currency, self.env.company, date, round=False
+                )
+
+            res[variant.id] = variant_price_vals
+
+        return res
 
     def _website_show_quick_add(self):
         self.ensure_one()
