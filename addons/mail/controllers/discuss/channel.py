@@ -133,14 +133,17 @@ class DiscussChannelWebclientController(WebclientController):
 
 class ChannelController(http.Controller):
     @mail_route("/discuss/channel/members", methods=["POST"], type="jsonrpc", auth="public", readonly=True)
-    def discuss_channel_members(self, channel_id, known_member_ids):
+    def discuss_channel_members(self, channel_id, known_member_ids=None, search_term=None):
         channel = request.env["discuss.channel"].search([("id", "=", channel_id)])
         if not channel:
             raise NotFound()
-        unknown_members = self.env["discuss.channel.member"].search(
-            domain=[("id", "not in", known_member_ids), ("channel_id", "=", channel.id)],
-            limit=100,
-        )
+        known_member_ids = known_member_ids or []
+        domain = [("channel_id", "=", channel.id)]
+        if search_term:
+            domain.extend(["|", ("partner_id.name", "ilike", search_term), ("guest_id.name", "ilike", search_term)])
+        else:
+            domain.append(("id", "not in", known_member_ids))
+        unknown_members = request.env["discuss.channel.member"].search(domain=domain, limit=100)
         store = Store()
         store.add(channel, ["member_count"])
         store.add(unknown_members, "_store_member_fields")
