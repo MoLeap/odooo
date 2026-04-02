@@ -40,16 +40,16 @@ const chatWindowPatch = {
                         this.livechatStep = CW_LIVECHAT_STEP.FEEDBACK;
                         this.open({ focus: true, notifyState: this.channel.state !== "open" });
                     } else {
-                        super.close(...arguments);
+                        this.channel.leaveChannelRpc();
                     }
+                    break;
+                }
+                if (!isSelfVisitor && this.channel.channel_member_ids.length > 2) {
+                    this.channel.leaveChannelRpc();
                     break;
                 }
                 this.actionsDisabled = true;
                 this.livechatStep = CW_LIVECHAT_STEP.CONFIRM_CLOSE;
-                if (!isSelfVisitor && this.channel.channel_member_ids.length > 2) {
-                    super.close(...arguments);
-                    break;
-                }
                 if (!this.hubAsOpened) {
                     this.open({ focus: true });
                 }
@@ -62,7 +62,7 @@ const chatWindowPatch = {
                     this.livechatStep = CW_LIVECHAT_STEP.FEEDBACK;
                 } else {
                     this.livechatStep = CW_LIVECHAT_STEP.NONE;
-                    super.close(...arguments);
+                    this.channel.leaveChannelRpc();
                 }
                 break;
             }
