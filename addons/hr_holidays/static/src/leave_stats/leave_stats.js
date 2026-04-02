@@ -32,8 +32,8 @@ export class LeaveStatsComponent extends Component {
         });
         this.date_format = {year: "numeric", month: "2-digit", day: "2-digit"};
         this.hour_format = {hour: "2-digit", minute: "2-digit"};
-        this.state.date_from = this.props.record.data.date_from || DateTime.now();
-        this.state.date_to = this.props.record.data.date_to || DateTime.now();
+        this.state.date_from = this.props.record.data.request_date_from || DateTime.now();
+        this.state.date_to = this.props.record.data.request_date_to || DateTime.now();
         this.state.employee = this.props.record.data.employee_id;
         this.state.department = this.props.record.data.department_id;
 
@@ -137,30 +137,24 @@ export class LeaveStatsComponent extends Component {
             this.state.leaves = [];
             return;
         }
-
-        const dateFrom = serializeDateTime(this.state.date_from.startOf("year"));
-        const dateTo = serializeDateTime(this.state.date_from.endOf("year"));
-        const leaves = await this.orm.webSearchRead(
-            "hr.leave",
-            [
-                ["employee_id", "=", employee.id],
-                ["state", "=", "validate"],
-                ["date_from", "<=", dateTo],
-                ["date_to", ">=", dateFrom],
-            ],
-            {
-                specification: {
-                    work_entry_type_id: { fields: { display_name: {} } },
-                    number_of_days: {},
-                    number_of_hours: {},
-                    color: {},
-                    max_leaves: {},
-                    virtual_remaining_leaves: {},
-                    work_entry_type_request_unit: {},
-                },
-            }
-        );
-        this.state.leaves = this.arrangeData(leaves.records);
+        const allocation_data = await this.orm.call("hr.work.entry.type", "get_allocation_data_request", [this.state.date_from], { context: { employee_id: employee.id } })
+        this.state.leaves = allocation_data
+            .filter((data) => data[1].leaves_approved > 0)
+            .map((data) => {
+                let work_entry_data = {}
+                work_entry_data.data = data[0]
+                work_entry_data.unit_of_measure = data[1].unit_of_measure
+                if (data[1].unit_of_measure == 'hour') {
+                    work_entry_data.leaves_approved = data[1].leaves_approved ? formatFloatTime(data[1].leaves_approved.toFixed(2)) : 0
+                    work_entry_data.max_leaves = data[1].max_leaves ? formatFloatTime(data[1].max_leaves.toFixed(2)) : 0
+                    work_entry_data.remaining_leaves = data[1].remaining_leaves ? formatFloatTime(data[1].remaining_leaves.toFixed(2)) : 0
+                } else {
+                    work_entry_data.leaves_approved = data[1].leaves_approved
+                    work_entry_data.max_leaves = data[1].max_leaves
+                    work_entry_data.remaining_leaves = data[1].remaining_leaves
+                }
+                return work_entry_data
+            });
     }
     arrangeData(leaves) {
         return leaves.map((leave) => {

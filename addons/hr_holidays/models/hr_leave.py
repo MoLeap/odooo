@@ -15,6 +15,7 @@ from odoo.addons.resource.models.utils import HOURS_PER_DAY
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools.date_utils import float_to_time
 from odoo.fields import Command, Date, Domain
+from odoo.tools.date_utils import time_to_float
 from odoo.tools.float_utils import float_round, float_compare, float_is_zero
 from odoo.tools.intervals import Intervals
 from odoo.tools.misc import clean_context, format_date
@@ -182,9 +183,10 @@ class HrLeave(models.Model):
         help='Number of days of the time off request. Used in the calculation.')
     number_of_hours = fields.Float(
         'Duration (Hours)', compute='_compute_duration', store=True, tracking=True,
+        inverse="_inverse_number_of_hours",
         help='Number of hours of the time off request. Used in the calculation.')
     last_several_days = fields.Boolean("All day", compute="_compute_last_several_days")
-    duration_display = fields.Char('Requested', compute='_compute_duration_display', inverse='_inverse_duration_display', store=True)
+    duration_display = fields.Char('Requested', compute='_compute_duration_display', store=True)
     # details
     meeting_id = fields.Many2one('calendar.event', string='Meeting', copy=False)
     first_approver_id = fields.Many2one(
@@ -231,7 +233,17 @@ class HrLeave(models.Model):
     is_striked = fields.Boolean('Striked', compute='_compute_is_hatched')
     has_mandatory_day = fields.Boolean(compute='_compute_has_mandatory_day')
     work_entry_type_increases_duration = fields.Char(compute='_compute_work_entry_type_increases_duration')
-
+    request_duration = fields.Selection(
+        [
+            ("full", "Full Day"),
+            ("am", "Morning"),
+            ("pm", "Afternoon"),
+            ("specific", "Specific"),
+        ],
+        default="full",
+        string="Duration",
+    )
+    request_duration_allowed = fields.Json(compute="_compute_request_duration_allowed")
     # warning message
     dashboard_warning_message = fields.Char(compute='_compute_dashboard_warning_message')
     _date_check2 = models.Constraint(
@@ -248,11 +260,10 @@ class HrLeave(models.Model):
     )
     _date_to_date_from_index = models.Index("(date_to, date_from)")
 
-    @api.onchange('request_hour_from', 'request_hour_to')
-    def _onchange_hours(self):
-        # avoid negative or after midnight
-        self.request_hour_from = min(max(self.request_hour_from, 0.0), 23.99)
-        self.request_hour_to = min(max(self.request_hour_to, 0.0), 24)
+    @api.depends("work_entry_type_request_unit", "last_several_days")
+    def _compute_request_duration_allowed(self):
+        for leave in self:
+            leave.request_duration_allowed = leave._get_request_duration_allowed()
 
     @api.depends('employee_id', 'request_date_from', 'request_date_to', 'work_entry_type_request_unit')
     def _compute_request_hour_from_to(self):
@@ -269,7 +280,7 @@ class HrLeave(models.Model):
                 leave.request_hour_to = hour_to
 
     @api.depends('employee_id', 'work_entry_type_request_unit', 'request_date_from', 'request_date_to',
-            'request_hour_from', 'request_hour_to', 'request_date_from_period', 'request_date_to_period')
+            'request_date_from_period', 'request_date_to_period')
     def _compute_dashboard_warning_message(self):
         all_leaves = self.search([
             ('date_from', '<', max(self.mapped('date_to'))),
@@ -428,7 +439,7 @@ class HrLeave(models.Model):
                           end_date=format_date(self.env, version.date_end) if version.date_end else self.env._("undefined"),
                       ) for version in versions)))
 
-    @api.depends('request_date_from_period', 'request_date_to_period', 'request_hour_from', 'request_hour_to',
+    @api.depends('request_date_from_period', 'request_date_to_period',
                  'request_date_from', 'request_date_to', 'work_entry_type_request_unit', 'employee_id')
     def _compute_date_from_to(self):
         for holiday in self:
@@ -446,14 +457,9 @@ class HrLeave(models.Model):
                 continue
 
             if holiday.work_entry_type_request_unit == 'hour':
-                hour_from = holiday.request_hour_from
-                hour_to = holiday.request_hour_to
-                if not hour_from or not hour_to:
-                    computed_from, computed_to = holiday._get_hour_from_to(holiday.request_date_from, holiday.request_date_to)
-                    hour_from = hour_from or computed_from
-                    hour_to = hour_to or computed_to
+                continue
 
-            elif holiday.work_entry_type_request_unit == 'half_day':
+            if holiday.work_entry_type_request_unit == 'half_day':
                 period_map = {'am': 'morning', 'pm': 'afternoon'}
                 from_period = period_map.get(holiday.request_date_from_period)
                 to_period = period_map.get(holiday.request_date_to_period)
@@ -711,62 +717,17 @@ class HrLeave(models.Model):
 
             leave.duration_display = display
 
-    def _inverse_duration_display(self):
+    @api.onchange('number_of_hours')
+    def _onchange_number_of_hours(self):
+        self._inverse_number_of_hours()
+
+    def _inverse_number_of_hours(self):
         for leave in self:
-            if not leave.duration_display or not leave.request_date_from:
-                continue
-            calendar = leave.resource_calendar_id or leave.employee_id.resource_calendar_id or self.env.company.resource_calendar_id
-            tz_name = leave.tz or leave.employee_id.tz or self.env.user.tz or 'UTC'
-            tz = ZoneInfo(tz_name)
-            if leave.work_entry_type_request_unit == 'hour':
-                val = leave.duration_display.lower().replace('hours', '').replace('hour', '').strip()
-                try:
-                    if ':' in val:
-                        h, m = map(int, val.split(':'))
-                        total_hours = h + (m / 60.0)
-                    else:
-                        total_hours = float(val)
-                except ValueError:
-                    continue
-
-                if float_compare(total_hours, leave.number_of_hours, precision_digits=2) == 0:
-                    continue
-
-                start_hour = leave.request_hour_from or 0.0
-                local_start_dt = datetime.combine(leave.request_date_from, float_to_time(start_hour))
-                local_start_dt = local_start_dt.replace(tzinfo=tz)
-                utc_start_dt = local_start_dt.astimezone(UTC).replace(tzinfo=None)
-                utc_end_dt = calendar.plan_hours(total_hours, utc_start_dt, compute_leaves=False)
-                if not utc_end_dt:
-                    utc_end_dt = utc_start_dt
-
-                local_end_dt = utc_end_dt.replace(tzinfo=UTC).astimezone(tz)
-                leave.number_of_hours = total_hours
-                leave.request_date_to = local_end_dt.date()
-                float_hour = local_end_dt.hour + (local_end_dt.minute / 60.0)
-                leave.request_hour_to = float_round(float_hour, precision_digits=2)
-
-            elif leave.work_entry_type_request_unit in ('day', 'half_day'):
-                val = leave.duration_display.lower().replace('days', '').replace('day', '').strip()
-                try:
-                    days_val = float(val)
-                except ValueError:
-                    continue
-                if float_compare(days_val, leave.number_of_days, precision_digits=2) == 0:
-                    continue
-                leave.number_of_days = days_val
-                current_date = leave.request_date_from
-                days_to_add = max(0, int(days_val) - 1)
-                while days_to_add > 0:
-                    current_date += timedelta(days=1)
-                    if current_date.weekday() < 5:
-                        days_to_add -= 1
-                leave.request_date_to = current_date
-
-    @api.onchange('duration_display')
-    def _onchange_duration_display(self):
-        """ When UI text changes, re-calculate the Dates """
-        self._inverse_duration_display()
+            calendar = leave.employee_id._get_version(leave.request_date_from).resource_calendar_id
+            tz = ZoneInfo(leave.tz or leave.employee_id.tz or self.env.user.tz or 'UTC')
+            local_date_to = calendar.plan_hours(leave.number_of_hours, leave.date_from, compute_leaves=False).replace(tzinfo=UTC).astimezone(tz)
+            leave.request_date_to = local_date_to.date()
+            leave.request_hour_to = time_to_float(local_date_to.time())
 
     @api.depends('state', 'employee_id', 'department_id')
     def _compute_can_approve(self):
