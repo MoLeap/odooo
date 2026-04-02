@@ -32,7 +32,7 @@
                     <field
                         string="Account Country"
                         name="mercado_pago_account_country_id"
-                        required="code == 'mercado_pago' and state != 'disabled'"
+                        required="code == 'mercado_pago'"
                         readonly="mercado_pago_access_token and mercado_pago_is_oauth_supported"
                         options="{'no_create': True}"
                     />
