@@ -1,9 +1,9 @@
 from odoo import fields, models
 
 
-class TestOrmCommonFields(models.Model):
-    _name = 'test_orm.common_fields'
-    _description = 'Test ORM Common Fields'
+class TestOrmMixed(models.Model):
+    _name = 'test_orm.mixed'
+    _description = 'Test ORM Mixed'
 
     # Binary Fields
     binary_with_attachment = fields.Binary()
@@ -21,18 +21,14 @@ class TestOrmCommonFields(models.Model):
     float_numeric = fields.Float(digits=(0, False))
     monetary = fields.Monetary()
 
-    # Properties Fields
-    properties = fields.Properties()
-    properties_definition = fields.PropertiesDefinition()
-
     # Reference Fields
     reference = fields.Reference(selection=[('option_1', 'Option 1')])
     many2one_reference = fields.Many2oneReference(model_field='res_model')
 
     # Relational Fields
-    many2one_id = fields.Many2one(comodel_name='test_orm.common_fields_relations')
-    one2many_ids = fields.One2many(comodel_name='test_orm.common_fields_relations', inverse_name='many2one_id')
-    many2many_ids = fields.Many2many(comodel_name='test_orm.common_fields_relations')
+    many2one_id = fields.Many2one(comodel_name='test_orm.mixed_relations')
+    one2many_ids = fields.One2many(comodel_name='test_orm.mixed_relations', inverse_name='many2one_id')
+    many2many_ids = fields.Many2many(comodel_name='test_orm.mixed_relations')
 
     # Selection Fields
     selection = fields.Selection(selection=[('option_1', 'Option 1')])
@@ -51,11 +47,11 @@ class TestOrmCommonFields(models.Model):
     res_model = fields.Char()  # Needed for the many2one_reference field.
 
 
-class TestOrmCommonFieldsRelations(models.Model):
-    # This model is used to set up 'test_orm.common_fields' relations.
-    _name = 'test_orm.common_fields_relations'
-    _description = 'Test ORM Common Fields Relations'
+class TestOrmMixedRelations(models.Model):
+    # This model is used to set up 'test_orm.mixed' relations.
+    _name = 'test_orm.mixed_relations'
+    _description = 'Test ORM Mixed Relations'
 
-    many2one_id = fields.Many2one(comodel_name='test_orm.common_fields')
-    one2many_ids = fields.One2many(comodel_name='test_orm.common_fields', inverse_name='many2one_id')
-    many2many_ids = fields.Many2many(comodel_name='test_orm.common_fields')
+    many2one_id = fields.Many2one(comodel_name='test_orm.mixed')
+    one2many_ids = fields.One2many(comodel_name='test_orm.mixed', inverse_name='many2one_id')
+    many2many_ids = fields.Many2many(comodel_name='test_orm.mixed')

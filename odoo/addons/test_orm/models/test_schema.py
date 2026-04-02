@@ -4,8 +4,13 @@ from odoo import fields, models
 class TestOrmSchema(models.Model):
     _name = 'test_orm.schema'
     _description = 'Test ORM Schema'
-    _inherit = ['test_orm.common_fields']
+    _inherit = ['test_orm.mixed']
 
+    # Properties Fields
+    properties = fields.Properties()
+    properties_definition = fields.PropertiesDefinition()
+
+    # Attributes
     required = fields.Char(required=True)
     size = fields.Char(size=3)
     index_btree = fields.Char(index='btree')
