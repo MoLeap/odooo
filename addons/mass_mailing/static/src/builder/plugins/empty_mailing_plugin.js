@@ -27,7 +27,7 @@ export class EmptyMailingPlugin extends Plugin {
         const snippet = this.config.snippetModel.snippetGroups.find(
             (group) => group.groupName === "text"
         );
-        this.dependencies.blockTab.onSnippetGroupClick(snippet, {});
+        this.dependencies.blockTab.insertSnippetGroup(snippet);
     }
 }
 
