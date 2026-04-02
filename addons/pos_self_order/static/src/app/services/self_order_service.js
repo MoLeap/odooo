@@ -301,6 +301,7 @@ export class SelfOrder extends Reactive {
             lineToMerge.setQuantity(lineToMerge.qty + newLine.qty);
             newLine.delete();
         }
+        this.currentOrder.updateServiceCharge();
     }
     async confirmationPage(screen_mode, device, access_token) {
         if (!access_token) {
@@ -924,22 +925,49 @@ export class SelfOrder extends Reactive {
     }
 
     get orderLineNotSend() {
-        return Object.entries(this.currentOrder.changes).reduce(
+        const result = Object.entries(this.currentOrder.changes).reduce(
             (acc, [key, { qty }]) => {
                 if (qty && qty > 0) {
                     const line = this.models["pos.order.line"].getBy("uuid", key);
+                    if (line.is_service_charge) {
+                        return acc;
+                    }
                     if (!line.combo_parent_id) {
                         acc.count += qty;
                     }
-                    const prices = line.prices;
-                    acc.priceWithTax += prices.total_included;
-                    acc.priceWithoutTax += prices.total_excluded;
-                    acc.tax += prices.taxes_data.reduce((acc, tax) => (acc += tax.tax_amount), 0);
+                    const taxDetails = line.order_id._constructPriceData({
+                        baseLineOpts: { quantity: qty },
+                    }).baseLineByLineUuids[line.uuid].tax_details;
+                    acc.priceWithTax += taxDetails.total_included;
+                    acc.priceWithoutTax += taxDetails.total_excluded;
+                    acc.tax += taxDetails.total_included - taxDetails.total_excluded;
                 }
                 return acc;
             },
             { priceWithTax: 0, priceWithoutTax: 0, count: 0, tax: 0 }
         );
+
+        // Include the service charge delta (not tracked in changes since qty doesn't change)
+        if (result.count > 0) {
+            const scLine = this.currentOrder.lines.find((l) => l.is_service_charge);
+            if (scLine) {
+                const preset = this.currentOrder.preset_id;
+                const isFixedFee = preset?.service_fee_type === "fixed";
+
+                // Do not show fixed service charge in unsent totals if pay_after is "meal"
+                if (!(isFixedFee && this.config.self_ordering_pay_after === "meal")) {
+                    const lastChange = this.currentOrder.uiState.lineChanges[scLine.uuid];
+                    const alreadySent = lastChange?.serviceChargePrice !== undefined;
+                    if (!(isFixedFee && alreadySent)) {
+                        const fullPrice = scLine.getDisplayPriceWithQty(scLine.qty);
+                        const sentPrice = lastChange?.serviceChargePrice ?? 0;
+                        result.priceWithTax += fullPrice - sentPrice;
+                    }
+                }
+            }
+        }
+
+        return result;
     }
 
     get kioskBackgroundImageUrl() {

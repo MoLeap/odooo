@@ -36,6 +36,22 @@ class ProductTemplate(models.Model):
             load=False
         )
         products.extend(combo_products_choice)
+
+        # Ensure special products (e.g. service fee) are loaded
+        loaded_ids = {p['id'] for p in products}
+        special_products = config._get_special_products().filtered(
+            lambda p: not p.sudo().company_id or p.sudo().company_id == config.company_id
+        )
+        special_tmpl_ids = special_products.product_tmpl_id.ids
+        missing_ids = [tid for tid in special_tmpl_ids if tid not in loaded_ids]
+        if missing_ids:
+            special_data = self.search_read(
+                [('id', 'in', missing_ids)],
+                fields,
+                load=False,
+            )
+            products.extend(special_data)
+
         self._process_pos_self_ui_products(products)
 
         return products
