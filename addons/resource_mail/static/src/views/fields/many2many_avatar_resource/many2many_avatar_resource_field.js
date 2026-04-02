@@ -16,7 +16,6 @@ import {
 import { Many2XAutocomplete } from "@web/views/fields/relational_utils";
 import { AvatarTag } from "@web/core/tags_list/avatar_tag";
 import { Many2ManyTagsAvatarFieldPopover } from "@web/views/fields/many2many_tags_avatar/many2many_tags_avatar_field";
-import { Component } from "@odoo/owl";
 
 // TODO: Remove me in master
 export class AvatarResourceMany2XAutocomplete extends Many2XAutocomplete {}
