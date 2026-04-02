@@ -19,6 +19,8 @@ class TestOrmMixed(models.Model):
     integer = fields.Integer()
     float_double_precision = fields.Float()
     float_numeric = fields.Float(digits=(0, False))
+    # number = fields.Float(digits=(10, 2), default=3.14)
+    float_precision = fields.Float(digits='ORM Precision')
     monetary = fields.Monetary()
 
     # Reference Fields
