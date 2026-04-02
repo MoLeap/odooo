@@ -1,6 +1,7 @@
-import { Component, useState } from "@odoo/owl";
+import { Component } from "@odoo/owl";
 import { formatCurrency } from "@web/core/currency";
 import { useDebounced } from "@web/core/utils/timing";
+import { useState } from "@web/owl2/utils";
 
 export const DELAY = 200;
 
@@ -29,13 +30,7 @@ export class CartLine extends Component {
         descriptionLines: Array,
         shopWarning: String,
         comboItemLines: Array,
-        isQuantityViewActive: Boolean,
-        isWishlistViewActive: Boolean,
-        currencyId: Number,
-        isUomFeatureEnabled: Boolean,
         templateData: Object,
-        update: Function,
-        addToWishlist: Function,
     };
 
     setup() {
@@ -43,12 +38,12 @@ export class CartLine extends Component {
             quantity: this.props.displayedQuantity,
         });
         this.updateQuantityDebounced = useDebounced(() => {
-            this.props.update(parseInt(this.props.id), this.props.productId, this.state.quantity);
+            this.env.update(parseInt(this.props.id), this.props.productId, this.state.quantity);
         }, DELAY);
     }
 
     formatPrice(price) {
-        return formatCurrency(price, this.props.currencyId);
+        return formatCurrency(price, this.env.currencyId);
     }
 
     updateQuantity(quantity) {
@@ -60,6 +55,6 @@ export class CartLine extends Component {
     }
 
     addToWishlist() {
-        this.props.addToWishlist(parseInt(this.props.id), this.props.productId);
+        this.env.addToWishlist(parseInt(this.props.id), this.props.productId);
     }
 }

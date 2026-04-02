@@ -92,7 +92,7 @@
                                 aria-label="Remove from cart"
                                 t-on-click="(event) => this.updateQuantity(0)"
                                 />
-                            <t t-if="this.props.isSellable and this.props.isWishlistViewActive">
+                            <t t-if="this.props.isSellable and this.env.isWishlistViewActive">
                                 <span class="text-300">|</span>
                                 <!-- TODO NIPL add to wishlist and remove from cart -->
                                 <button
@@ -124,7 +124,7 @@
                     </div>
                     <!-- TODO NIPL add to wishlist and remove from cart -->
                     <button
-                        t-if="this.props.isSellable and this.props.isWishlistViewActive"
+                        t-if="this.props.isSellable and this.env.isWishlistViewActive"
                         class="btn btn-link d-inline-block d-md-none px-2"
                         title="Wishlist"
                         t-on-click="() => this.addToWishlist()"
@@ -158,7 +158,7 @@
             <span t-out="this.formatPrice(this.props.productPrice)" style="white-space: nowrap;"/>
         </h6>
         <small
-            t-if="this.props.isSellable and this.props.isUomFeatureEnabled and this.props.baseUnitPrice"
+            t-if="this.props.isSellable and this.env.isUomFeatureEnabled and this.props.baseUnitPrice"
             class="cart_product_base_unit_price d-block text-muted text-end"
         >
             <span
@@ -193,7 +193,7 @@
     </t>
 
     <t t-name="website_sale.CartLinesQuantity">
-        <t t-set="showQuantitySelector" t-value="this.props.isQuantityViewActive"/>
+        <t t-set="showQuantitySelector" t-value="this.env.isQuantityViewActive"/>
         <div
             t-attf-class="css_quantity input-group justify-content-end h-100 {{showQuantitySelector and this.props.isSellable ? 'border' : ''}}"
             t-attf-name="{{ isMobile ? 'website_sale_cart_line_quantity_mobile' : 'website_sale_cart_line_quantity' }}"

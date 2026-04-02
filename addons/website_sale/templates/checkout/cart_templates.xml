@@ -7,7 +7,6 @@
         <div id="cart_products"/>
         <!-- dummy cart line to display in edit mode only -->
         <div
-            t-if="editable and website_sale_order and website_sale_order.website_order_line"
             class="css_non_editable_mode_hidden"
             id="cart_products_edit_mode"
         >
@@ -81,7 +80,6 @@
             </div>
         </div>
         <div
-            t-if="editable and (not website_sale_order or not website_sale_order.website_order_line)"
             class="css_non_editable_mode_hidden empty_cart w-100"
         >
             <div class="mt-5 mb-3"><t t-call="website_sale.empty_cart_svg"/></div>

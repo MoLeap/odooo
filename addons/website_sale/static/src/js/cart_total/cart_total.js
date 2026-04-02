@@ -1,10 +1,10 @@
-import { Component, onWillStart, useState } from '@odoo/owl';
-import { formatCurrency } from '@web/core/currency';
-import { rpc } from '@web/core/network/rpc';
+import { Component, onWillStart, useState } from "@odoo/owl";
+import { formatCurrency } from "@web/core/currency";
+import { rpc } from "@web/core/network/rpc";
 import { useService, useBus } from "@web/core/utils/hooks";
 
 export class CartTotal extends Component {
-    static template = 'website_sale.CartTotal';
+    static template = "website_sale.CartTotal";
     static props = {};
 
     setup() {
@@ -18,19 +18,19 @@ export class CartTotal extends Component {
             has_deliverable_products: false,
             tax_included: false,
         });
-        this.cartService = useService('cart');
+        this.cartService = useService("cart");
 
         onWillStart(async () => {
             await this.updateTotals();
         });
 
-        useBus(this.cartService.bus, 'cart_update', () => {
+        useBus(this.cartService.bus, "cart_update", () => {
             this.updateTotals();
         });
     }
 
     async updateTotals() {
-        const data = await rpc('/shop/cart/totals');
+        const data = await rpc("/shop/cart/totals");
         // !This can be improved a bit but I don't wanna define some nasty hooks for now just for adding
         // !a new assignment in extenstions
         Object.assign(this.state, data);

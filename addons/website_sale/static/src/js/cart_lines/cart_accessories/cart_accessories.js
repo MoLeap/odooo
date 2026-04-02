@@ -24,11 +24,11 @@ export class CartAccessories extends Component {
     }
 
     async updateAccessories() {
-        this.state.accessories = await rpc("shop/cart/accessories");
+        this.state.accessories = await rpc("/shop/cart/accessories");
     }
 
     formatPrice(price) {
-        return formatCurrency(price, this.props.currencyId);
+        return formatCurrency(price, this.env.currencyId);
     }
 
     async addToCart(accessoryProduct) {
