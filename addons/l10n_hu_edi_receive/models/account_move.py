@@ -54,7 +54,7 @@ class AccountMove(models.Model):
                 *self._check_company_domain(self.env.company),
                 ('move_type', 'in', self.get_purchase_types()),
                 ('ref', '=', ref),
-                ('partner_id.l10n_hu_eu_vat', '=', l10n_hu_eu_vat),
+                ('partner_id.l10n_hu_eu_vat_stored', '=', l10n_hu_eu_vat),
             ]
             move = self.search(move_domain, limit=1)
             if move:
@@ -140,7 +140,7 @@ class AccountMove(models.Model):
             supplier_info.findtext('data:groupMemberTaxNumber/base:taxpayerId', namespaces=XML_NAMESPACES) or
             supplier_info.findtext('data:supplierTaxNumber/base:taxpayerId', namespaces=XML_NAMESPACES)
         )
-        partner = self.env['res.partner'].search([('l10n_hu_eu_vat', '=', l10n_hu_eu_vat)], limit=1)
+        partner = self.env['res.partner'].search([('l10n_hu_eu_vat_stored', '=', l10n_hu_eu_vat)], limit=1)
         if not partner:
             supplier_tax_number = parse_vat(supplier_info.find('data:supplierTaxNumber', namespaces=XML_NAMESPACES))
             supplier_group_member_tax_number = parse_vat(supplier_info.find('data:groupMemberTaxNumber', namespaces=XML_NAMESPACES))
