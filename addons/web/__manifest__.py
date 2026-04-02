@@ -191,7 +191,6 @@ This module provides the core of the Odoo Web Client.
             'web/static/lib/owl/owl.js',
             'web/static/src/owl2/utils.js',
             'web/static/lib/owl/odoo_module.js',
-            'web/static/lib/jquery/jquery.js',
             'web/static/lib/popper/popper.js',
             'web/static/lib/bootstrap/js/dist/util/index.js',
             'web/static/lib/bootstrap/js/dist/dom/data.js',
@@ -220,8 +219,6 @@ This module provides the core of the Odoo Web Client.
             'web/static/lib/bootstrap/js/dist/tab.js',
             'web/static/lib/bootstrap/js/dist/toast.js',
             'web/static/src/libs/bootstrap.js',
-            'web/static/src/legacy/js/libs/jquery.js',
-            'web/static/src/legacy/js/core/class.js',
 
             'web/static/src/env.js',
             'web/static/src/core/utils/transitions.scss',  # included early because used by other files
@@ -383,10 +380,6 @@ This module provides the core of the Odoo Web Client.
 
             ('include', 'web._assets_primary_variables'),
             ('include', 'web._assets_secondary_variables'),
-        ],
-        'web._assets_jquery': [
-            'web/static/lib/jquery/jquery.js',
-            'web/static/src/legacy/js/libs/jquery.js',
         ],
         'web._assets_bootstrap': [
             'web/static/src/scss/import_bootstrap.scss',

@@ -8,6 +8,8 @@ const errorHandlerRegistry = registry.category("error_handlers");
 import { Component, xml } from "@odoo/owl";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
 
+// Mondial Relay only provides a widget in jQuery
+const JQUERY_URL = "https://code.jquery.com/jquery-3.7.1.min.js";
 const MONDIALRELAY_SCRIPT_URL = "https://widget.mondialrelay.com/parcelshop-picker/jquery.plugin.mondialrelay.parcelshoppicker.min.js"
 
 function corsIgnoredErrorHandler(env, error) {
@@ -24,12 +26,14 @@ export class MondialRelayField extends Component {
         this.state = useState({
             libLoaded: false, // Whether the library is loaded or not
         });
-        onWillRender(() => {
+        onWillRender(async () => {
             // Do nothing if the record is not of type mondial_relay
             if (!this.enabled || this.state.libLoaded) {
                 return;
             }
-            loadJS(MONDIALRELAY_SCRIPT_URL).then(() => {this.state.libLoaded = true});
+            await loadJS(JQUERY_URL);
+            await loadJS(MONDIALRELAY_SCRIPT_URL);
+            this.state.libLoaded = true;
         });
 
         useLayoutEffect(
