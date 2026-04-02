@@ -55,6 +55,7 @@
                                    name="csrf_token"
                                    t-att-value="request.csrf_token()"/>
                             <t t-if="not hide_payment_button" t-call="payment.submit_button"/>
+
                         </form>
                     </div>
                     <t t-elif="not hide_payment_button" t-call="payment.submit_button"/>
@@ -403,19 +404,12 @@
 
     <!-- Called in `website_sale.checkout_layout`. -->
     <template id="total">
-        <!-- Layout customization parameters:
-            - _cart_total_classes: CSS classes to append on the root div of the total template;
-                                   default `None`.
-        -->
         <div
             t-if="website_sale_order and website_sale_order.website_order_line"
-            t-attf-class="o_cart_total #{_cart_total_classes}"
+            t-attf-class="css_non_editable_mode_hidden #{_cart_total_classes}"
+            id="cart_total_edit_mode"
         >
-            <t
-                t-set="tax_included"
-                t-value="website_sale_order.website_id.show_line_subtotals_tax_selection == 'tax_included'"
-            />
-            <table name="cart_total_table" class="table mb-0">
+            <table class="table mb-0">
                 <tr
                     t-if="website_sale_order._has_deliverable_products()"
                     name="o_order_delivery"
@@ -424,61 +418,32 @@
                         Delivery
                     </td>
                     <td class="text-end pe-0 pt-0 pb-2 border-0">
-                        <span
-                            name="o_message_no_dm_set"
-                            t-att-class="'d-none' if website_sale_order.carrier_id else ''"
-                            title="Price will be updated after choosing a delivery method"
-                        >
-                            -
-                        </span>
-                        <span
-                            t-out="website_sale_order.amount_delivery"
-                            t-att-class="'monetary_field' + ('' if website_sale_order.carrier_id else ' d-none')"
-                            style="white-space: nowrap;"
-                            t-options="{'widget': 'monetary', 'display_currency': website_sale_order.currency_id}"
-                        />
+                        <span t-out="5.00" style="white-space: nowrap;"/>
                     </td>
                 </tr>
-                <!-- Tax excluded view -->
-                <tr
-                    t-if="not tax_included"
-                    name="o_order_total_untaxed"
-                >
-                    <td
-                        class="border-0 pb-2 ps-0 pt-0 text-muted"
-                        colspan="2"
-                    >
+                <tr name="o_order_total_untaxed">
+                    <td class="border-0 pb-2 ps-0 pt-0 text-start text-muted" colspan="2">
                         Subtotal
                     </td>
                     <td class="text-end border-0 pb-2 pe-0 pt-0">
-                        <span
-                            t-field="website_sale_order.amount_untaxed"
-                            class="monetary_field"
-                            t-options="{'widget': 'monetary', 'display_currency': website_sale_order.currency_id}"
-                        />
+                        <span t-out="40.00"/>
                     </td>
                 </tr>
-                <t t-if="not tax_included" t-call="website_sale.order_tax_lines"/>
-                <!-- Total -->
                 <tr name="o_order_total" class="border-top">
-                    <td
-                        colspan="2"
-                        t-attf-class="border-0 ps-0 pt-2 #{'pb-1' if tax_included else 'pb-2'}"
-                    >
+                    <td colspan="2" class="border-0 ps-0 pt-2">
                         <strong>Total</strong>
                     </td>
-                    <td t-attf-class="text-end border-0 px-0 pt-2 #{'pb-1' if tax_included else 'pb-2'}">
-                        <strong
-                            t-field="website_sale_order.amount_total"
-                            class="monetary_field"
-                            t-options="{'widget': 'monetary', 'display_currency': website_sale_order.currency_id}"
-                        />
+                    <td class="text-end border-0 px-0 pt-2">
+                        <strong t-out="45.00" class="text-end p-0"/>
                     </td>
                 </tr>
-                <!-- Tax included view -->
-                <t t-if="tax_included" t-call="website_sale.order_tax_lines"/>
             </table>
         </div>
+        <!-- Layout customization parameters:
+            - _cart_total_classes: CSS classes to append on the root div of the total template;
+                                   default `None`.
+        -->
+        <div t-attf-class="o_cart_total #{_cart_total_classes}"/>
     </template>
 
     <!-- Deactivatable through the website editor. -->
@@ -488,68 +453,14 @@
             - redirect: The route to redirect to when a customer enters a coupon; default: `None`.
             - website_sale_order: The current order.
         -->
-        <table name="cart_total_table" position="inside">
-            <tr t-if="not hide_promotions">
-                <td colspan="3" class="text-end text-xl-end border-0 p-0">
-                <span>
-                    <t t-set="force_coupon" t-value="website_sale_order.pricelist_id.code"/>
-                    <div t-if="not force_coupon" class="coupon_form">
-                        <t t-call="website_sale.coupon_form"/>
-                    </div>
-                </span>
-                </td>
-            </tr>
-        </table>
-    </template>
-
-    <template id="order_tax_lines">
-        <tbody id="order_tax_lines_container">
-            <t
-                t-set="tax_included"
-                t-value="website_sale_order.website_id.show_line_subtotals_tax_selection == 'tax_included'"
-            />
-            <t t-if="website_sale_order.tax_totals and website_sale_order.tax_totals['subtotals']">
-                <t t-foreach="website_sale_order.tax_totals['subtotals']" t-as="line">
-                    <t t-foreach="line['tax_groups']" t-as="tax_line">
-                        <tr name="o_order_total_taxes">
-                            <!-- Tax included view -->
-                            <td
-                                t-if="tax_included"
-                                class="border-0 p-0 pb-2 small"
-                                colspan="3"
-                            >
-                                <p class="text-muted mb-0">
-                                    Including
-                                    <span
-                                        t-out="tax_line['tax_amount_currency']"
-                                        class="monetary_field"
-                                        t-options="{'widget': 'monetary', 'display_currency': website_sale_order.currency_id}"
-                                    />
-                                    <t t-out="tax_line['group_name']"/>
-                                </p>
-                            </td>
-                            <!-- Tax excluded view -->
-                            <t t-else="">
-                                <td
-                                    class="text-muted border-0 p-0 pe-3 pb-2"
-                                    colspan="2"
-                                >
-                                    <t t-out="tax_line['group_name']"/>
-                                </td>
-                                <td class="text-end border-0 p-0 ps-3 pb-2">
-                                    <span
-                                        t-out="tax_line['tax_amount_currency']"
-                                        class="monetary_field"
-                                        style="white-space: nowrap;"
-                                        t-options="{'widget': 'monetary', 'display_currency': website_sale_order.currency_id}"
-                                    />
-                                </td>
-                            </t>
-                        </tr>
-                    </t>
-                </t>
-            </t>
-        </tbody>
+        <xpath expr="//div[contains(@t-attf-class, 'o_cart_total')]" position="after">
+            <span t-if="not hide_promotions">
+                <t t-set="force_coupon" t-value="website_sale_order.pricelist_id.code"/>
+                <div t-if="not force_coupon" class="coupon_form">
+                    <t t-call="website_sale.coupon_form"/>
+                </div>
+            </span>
+        </xpath>
     </template>
 
 </odoo>
