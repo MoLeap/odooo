@@ -76,12 +76,6 @@ export class AddressAutoComplete extends CharField {
                             label: result.formatted_address,
                             onSelect: () => this.selectAddressProposition(result),
                         }));
-                        if (suggestions.results.length) {
-                            suggestions.results.push({
-                                label: "&#160;",
-                                cssClass: "pe-none o-google-credits",
-                            });
-                        }
                         return suggestions.results;
                     } else {
                         return [];

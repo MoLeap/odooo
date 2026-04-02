@@ -1,11 +1,12 @@
 import { useRef, useState } from "@web/owl2/utils";
-import { Component } from "@odoo/owl";
+import { Component, useEffect } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { useSelfOrder } from "@pos_self_order/app/services/self_order_service";
 import { OrderWidget } from "@pos_self_order/app/components/order_widget/order_widget";
 import { PresetInfoPopup } from "@pos_self_order/app/components/preset_info_popup/preset_info_popup";
 import { useScrollShadow } from "../../utils/scroll_shadow_hook";
 import { CancelPopup } from "@pos_self_order/app/components/cancel_popup/cancel_popup";
+import { OrderNotePopup } from "@pos_self_order/app/components/order_note_popup/order_note_popup";
 import { _t } from "@web/core/l10n/translation";
 import { formatProductName } from "../../utils";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
@@ -23,11 +24,21 @@ export class CartPage extends Component {
         this.dialog = useService("dialog");
         this.router = useService("router");
         this.state = useState({
-            showOrderNote: this.orderNote,
             orderNoteValue: "",
         });
 
         this.scrollShadow = useScrollShadow(useRef("scrollContainer"));
+        useEffect(
+            () => this.selfOrder.ensureDeliveryLine(),
+            () => {
+                const order = this.selfOrder.currentOrder;
+                const nonDeliveryId = order?.preset_id?.delivery_product_id?.id;
+                const nonDeliveryTotal = order?.lines
+                    ?.filter((l) => l.product_id?.product_tmpl_id?.id !== nonDeliveryId)
+                    .reduce((sum, l) => sum + (l.qty || 0) * (l.price_unit || 0), 0);
+                return [order?.preset_id?.id, nonDeliveryTotal];
+            }
+        );
     }
 
     get showCancelButton() {
@@ -73,6 +84,15 @@ export class CartPage extends Component {
 
     getAttributes(line) {
         return [...(line.attribute_value_ids || [])];
+    }
+
+    async openNotePopup() {
+        const note = await makeAwaitable(this.dialog, OrderNotePopup, {
+            note: this.orderNote,
+        });
+        if (note !== undefined) {
+            this.state.orderNoteValue = note;
+        }
     }
 
     async cancelOrder() {
@@ -375,6 +395,11 @@ export class CartPage extends Component {
     }
     get displayTaxes() {
         return !this.selfOrder.isTaxesIncludedInPrice();
+    }
+
+    isDeliveryLine(line) {
+        const deliveryTmplId = this.selfOrder.currentOrder?.preset_id?.delivery_product_id?.id;
+        return deliveryTmplId && line.product_id?.product_tmpl_id?.id === deliveryTmplId;
     }
 
     formatProductName(product) {

@@ -89,6 +89,26 @@ class ProductTemplate(models.Model):
 class ProductProduct(models.Model):
     _inherit = "product.product"
 
+    def _load_pos_self_data_search_read(self, data, config):
+        result = super()._load_pos_self_data_search_read(data, config)
+        # Also load product.product variants for delivery products referenced by active presets.
+        # Their templates may have been loaded with active_test=False, but variants need explicit loading too.
+        preset_data = data.get('pos.preset', [])
+        delivery_tmpl_ids = [
+            p['delivery_product_id']
+            for p in preset_data
+            if p.get('delivery_product_id')
+        ]
+        if delivery_tmpl_ids:
+            existing_ids = {r['id'] for r in result}
+            delivery_variants = self.with_context(active_test=False).search(
+                [('product_tmpl_id', 'in', delivery_tmpl_ids)]
+            )
+            missing_variants = delivery_variants.filtered(lambda v: v.id not in existing_ids)
+            if missing_variants:
+                result.extend(self._load_pos_self_data_read(missing_variants, config))
+        return result
+
     def write(self, vals):
         res = super().write(vals)
         if 'self_order_available' in vals:

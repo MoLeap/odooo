@@ -217,6 +217,12 @@ class PosOrder(models.Model):
             elif not line.combo_parent_id:
                 self._compute_line_price(line)
 
+        self._update_amounts()
+
+    def _update_amounts(self):
+        """Recompute amount_tax and amount_total from current line prices without resetting price_unit."""
+        self.ensure_one()
+        company = self.company_id
         order_lines = self.lines
         base_lines = [line._prepare_base_line_for_taxes_computation() for line in order_lines]
         self.env['account.tax']._add_tax_details_in_base_lines(base_lines, company)

@@ -1,0 +1,9 @@
+.o-autocomplete--input {
+    @extend .form-control;
+    @extend .form-control-lg;
+}
+
+.address-delivery-error .o-autocomplete--input {
+    border-color: $danger;
+    background-color: mix(white, $danger, 85%);
+}
