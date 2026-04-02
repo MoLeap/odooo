@@ -8,7 +8,7 @@ from werkzeug import urls
 from odoo import _, api, fields, models
 from odoo.fields import Domain
 from odoo.http import request
-from odoo.tools import float_is_zero, is_html_empty
+from odoo.tools import float_is_zero, float_round, is_html_empty
 from odoo.tools.sql import SQL, column_exists, create_column
 from odoo.tools.translate import adapt_translated_field_value, html_translate
 
@@ -641,6 +641,38 @@ class ProductTemplate(models.Model):
             # If the price should be hidden, we don't want to send any price information regarding
             # the product
             combination_info["compare_list_price"] = 0
+
+        if not product_or_template.is_storable:
+            return combination_info
+
+        combination_info.update({
+            "is_storable": True,
+            "allow_out_of_stock_order": product_or_template.allow_out_of_stock_order,
+            "available_threshold": product_or_template.available_threshold,
+        })
+        if product_or_template.is_product_variant:
+            product_sudo = product_or_template.sudo()
+            computed_qty = product_sudo.uom_id._compute_quantity(
+                website._get_product_available_qty(product_sudo), to_unit=uom, round=False
+            )
+            free_qty = float_round(computed_qty, precision_digits=0, rounding_method="DOWN")
+            cart_quantity = 0.0
+            if not product_sudo.allow_out_of_stock_order:
+                cart_quantity = product_sudo.uom_id._compute_quantity(
+                    request.cart._get_cart_qty(product_sudo.id), to_unit=uom
+                )
+            digits = self.env["decimal.precision"].precision_get("Product Unit")
+            rounding = 10**-digits
+            combination_info.update({
+                "free_qty": free_qty,
+                "cart_qty": cart_quantity,
+                "uom_name": uom.name,
+                "uom_rounding": rounding,
+                "show_availability": product_sudo.show_availability,
+                "out_of_stock_message": product_sudo.out_of_stock_message,
+            })
+        else:
+            combination_info.update({"free_qty": 0, "cart_qty": 0})
 
         return combination_info
 

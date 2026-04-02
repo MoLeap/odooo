@@ -1,9 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import api, fields, models
+from odoo import api, models
 from odoo.http import request
-from odoo.tools import float_round
-from odoo.tools.translate import html_translate
 
 from odoo.addons.website.models import ir_http
 
@@ -32,20 +30,8 @@ class ProductTemplate(models.Model):
                 # No uom conversion: combo are not supposed to be sold with other uoms.
                 res["max_combo_quantity"] = min(max_quantities)
 
-        if not product_or_template.is_storable:
-            return res
-
-        res.update({
-            "is_storable": True,
-            "allow_out_of_stock_order": product_or_template.allow_out_of_stock_order,
-            "available_threshold": product_or_template.available_threshold,
-        })
-        if product_or_template.is_product_variant:
+        if product_or_template.is_storable and product_or_template.is_product_variant:
             product_sudo = product_or_template.sudo()
-            computed_qty = product_sudo.uom_id._compute_quantity(
-                website._get_product_available_qty(product_sudo), to_unit=uom, round=False
-            )
-            free_qty = float_round(computed_qty, precision_digits=0, rounding_method="DOWN")
             has_stock_notification = product_sudo._has_stock_notification(
                 self.env.user.partner_id
             ) or (
@@ -56,29 +42,11 @@ class ProductTemplate(models.Model):
             stock_notification_email = request and request.session.get(
                 "stock_notification_email", ""
             )
-            cart_quantity = 0.0
-            if not product_sudo.allow_out_of_stock_order:
-                cart_quantity = product_sudo.uom_id._compute_quantity(
-                    request.cart._get_cart_qty(product_sudo.id), to_unit=uom
-                )
-            digits = self.env["decimal.precision"].precision_get("Product Unit")
-            rounding = 10**-digits
             res.update({
-                "free_qty": free_qty,
-                "cart_qty": cart_quantity,
-                "uom_name": uom.name,
-                "uom_rounding": rounding,
-                "show_availability": product_sudo.show_availability,
-                "out_of_stock_message": product_sudo.out_of_stock_message,
                 "has_stock_notification": has_stock_notification,
                 "stock_notification_email": stock_notification_email,
+                "is_in_wishlist": product_sudo._is_in_wishlist(),
             })
-        else:
-            res.update({"free_qty": 0, "cart_qty": 0})
-
-        if product_or_template.is_product_variant:
-            product_sudo = product_or_template.sudo()
-            res["is_in_wishlist"] = product_sudo._is_in_wishlist()
 
         return res
 
