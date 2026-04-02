@@ -143,6 +143,22 @@ test("Many2OneReferenceField with model_field change in form view", async () => 
     expect(".o_field_widget[name=res_id] .o-autocomplete--dropdown-item").toHaveCount(4);
 });
 
+test("Many2OneReferenceField server value in form view", async () => {
+    expect.assertions(1);
+
+     await mountView({
+        type: "form",
+        resModel: "partner",
+        arch: `
+            <form>
+                <field name="model"/>
+                <field name="res_id"/>
+            </form>`,
+    });
+
+    expect(".o_field_widget[name=res_id] .o_many2one > *").toHaveCount(0);
+});
+
 test.tags("desktop");
 test("Many2OneReferenceField edition: unset", async () => {
     expect.assertions(4);
