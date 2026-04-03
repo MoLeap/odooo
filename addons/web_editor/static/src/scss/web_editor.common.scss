@@ -156,7 +156,8 @@ ul.o_checklist {
             display: block;
             height: $o-checklist-before-size;
             width: $o-checklist-before-size;
-            top: 4px;
+            top: 50%;
+            transform: translateY(- $o-checklist-before-size / 2);
             border: 1px solid;
             text-align: center;
             cursor: pointer;
@@ -170,6 +171,9 @@ ul.o_checklist {
                 justify-content: center;
                 padding-left: 1px #{"/*rtl:ignore*/"};
                 padding-top: 1px;
+            }
+            &::after {
+                text-decoration: line-through;
             }
         }
     }
