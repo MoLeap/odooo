@@ -9,8 +9,8 @@ from odoo.tools import consteq
 
 class PosSelfOrderController(http.Controller):
     @http.route("/pos-self-order/process-order/<device_type>/", auth="public", type="jsonrpc", website=True)
-    def process_order(self, order, access_token, table_identifier, device_type):
-        pos_config, table = self._verify_authorization(access_token, table_identifier, order)
+    def process_order(self, order, access_token, table_identifier, order_uuid, device_type):
+        pos_config, table = self._verify_authorization(access_token, table_identifier, order, order_uuid)
 
         # Create a safe copy of the order with only the necessary fields for order creation to
         # avoid potential security issues and to reduce the payload size
@@ -89,19 +89,23 @@ class PosSelfOrderController(http.Controller):
         pos_order.remove_from_ui([pos_order.id])
 
     @http.route('/pos-self-order/get-user-data', auth='public', type='jsonrpc', website=True)
-    def get_orders_by_access_token(self, access_token, order_access_tokens, table_identifier=None):
+    def get_orders_by_access_token(self, access_token, order_access_tokens, table_identifier=None, order_uuid=None):
         pos_config = self._verify_pos_config(access_token)
         table = pos_config.env["restaurant.table"].search([('identifier', '=', table_identifier)], limit=1)
-        domain = False
+        domain = Domain(False)
 
-        if not table_identifier or pos_config.self_ordering_pay_after == 'each':
-            domain = [(False, '=', True)]
-        else:
-            domain = ['&', '&',
+        if order_uuid:
+            domain = Domain([
+                ('uuid', '=', order_uuid),
+                ('state', '=', 'draft'),
+            ])
+
+        elif table_identifier and pos_config.self_ordering_pay_after != 'each':
+            domain = Domain([
                 ('table_id', '=', table.id),
                 ('state', '=', 'draft'),
-                ('access_token', 'not in', [data.get('access_token') for data in order_access_tokens])
-            ]
+                ('access_token', 'not in', [data.get('access_token') for data in order_access_tokens]),
+            ])
 
         for data in order_access_tokens:
             domain = Domain.OR([domain, ['&',
@@ -110,6 +114,7 @@ class PosSelfOrderController(http.Controller):
                 ('write_date', '>', data.get('write_date')),
                 ('state', '!=', data.get('state')),
             ]])
+
         orders = pos_config.env['pos.order'].search(domain)
         access_tokens = set({o.get('access_token') for o in order_access_tokens})
         # Do not use session.order_ids, it may fail if there is shared sessions
@@ -122,7 +127,7 @@ class PosSelfOrderController(http.Controller):
     @http.route('/kiosk/payment/<int:pos_config_id>/<device_type>', auth='public', type='jsonrpc', website=True)
     def pos_self_order_kiosk_payment(self, pos_config_id, order, payment_method_id, access_token, device_type):
         pos_config = self._verify_pos_config(access_token)
-        results = self.process_order(order, access_token, None, device_type)
+        results = self.process_order(order, access_token, None, None, device_type)
 
         if not results['pos.order'][0].get('id'):
             raise BadRequest("Something went wrong")
@@ -200,13 +205,26 @@ class PosSelfOrderController(http.Controller):
     def _verify_config_constraint(self, pos_config_sudo, check_active_session=True):
         return not pos_config_sudo or (pos_config_sudo.self_ordering_mode != 'mobile' and pos_config_sudo.self_ordering_mode != 'kiosk') or (check_active_session and not pos_config_sudo.has_active_session)
 
-    def _verify_authorization(self, access_token, table_identifier, order):
+    def _verify_authorization(self, access_token, table_identifier, order, order_uuid):
         """
         Similar to _verify_pos_config but also looks for the restaurant.table of the given identifier.
         The restaurant.table record is also returned with reduced privileges.
         """
         pos_config = self._verify_pos_config(access_token)
-        table_sudo = request.env["restaurant.table"].sudo().search([('identifier', '=', table_identifier)], limit=1)
+        table_sudo = request.env["restaurant.table"].sudo()
+
+        if order_uuid:
+            order_sudo = request.env["pos.order"].sudo().search([("uuid", "=", order_uuid)], limit=1)
+            if order_sudo and order_sudo.table_id:
+                table_sudo = order_sudo.table_id
+
+                if table_identifier and table_sudo.identifier != table_identifier:
+                    msg = "Table identifier does not match the dynamic order."
+                    raise Unauthorized(msg)
+
+        elif table_identifier:
+            table_sudo = request.env["restaurant.table"].sudo().search([('identifier', '=', table_identifier)], limit=1)
+
         preset = request.env['pos.preset'].sudo().browse(order.get('preset_id'))
         is_takeaway = order and pos_config.use_presets and preset and preset.service_at != 'table'
         if not table_sudo and not pos_config.self_ordering_mode == 'kiosk' and pos_config.self_ordering_service_mode == 'table' and not is_takeaway:
