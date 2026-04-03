@@ -151,3 +151,5 @@ class TestSaleExpense(TestExpenseCommon, TestSaleCommon):
                 'analytic_distribution': {str(analytic_account_2.id): 100.0},
             },
         ])
+
+        print(expenses)
