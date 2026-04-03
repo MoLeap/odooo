@@ -262,6 +262,11 @@ class AccountMoveLine(models.Model):
         index="btree_not_null",
     )
 
+    def create(self, vals_list):
+        if self._context.get('is_price_change'):
+            vals_list = [val for val in vals_list if val.get('display_type') != 'tax']
+        return super().create(vals_list)
+
     def _compute_account_id(self):
         super()._compute_account_id()
         input_lines = self.filtered(lambda line: (
