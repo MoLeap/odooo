@@ -4,7 +4,7 @@ import { MediaDialog, TABS } from "@html_editor/main/media/media_dialog/media_di
 patch(MediaDialog.prototype, {
     extraClassesToAdd() {
         const classes = super.extraClassesToAdd();
-        const closestDivEl = this.props.node?.parentElement.closest("div");
+        const closestDivEl = this.props.node?.closest("div");
         if (
             this.state.activeTab == TABS.IMAGES.id &&
             closestDivEl?.matches(".s_social_media, .s_share")
