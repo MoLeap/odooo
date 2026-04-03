@@ -22,6 +22,7 @@ import {
     getFacetTexts,
     getService,
     makeServerError,
+    mockOffline,
     mockService,
     models,
     mountView,
@@ -337,6 +338,58 @@ test("do not send context in unity spec if field is invisible", async () => {
                 <field name="trululu" invisible="1" context="{'blip': int_field, 'blop': 3}" />
             </form>`,
     });
+});
+
+test("[Offline] many2one", async () => {
+    const setOffline = mockOffline();
+
+    Partner._views = {
+        form: '<form> <field name="trululu"/> </form>',
+    };
+    await mountWithCleanup(WebClient);
+    await getService("action").doAction({
+        name: "Partner",
+        res_model: "partner",
+        res_id: 1,
+        type: "ir.actions.act_window",
+        views: [[false, "form"]],
+    });
+
+    await contains(".o_field_many2one input").click();
+    expect(queryAllTexts(`.o-autocomplete.dropdown li`)).toEqual([
+        "first record",
+        "second record",
+        "aaa",
+        "Search more...",
+    ]);
+
+    //close the dropdown
+    await contains(".o_form_renderer").click();
+
+    //re-render to avoid the memorizeSearch !
+    await getService("action").doAction({
+        name: "Partner",
+        res_model: "partner",
+        res_id: 1,
+        type: "ir.actions.act_window",
+        views: [[false, "form"]],
+    });
+
+    await setOffline(true);
+    await contains(".o_field_many2one input").click();
+    expect(queryAllTexts(`.o-autocomplete.dropdown li`)).toEqual([
+        "first record",
+        "second record",
+        "aaa",
+    ]);
+
+    //close the dropdown
+    await contains(".o_form_renderer").click();
+
+    // search Offline
+    await contains(".o_field_widget input").edit("record", { confirm: false });
+    await runAllTimers();
+    expect(queryAllTexts(`.o-autocomplete.dropdown li`)).toEqual(["first record", "second record"]);
 });
 
 test("editing a many2one (with form view opened with external button)", async () => {
