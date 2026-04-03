@@ -225,16 +225,24 @@ class StockLot(models.Model):
     @api.depends('name')
     def _compute_sale_order_ids(self):
         sale_orders = defaultdict(set)
-        move_lines = self.env['stock.move.line'].search([
-            ('lot_id', 'in', self.ids),
-            ('state', '=', 'done'),
-            ('move_id.sale_line_id.order_id', '!=', False),
-            ('move_id.picking_id.location_dest_id.usage', 'in', ('customer', 'transit')),
-        ])
-        for ml in move_lines:
-            so = ml.move_id.sale_line_id.order_id
-            if so.with_user(self.env.user).has_access('read'):
-                sale_orders[ml.lot_id.id].add(so.id)
+
+        move_line_dict = self.env['stock.move.line'].read_group(
+            [('lot_id', 'in', self.ids), ('state', '=', 'done')],
+            ['move_id', 'lot_id'],
+            ['lot_id', 'move_id'],
+            lazy=False
+        )
+        move_to_lot = {ml['move_id'][0]: ml['lot_id'][0] for ml in move_line_dict if ml.get('move_id')}
+        if move_to_lot:
+            valid_moves = self.env['stock.move'].search([
+                ('id', 'in', list(move_to_lot.keys())),
+                ('sale_line_id.order_id', '!=', False),
+                ('picking_id.location_dest_id.usage', 'in', ('customer', 'transit')),
+            ])
+            for move in valid_moves:
+                so = move.sale_line_id.order_id
+                if so.with_user(self.env.user).has_access('read'):
+                    sale_orders[move_to_lot[move.id]].add(so.id)
         for lot in self:
             so_ids = sale_orders.get(lot.id, set())
             lot.sale_order_ids = [Command.set(list(so_ids))]
