@@ -291,12 +291,12 @@ class Websocket:
     # and in particular not sufficient for those with a lower id coming after a
     # higher id was dispatched.
     # To solve the issue of missed notifications, the lowest id, stored in
-    # ``_last_notif_sent_id``, is held back by a few seconds to give time for
+    # ``_last_id_by_channel``, is held back by a few seconds to give time for
     # concurrent transactions to finish. To avoid dispatching duplicate
     # notifications, the history of already dispatched notifications during this
     # period is kept in memory in ``_notif_history`` and the corresponding
     # notifications are discarded from subsequent dispatching even if their id
-    # is higher than ``_last_notif_sent_id``.
+    # is higher than the corresponding ``_last_id_by_channel``.
     # In practice, what is important functionally is the time between the create
     # of the notification and the commit of the transaction in business code.
     # If this time exceeds this threshold, the notification will never be
@@ -326,13 +326,15 @@ class Websocket:
         # as triggering notification dispatching or terminating the connection.
         self.__cmd_queue = PollablePriorityQueue()
         self._waiting_for_dispatch = False
-        self._channels = set()
-        # For ``_last_notif_sent_id and ``_notif_history``, see
-        # ``MAX_NOTIFICATION_HISTORY_SEC`` for more details.
-        # id of the last sent notification that is no longer in _notif_history
-        self._last_notif_sent_id = 0
-        # history of last sent notifications in the format (notif_id, send_time)
-        # always sorted by notif_id ASC
+        # Per-channel last dispatched notification id. Ensures no notifications are missed:
+        # - For existing channels, the server tracks notifications reliably.
+        # - For newly subscribed channels, there is a delay between the client issuing
+        #   the subscription and the server processing it, so the client's last seen id is
+        #   used to avoid missing any notifications created in that window.
+        self._last_id_by_channel = {}
+        # History of last sent notifications in the format (notif_id, send_time)
+        # always sorted by notif_id ASC. See ``MAX_NOTIFICATION_HISTORY_SEC`` for
+        # more information.
         self._notif_history = []
         # Websocket start up
         self.__selector = (
@@ -398,12 +400,9 @@ class Websocket:
         return func
 
     def subscribe(self, channels, last):
-        """ Subscribe to bus channels. """
-        self._channels = channels
-        # Only assign the last id according to the client once: the server is
-        # more reliable later on, see ``MAX_NOTIFICATION_HISTORY_SEC``.
-        if self._last_notif_sent_id == 0:
-            self._last_notif_sent_id = last
+        self._last_id_by_channel = {
+            c: self._last_id_by_channel.get(c, last) for c in channels
+        }
         # Dispatch past notifications if there are any.
         self.trigger_notification_dispatching()
 
@@ -787,7 +786,9 @@ class Websocket:
         self._waiting_for_dispatch = False
         with acquire_cursor(self._session.db) as cr:
             notifications = fetch_bus_notifications(
-                cr, self._channels, self._last_notif_sent_id, [n[0] for n in self._notif_history]
+                cr,
+                self._last_id_by_channel,
+                [n[0] for n in self._notif_history],
             )
         if not notifications:
             return
@@ -811,7 +812,9 @@ class Websocket:
             else:
                 break
         if last_index != -1:
-            self._last_notif_sent_id = self._notif_history[last_index][0]
+            new_last_id = self._notif_history[last_index][0]
+            for channel in self._last_id_by_channel:
+                self._last_id_by_channel[channel] = max(self._last_id_by_channel[channel], new_last_id)
             self._notif_history = self._notif_history[last_index + 1 :]
         self._send(notifications)
 
@@ -984,7 +987,7 @@ class WebsocketConnectionHandler:
     # Latest version of the websocket worker. This version should be incremented
     # every time `websocket_worker.js` is modified to force the browser to fetch
     # the new worker bundle.
-    _VERSION = "19.0-2"
+    _VERSION = "saas-19.3-1"
 
     @classmethod
     def websocket_allowed(cls, request):

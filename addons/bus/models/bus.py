@@ -7,14 +7,15 @@ import os
 import selectors
 import threading
 import time
+
 from psycopg2 import InterfaceError
 from psycopg2.pool import PoolError
 
 import odoo
 from odoo import api, fields, models
 from odoo.service.server import CommonServer
-from odoo.tools import config, json_default, SQL
-from odoo.tools.misc import OrderedSet
+from odoo.tools import SQL, config, json_default
+from odoo.tools.misc import OrderedSet, groupby
 
 from ..tools import orjson
 
@@ -45,26 +46,30 @@ NOTIFY_PAYLOAD_MAX_LENGTH = get_notify_payload_max_length()
 SKIP_NOTIFICATION = object()
 
 
-def fetch_bus_notifications(cr, channels, last=0, ignore_ids=None):
+def fetch_bus_notifications(cr, last_id_by_channel, ignore_ids=None):
     """Fetch notifications from the bus table.
 
     :param cr: Database cursor.
-    :param channels: List of channels for which notifications should be fetched.
-        May contain channel names, model instances, or (model, string) tuples.
-    :param last: The ID of the last fetched notification. Defaults to 0.
+    :param last_id_by_channel: Dictionary mapping channels to the ID of the last fetched
+        notification.
     :param ignore_ids: IDs to exclude.
     :return: List of notifications.
 
     """
-    conditions = [
-        SQL("channel IN %s", tuple(json_dump(channel_with_db(cr.dbname, c)) for c in channels)),
-        SQL("create_date > %s", fields.Datetime.now() - datetime.timedelta(seconds=TIMEOUT))
-        if last == 0
-        else SQL("id > %s", last),
-    ]
+    timeout_threshold = fields.Datetime.now() - datetime.timedelta(seconds=TIMEOUT)
+    channels_by_id_conditions = []
+    for last_id, items in groupby(last_id_by_channel.items(), key=lambda item: item[1]):
+        channel_names = tuple(json_dump(channel_with_db(cr.dbname, c)) for c, _ in items)
+        time_or_id_condition = (
+            SQL("create_date > %s", timeout_threshold) if last_id == 0 else SQL("id > %s", last_id)
+        )
+        channels_by_id_conditions.append(
+            SQL("(channel IN %s AND %s)", channel_names, time_or_id_condition),
+        )
+    where_parts = [SQL("(%s)", SQL(" OR ").join(channels_by_id_conditions))]
     if ignore_ids:
-        conditions.append(SQL("id NOT IN %s", tuple(ignore_ids)))
-    where = SQL(" AND ").join(conditions)
+        where_parts.append(SQL("id NOT IN %s", tuple(ignore_ids)))
+    where = SQL(" AND ").join(where_parts)
     cr.execute(SQL("SELECT id, message FROM bus_bus WHERE %s ORDER BY id", where))
     return [{"id": r[0], "message": orjson.loads(r[1])} for r in cr.fetchall()]
 
@@ -204,7 +209,7 @@ class BusBus(models.Model):
 
     @api.model
     def _poll(self, channels, last=0, ignore_ids=None):
-        return fetch_bus_notifications(self.env.cr, channels, last, ignore_ids)
+        return fetch_bus_notifications(self.env.cr, {c: last for c in channels}, ignore_ids)
 
     def _bus_last_id(self):
         last = self.env['bus.bus'].search([], order='id desc', limit=1)
@@ -229,7 +234,7 @@ class ImDispatch(threading.Thread):
         channels = {hashable(channel_with_db(db, c)) for c in channels}
         for channel in channels:
             self._channels_to_ws.setdefault(channel, set()).add(websocket)
-        outdated_channels = websocket._channels - channels
+        outdated_channels = websocket._last_id_by_channel.keys() - channels
         self._clear_outdated_channels(websocket, outdated_channels)
         websocket.subscribe(channels, last)
         with contextlib.suppress(RuntimeError):
@@ -237,7 +242,7 @@ class ImDispatch(threading.Thread):
                 self.start()
 
     def unsubscribe(self, websocket):
-        self._clear_outdated_channels(websocket, websocket._channels)
+        self._clear_outdated_channels(websocket, websocket._last_id_by_channel.keys())
 
     def _clear_outdated_channels(self, websocket, outdated_channels):
         """ Remove channels from channel to websocket map. """

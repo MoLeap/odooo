@@ -144,3 +144,49 @@ test("check connection health during inactivity", async () => {
     await advanceTime(worker.CONNECTION_CHECK_DELAY + 1000);
     await expect.waitForSteps(["check_connection_health_sent"]);
 });
+
+test("debounced updates respect force and batching", async () => {
+    patchWithCleanup(WebsocketWorker, { OUTGOING_BATCH_DELAY: 120_000 });
+    patchWithCleanup(WebsocketWorker.prototype, {
+        _updateChannels({ force } = {}) {
+            expect.step(force ? "update_channels_forced" : "update_channels");
+            super._updateChannels(...arguments);
+        },
+    });
+    await makeMockServer();
+    const worker = getWebSocketWorker();
+    patchWithCleanup(worker, {
+        _debouncedUpdateChannels() {
+            super._debouncedUpdateChannels(...arguments);
+            expect.step("debounced_update_channels");
+        },
+        _debouncedForceUpdateChannels() {
+            super._debouncedForceUpdateChannels();
+            expect.step("force_update_channel");
+        },
+    });
+    const client = new MessagePort();
+    worker.registerClient(client);
+    worker._start();
+    await expect.waitForSteps(["debounced_update_channels"]);
+    await advanceTime(120_000);
+    await expect.waitForSteps(["update_channels"]);
+    // 1 add channel => force => only one forced subscribe
+    worker._addChannel(client, "C1");
+    worker._debouncedForceUpdateChannels();
+    await expect.waitForSteps(["debounced_update_channels", "force_update_channel"]);
+    await advanceTime(120_000);
+    await expect.waitForSteps(["update_channels_forced"]);
+    // 2 multiple adds => only one subscribe
+    worker._addChannel(client, "C2");
+    worker._addChannel(client, "C3");
+    await expect.waitForSteps(["debounced_update_channels", "debounced_update_channels"]);
+    await advanceTime(120_000);
+    await expect.waitForSteps(["update_channels"]);
+    // 3 force => add => only one subscribe forced
+    worker._debouncedForceUpdateChannels();
+    worker._addChannel(client, "C5");
+    await expect.waitForSteps(["force_update_channel", "debounced_update_channels"]);
+    await advanceTime(120_000);
+    await expect.waitForSteps(["update_channels_forced"]);
+});

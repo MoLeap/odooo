@@ -246,7 +246,6 @@ class TestWebsocketCaryall(WebsocketCase):
             self.assertEqual(len(notifications), 1)
             self.assertEqual(notifications[0]['message']['type'], 'notif_on_global_channel')
             self.assertEqual(notifications[0]['message']['payload'], 'message')
-
         with patch.object(IrWebsocket, "_build_bus_channel_list", return_value=[(channel, "PRIVATE")]):
             self.subscribe(websocket, [], self.env['bus.bus']._bus_last_id())
             channel._bus_send("notif_on_global_channel", "message")
