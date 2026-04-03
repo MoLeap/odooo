@@ -32,8 +32,11 @@ export class BuilderSlidingPanel extends Component {
         useBuilderComponent();
         this.slidingPanelRef = useRef("slidingPanel");
         this.openButtonRef = useRef("openButton");
+        // contentRendered is set to true when panel is first opened and stays true
+        // (intentional cache behavior - content is rendered once and kept alive).
         this.state = useState({
             optionContainerName: "",
+            contentRendered: !!this.props.openByDefault,
         });
         onMounted(() => {
             this.optionsContainerEls = document.querySelectorAll("div.options-container");
@@ -71,11 +74,23 @@ export class BuilderSlidingPanel extends Component {
     }
 
     showSlidingPanel() {
-        this.updateDisplay("hb-panel-slide-in");
-        this.updateDisplayTimeout = setTimeout(() => this.updateDisplay("d-block"), 200);
+        this.state.contentRendered = true;
+        // Defer animation to next microtask to ensure OWL has rendered the content.
+        // This prevents the panel from sliding in empty before the slot content is mounted.
+        //
+        // Clear any in-flight hide timeout first: if the user clicks open before a
+        // previous hide animation completes, we must not let the stale d-none timeout fire.
+        clearTimeout(this.updateDisplayTimeout);
+        Promise.resolve().then(() => {
+            this.updateDisplay("hb-panel-slide-in");
+            this.updateDisplayTimeout = setTimeout(() => this.updateDisplay("d-block"), 200);
+        });
     }
 
     hideSlidingPanel() {
+        // Clear any in-flight show timeout: if the user clicks close before the d-block
+        // timeout fires (200ms), we must not let the panel snap to d-block mid-close.
+        clearTimeout(this.updateDisplayTimeout);
         this.updateDisplay("hb-panel-slide-out");
         // We set a timeout slightly shorter than 200 because some flicker may
         // happen otherwise.
