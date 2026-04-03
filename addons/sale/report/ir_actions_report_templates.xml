@@ -223,7 +223,19 @@
                                     class="w-100"
                                     t-att-style="padding_style"
                                 >
-                                    <span t-field="line.name">Bacon Burger</span>
+                                    <div class="o_product_cell_flex">
+                                        <div class="o_product_image_cell">
+                                            <img
+                                                t-if="doc.company_id.display_product_images_on_so and line.product_id.image_128"
+                                                t-att-src="image_data_uri(line.product_id.image_128)"
+                                                t-att-alt="line.product_id.display_name"
+                                                class="o_sale_report_product_image"
+                                            />
+                                        </div>
+                                        <div class="o_product_name_cell">
+                                            <span t-field="line.name">Bacon Burger</span>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td name="td_product_quantity" class="o_td_quantity text-end">
                                     <span t-field="line.product_uom_qty" class="text-nowrap">3</span>
