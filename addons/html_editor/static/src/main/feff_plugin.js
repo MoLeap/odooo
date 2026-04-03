@@ -37,6 +37,9 @@ export class FeffPlugin extends Plugin {
     resources = {
         normalize_processors: withSequence(Infinity, this.updateFeffs.bind(this)),
         clean_for_save_processors: this.cleanForSave.bind(this),
+        on_will_merge_adjacent_siblings_handlers:
+            this.onWillMergeAdjacentSiblingsHandler.bind(this),
+        on_merged_adjacent_siblings_handlers: this.onMergedAdjacentSiblingsHandler.bind(this),
         is_char_tangible_for_keyboard_navigation_predicates: (ev, char, lastSkipped) => {
             // Skip first FEFF, but not the second one (unless shift is pressed).
             if (char === "\uFEFF" && (ev.shiftKey || lastSkipped !== "\uFEFF")) {
@@ -55,6 +58,15 @@ export class FeffPlugin extends Plugin {
         } else {
             this.removeFeffs(root, null);
         }
+    }
+
+    onWillMergeAdjacentSiblingsHandler(root) {
+        const cursors = this.getCursors();
+        this.removeFeffs(root, cursors);
+        cursors.restore();
+    }
+    onMergedAdjacentSiblingsHandler(root) {
+        this.updateFeffs(root);
     }
 
     /**

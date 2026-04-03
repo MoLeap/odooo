@@ -19,6 +19,11 @@ export class InlineCodePlugin extends Plugin {
             selectElements(root, ".o_inline_code").flatMap((code) =>
                 this.dependencies.feff.surroundWithFeffs(code, cursors)
             ),
+        are_similar_elements_overrides: ({ node, node2 }) => {
+            if (node.matches("code.o_inline_code") && node2.matches("code.o_inline_code")) {
+                return true;
+            }
+        },
     };
 
     setup() {
