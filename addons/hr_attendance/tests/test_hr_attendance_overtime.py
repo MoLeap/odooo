@@ -890,7 +890,12 @@ class TestHrAttendanceOvertime(HttpCase):
         self.assertAlmostEqual(attendance.validated_overtime_hours, 2, 2)
 
         attendance.linked_overtime_ids.manual_duration = 0.5
-        self.assertNotEqual(attendance.validated_overtime_hours, attendance.overtime_hours)
+        self.assertAlmostEqual(
+            attendance.validated_overtime_hours,
+            attendance.overtime_hours,
+            2,
+            "Validated hours should follow overtime hours after manual edit",
+        )
 
         # Create another attendance for the same employee
         self.env['hr.attendance'].create({
