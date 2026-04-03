@@ -1058,7 +1058,7 @@ class SaleOrderLine(models.Model):
 
     @api.model
     def _get_delivered_quantity_by_analytic_domain(self):
-        return Domain("amount", "<=", 0.0)
+        return Domain.OR([Domain("amount", "<=", 0.0), Domain("unit_amount", "<", 0.0)])
 
     def _get_downpayment_state(self):
         self.ensure_one()
