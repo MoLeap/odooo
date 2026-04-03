@@ -69,6 +69,9 @@ export class PosOrderlineAccounting extends Base {
             ? this.unitPrices.total_included
             : this.unitPrices.total_excluded;
     }
+    get displayPriceUnitIncl() {
+        return this.unitPrices.total_included;
+    }
     get displayPriceUnitExcl() {
         return this.unitPrices.total_excluded;
     }
@@ -83,6 +86,11 @@ export class PosOrderlineAccounting extends Base {
     }
     get priceExcl() {
         return this.currency.round(this.prices.total_excluded * this.order_id.orderSign);
+    }
+    get priceUnitInclNoDiscount() {
+        return this.currency.round(
+            this.unitPrices.no_discount_total_included * this.order_id.orderSign
+        );
     }
     get priceInclNoDiscount() {
         return this.currency.round(
@@ -125,6 +133,11 @@ export class PosOrderlineAccounting extends Base {
     get comboTotalPrice() {
         const childLines = this.getAllLinesInCombo().filter((line) => !line.combo_line_ids.length);
         return childLines.reduce((total, line) => total + line.displayPrice, 0);
+    }
+
+    get comboTotalPriceWithTax() {
+        const allLines = this.getAllLinesInCombo();
+        return allLines.reduce((total, line) => total + line.priceIncl, 0);
     }
 
     get comboTotalPriceWithoutTax() {
