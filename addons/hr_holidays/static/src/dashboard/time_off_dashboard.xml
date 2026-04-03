@@ -3,7 +3,7 @@
     <div t-name="hr_holidays.TimeOffDashboard" class="o_timeoff_dashboard">
         <t t-foreach="this.state.holidays" t-as="holiday" t-key="holiday[3]">
             <TimeOffCard
-                name="holiday[0]"
+                name="holiday[0].name"
                 data="holiday[1]"
                 requires_allocation="holiday[2]"
                 holidayStatusId="holiday[3]"
