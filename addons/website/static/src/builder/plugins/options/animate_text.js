@@ -37,7 +37,7 @@ export class AnimateText extends Component {
     static template = "website_builder.AnimateText";
     static props = {
         ...toolbarButtonProps,
-        config: { type: Object, shape: { editor: Object, editorBus: Object } },
+        config: { type: Object, shape: { editor: Object, editorBus: Object, "*": true } },
         animateOptionProps: AnimateOption.props,
         getAnimatedTextOrCreateDefault: Function,
         isActive: Function,

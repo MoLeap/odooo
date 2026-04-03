@@ -238,6 +238,7 @@ export class FormatPlugin extends Plugin {
 
     removeAllFormats() {
         const targetedNodes = this.dependencies.selection.getTargetedNodes();
+        this.trigger("on_remove_all_formats_handlers", targetedNodes);
         this.removeFormats(Object.keys(formatsSpecs), targetedNodes);
         this.trigger("on_all_formats_removed_handlers");
         this.dependencies.history.addStep();

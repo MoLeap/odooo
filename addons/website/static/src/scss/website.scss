@@ -3409,3 +3409,13 @@ input[value*="data-oe-translation-source-sha"] {
 img.o_image_popup {
     cursor: pointer;
 }
+
+.o_text_shadow {
+    text-shadow: $box-shadow-offset-x $box-shadow-offset-y $box-shadow-blur-radius $box-shadow-color;
+}
+.o_text_shadow_sm {
+    text-shadow: $box-shadow-sm-offset-x $box-shadow-sm-offset-y $box-shadow-sm-blur-radius $box-shadow-sm-color;
+}
+.o_text_shadow_lg {
+    text-shadow: $box-shadow-lg-offset-x $box-shadow-lg-offset-y $box-shadow-lg-blur-radius $box-shadow-lg-color;
+}

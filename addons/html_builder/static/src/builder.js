@@ -198,7 +198,10 @@ export class Builder extends Component {
                 hideStylingInLinkPopover: true,
                 allowTargetBlank: true,
                 dropImageAsAttachment: true,
-                getAnimateTextConfig: () => ({ editor: this.editor, editorBus: this.editorBus }),
+                getAnimateTextConfig: () => ({
+                    editor: this.editor,
+                    editorBus: this.editorBus,
+                }),
                 baseContainers: ["P"],
                 cleanEmptyStructuralContainers: false,
                 isEditableRTL: false,
@@ -332,7 +335,7 @@ export class Builder extends Component {
 
     updateInvisibleEls(isMobile = this.props.isMobile) {
         this.invisibleElementsPanelState.invisibleEls = [
-            ...this.editor.editable?.querySelectorAll(this.getInvisibleSelector(isMobile)) || [],
+            ...(this.editor.editable?.querySelectorAll(this.getInvisibleSelector(isMobile)) || []),
         ];
     }
 
