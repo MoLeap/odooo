@@ -1,4 +1,4 @@
-import { debounce, Logger } from "@bus/workers/bus_worker_utils";
+import { BoundedSet, debounce, Logger } from "@bus/workers/bus_worker_utils";
 
 /**
  * Type of events that can be sent from the worker to its clients.
@@ -53,6 +53,13 @@ export class WebsocketWorker {
     INITIAL_RECONNECT_DELAY = 1000;
     RECONNECT_JITTER = 1000;
     CONNECTION_CHECK_DELAY = 60_000;
+
+    /**
+     * @type {Set<number>}
+     *
+     * Notifications ids that were already received. Useful to filter rare duplicates.
+     */
+    seenNotificationIds = new BoundedSet(10_000);
 
     constructor(name) {
         this.active = true;
@@ -358,10 +365,17 @@ export class WebsocketWorker {
         this._restartConnectionCheckInterval();
         const notifications = JSON.parse(messageEv.data);
         this._logDebug("_onWebsocketMessage", notifications);
-        this.lastNotificationId = Math.max(
-            notifications[notifications.length - 1].id,
-            this.lastNotificationId
+        const newNotifications = notifications.filter(
+            ({ id }) => !this.seenNotificationIds.has(id)
         );
+        if (newNotifications.length === 0) {
+            return;
+        }
+        newNotifications.forEach(({ id }) => this.seenNotificationIds.add(id));
+        const lastNotificationId = newNotifications.at(-1).id;
+        if (lastNotificationId > this.lastNotificationId) {
+            this.lastNotificationId = lastNotificationId;
+        }
         this.broadcast("BUS:NOTIFICATION", notifications);
     }
 

@@ -156,3 +156,24 @@ export class Logger {
         });
     }
 }
+
+export class BoundedSet extends Set {
+    constructor(maxSize) {
+        super();
+        this.capacity = maxSize * 1.25;
+    }
+
+    add(item) {
+        super.add(item);
+        if (this.size > this.capacity) {
+            let amountToRemove = this.size - this.capacity;
+            for (item of this) {
+                this.delete(item);
+                if (--amountToRemove === 0) {
+                    break;
+                }
+            }
+        }
+        return this;
+    }
+}
