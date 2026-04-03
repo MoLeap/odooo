@@ -6,28 +6,32 @@ from odoo.http import request
 from odoo.addons.web.controllers.home import Home
 from odoo.addons.web.controllers.webclient import WebClient
 
-def _add_context_from_query_website_id(env, website_id):
-    if website_id is None:
+def _request_update_context_website_id(env, website_id):
+    if not website_id:
         return
 
-    website_id = int(website_id)
+    error_msg = env._("You do not have access to that website.")
+    try:
+        website_id = int(website_id)
+    except (TypeError, ValueError):
+        raise AccessError(error_msg)
+
     if website_id not in env['website'].get_all().ids:
-        return
+        raise AccessError(error_msg)
 
-    if (website_id != env.context.get('website_id')
-        and website_id != env.context.get('fallback_website_id')
+    if (website_id not in (env.context.get('website_id'), env.context.get('fallback_website_id'))
         and not (
             (user := env.user or env['res.users'].sudo().browse(request.session.uid))
             and user.has_group('website.group_multi_website')
             and user.has_group('website.group_website_restricted_editor')
         )
     ):
-        raise AccessError(env._("You do not have access to the website introduced in the URL."))
+        raise AccessError(error_msg)
 
     request.update_context(website_id=website_id)
 
 
-class WebsiteBackend(Home):
+class WebsiteBackend(http.Controller):
 
     @http.route('/website/fetch_dashboard_data', type="jsonrpc", auth='user', readonly=True)
     def fetch_dashboard_data(self, website_id):
@@ -78,16 +82,19 @@ class WebsiteBackend(Home):
         }
         return features_info
 
+
+class WebsiteWebHome(Home):
+
     @http.route()
-    def web_client(self, s_action=None, **kw):
+    def web_client(self, s_action=None, *, website_id=None, **kw):
         if s_action == 'action-website.website_preview':
-            _add_context_from_query_website_id(self.env, kw.get('website_id'))
+            _request_update_context_website_id(self.env, website_id)
         return super().web_client(s_action, **kw)
 
 
 class WebsiteWebClient(WebClient):
 
     @http.route()
-    def bundle(self, bundle_name, website_id=None, **bundle_params):
-        _add_context_from_query_website_id(self.env, website_id)
+    def bundle(self, bundle_name, *, website_id=None, **bundle_params):
+        _request_update_context_website_id(self.env, website_id)
         return super().bundle(bundle_name, **bundle_params)
