@@ -69,6 +69,14 @@ export class AnimateOptionPlugin extends Plugin {
         this.scrollingElement = getScrollingElement(this.document);
     }
 
+    ignoreAnimationPreviewMutations(callback) {
+        // This method ensure changes done to trigger an animation do not
+        // impact the history. For example, the change "animation-name: dummy"
+        // could be replayed when stopping the preview of an unrelated option,
+        // which would retrigger the onAppearance animation.
+        return this.dependencies.history.ignoreDOMMutations(callback);
+    }
+
     getEffectsItems(isActiveItem) {
         const isOnAppearance = () => isActiveItem("animation_on_appearance_opt");
         return [
@@ -107,24 +115,32 @@ export class AnimateOptionPlugin extends Plugin {
         ];
     }
     async forceAnimation(editingElement) {
-        editingElement.style.animationName = "dummy";
+        this.ignoreAnimationPreviewMutations(() => {
+            editingElement.style.animationName = "dummy";
+        });
         if (editingElement.classList.contains("o_animate_on_scroll")) {
             // Trigger a DOM reflow.
             void editingElement.offsetWidth;
-            editingElement.style.animationName = "";
+            this.ignoreAnimationPreviewMutations(() => {
+                editingElement.style.animationName = "";
+            });
             this.window.dispatchEvent(new Event("resize"));
         } else {
             // Trigger a DOM reflow (Needed to prevent the animation from
             // being launched twice when previewing the "Intensity" option).
             await new Promise((resolve) => setTimeout(resolve));
-            editingElement.classList.add("o_animating");
-            this.scrollingElement.classList.add("o_wanim_overflow_xy_hidden");
-            editingElement.style.animationName = "";
+            this.ignoreAnimationPreviewMutations(() => {
+                editingElement.classList.add("o_animating");
+                this.scrollingElement.classList.add("o_wanim_overflow_xy_hidden");
+                editingElement.style.animationName = "";
+            });
             editingElement.addEventListener(
                 "animationend",
                 () => {
-                    this.scrollingElement.classList.remove("o_wanim_overflow_xy_hidden");
-                    editingElement.classList.remove("o_animating");
+                    this.ignoreAnimationPreviewMutations(() => {
+                        this.scrollingElement.classList.remove("o_wanim_overflow_xy_hidden");
+                        editingElement.classList.remove("o_animating");
+                    });
                 },
                 { once: true }
             );
