@@ -9,7 +9,7 @@ import { Builder } from "@html_builder/builder";
 import { SetupEditorPlugin } from "@html_builder/core/setup_editor_plugin";
 import { Plugin } from "@html_editor/plugin";
 import { defineMailModels, startServer } from "@mail/../tests/mail_test_helpers";
-import { describe, globals } from "@odoo/hoot";
+import { describe } from "@odoo/hoot";
 import { advanceTime, animationFrame, click, queryOne, tick, waitFor } from "@odoo/hoot-dom";
 import {
     contains,
@@ -38,29 +38,12 @@ import { WebsiteBuilder } from "@website/builder/website_builder";
 import { session } from "@web/session";
 import { getTranslatedElements } from "./translated_elements_getter.hoot";
 import { BackgroundShapeOptionPlugin } from "@html_builder/plugins/background_option/background_shape_option_plugin";
+import { getWebsiteId } from "./get_website_id.hoot";
 
-const prom = globals.fetch(`/web/dataset/call_kw/website/get_current_website`, {
-    method: 'post',
-    headers: {"Content-type": "application/json"},
-    body: JSON.stringify({
-        "jsonrpc": "2.0",
-        "method": "call",
-        "id": null,
-        "params": {
-            "model": "website",
-            "method": "get_current_website",
-            "args": [],
-            "kwargs": {},
-        }
-    })
-});
-
-let website_id;
 class Website extends models.Model {
     _name = "website";
     async get_current_website() {
-        website_id = website_id || (await (await prom).json()).result[0];
-        return [website_id];
+        return getWebsiteId();
     }
 }
 
@@ -356,10 +339,11 @@ export async function setupWebsiteBuilder(
 }
 
 async function openBuilderSidebar(editAssetsLoaded) {
+    const websiteId = await getWebsiteId();
     // The next line allow us to await asynchronous fetches and cache them before it is used
     await Promise.all([
         getWebsiteSnippets(),
-        loadBundle("website.website_builder_assets?website_id=" + website_id),
+        loadBundle("website.website_builder_assets?website_id=" + websiteId[0]),
         loadBundle("html_editor.assets_image_cropper"),
     ]);
 
