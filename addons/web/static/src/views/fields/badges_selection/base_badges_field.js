@@ -19,12 +19,49 @@ export class BaseBadgesField extends Component {
         SelectMenu,
     };
 
-    get options() {
-        return this.props.options;
+    /**
+     * Computes the ordered list of options. If the selected value is
+     * beyond the limit, it is moved into the visible "unfolded" range.
+     */
+    get optionsDict() {
+        const { options, badgeLimit, value } = this.props;
+        const displayOptions = [...options];
+
+        if (this.hasMoreThanMax) {
+            const index = displayOptions.findIndex((opt) => opt[0] === value);
+
+            // If selected value is in the "More" dropdown, move it to the visible limit
+            if (index >= badgeLimit) {
+                const [selectedOption] = displayOptions.splice(index, 1);
+                displayOptions.splice(badgeLimit - 1, 0, selectedOption);
+            }
+        }
+
+        return {
+            unfolded: badgeLimit ? displayOptions.slice(0, badgeLimit) : displayOptions,
+            folded: badgeLimit ? displayOptions.slice(badgeLimit) : [],
+        };
+    }
+
+    get badgesOptions() {
+        return this.optionsDict.unfolded;
+    }
+
+    get selectOptions() {
+        return this.optionsDict.folded.map(([value, label, icon]) => ({
+            value,
+            label,
+            icon,
+        }));
     }
 
     get placeholder() {
-        return this.props.placeholder || this.props.record.fields[this.props.name].string;
+        const hiddenCount = this.props.options.length - this.props.badgeLimit;
+        return `+${hiddenCount}`;
+    }
+
+    get hasMoreThanMax() {
+        return this.props.badgeLimit && this.props.options.length > this.props.badgeLimit;
     }
 
     get string() {
@@ -33,14 +70,6 @@ export class BaseBadgesField extends Component {
 
     get value() {
         return this.props.value;
-    }
-
-    get hasMoreThanMax() {
-        return this.props.badgeLimit && this.options.length > this.props.badgeLimit;
-    }
-
-    get selectOptions() {
-        return this.options.map(([value, label, icon]) => ({ value, label, icon }));
     }
 
     get isBottomSheet() {
