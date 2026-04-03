@@ -293,6 +293,58 @@ class ProductProduct(models.Model):
                 ('date', '<=', at_date),
             ])
 
+<<<<<<< ac5db9d471b44f2432f45090a4a2d1a4a6b4ae23
+||||||| 12d408855ba6cebfcf0636064f4d25d0c5eafd11
+        last_manual_value_by_product = self._get_last_product_value(at_date, lot=lot)
+        oldest_manual_value = min(pv.date for pv in last_manual_value_by_product.values()) if last_manual_value_by_product else False
+        if oldest_manual_value:
+            moves_domain &= Domain([('date', '>=', oldest_manual_value)])
+
+        for manual_value in last_manual_value_by_product.values():
+            product = manual_value.product_id
+            if lot:
+                quantity = lot.with_context(to_date=manual_value.date, skip_in_progress=True).product_qty
+            else:
+                quantity = product.with_context(to_date=manual_value.date).qty_available
+
+            std_price_by_product_id[product.id] = manual_value.value
+            quantity_by_product_id[product.id] = quantity
+            value_by_product_id[product.id] = manual_value.value * quantity
+            date_by_product_id[product.id] = manual_value.date
+
+        self.env['product.value'].invalidate_model()  # Avoid keeping too many records in cache
+
+        moves = self.env['stock.move'].search_fetch(
+            moves_domain,
+            field_names=['id'],
+            order='product_id, date, id'
+        )
+=======
+        last_manual_value_by_product = self._get_last_product_value(at_date, lot=lot)
+        oldest_manual_value = min(pv.date for pv in last_manual_value_by_product.values()) if last_manual_value_by_product else False
+        if oldest_manual_value and self.env['product.product'].concat(*last_manual_value_by_product.keys()) == self:
+            moves_domain &= Domain([('date', '>=', oldest_manual_value)])
+
+        for manual_value in last_manual_value_by_product.values():
+            product = manual_value.product_id
+            if lot:
+                quantity = lot.with_context(to_date=manual_value.date, skip_in_progress=True).product_qty
+            else:
+                quantity = product.with_context(to_date=manual_value.date).qty_available
+
+            std_price_by_product_id[product.id] = manual_value.value
+            quantity_by_product_id[product.id] = quantity
+            value_by_product_id[product.id] = manual_value.value * quantity
+            date_by_product_id[product.id] = manual_value.date
+
+        self.env['product.value'].invalidate_model()  # Avoid keeping too many records in cache
+
+        moves = self.env['stock.move'].search_fetch(
+            moves_domain,
+            field_names=['id'],
+            order='product_id, date, id'
+        )
+>>>>>>> ba72ec7f25eca7db88e159600696f9d0b2cb1e33
         # PERF avoid memoryerror
         move_fields = ['date', 'is_dropship', 'is_in', 'is_out', 'location_dest_id', 'location_id', 'move_line_ids', 'picked', 'value']
         # load in before in case of quick return
