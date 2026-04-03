@@ -16,16 +16,17 @@ const INDEXED_DB_VERSION = 1;
 
 export class PosData extends Reactive {
     static modelToLoad = []; // When empty all models are loaded
-    static serviceDependencies = ["orm", "bus_service"];
+    static serviceDependencies = ["orm", "bus_service", "dialog"];
 
     constructor() {
         super();
         this.ready = this.setup(...arguments).then(() => this);
     }
 
-    async setup(env, { orm, bus_service }) {
+    async setup(env, { orm, bus_service, dialog }) {
         this.orm = orm;
         this.bus = bus_service;
+        this.dialog = dialog;
         this.relations = [];
         this.custom = {};
         this.syncInProgress = false;
@@ -119,8 +120,26 @@ export class PosData extends Reactive {
         return `config-id_${odoo.pos_config_id}_${odoo.access_token}`;
     }
 
+<<<<<<< b0258a231bb6f82f020e8bc5e51a9d4fbbd98d62:addons/point_of_sale/static/src/app/services/data_service.js
     get serverDateKey() {
         return `data_server_date_${odoo.pos_config_id}`;
+||||||| df6e8827ed72a526b675326f24f1c7975dc6499b:addons/point_of_sale/static/src/app/models/data_service.js
+    initIndexedDB() {
+        // In web tests info is not defined
+        const models = Object.entries(this.opts.databaseTable).map(([name, data]) => [
+            data.key,
+            name,
+        ]);
+        this.indexedDB = new IndexedDB(this.databaseName, INDEXED_DB_VERSION, models);
+=======
+    initIndexedDB() {
+        // In web tests info is not defined
+        const models = Object.entries(this.opts.databaseTable).map(([name, data]) => [
+            data.key,
+            name,
+        ]);
+        this.indexedDB = new IndexedDB(this.databaseName, INDEXED_DB_VERSION, models, this.dialog);
+>>>>>>> 101d123e665bf32f686d4b24b2416f1830a58f89:addons/point_of_sale/static/src/app/models/data_service.js
     }
 
     async resetIndexedDB() {
