@@ -543,10 +543,88 @@ class HrVersion(models.Model):
                 version.date_end = version.contract_date_end
 
     def _search_start_date(self, operator, value):
-        return [('contract_date_start', operator, value)]
+        if operator in ('>', '>='):
+            return [
+                '|',
+                    ('date_version', operator, value),
+                    ('contract_date_start', operator, value),
+            ]
+
+        if operator in ('<', '<='):
+            return [
+                '&',
+                    ('date_version', operator, value),
+                    '|',
+                        ('contract_date_start', '=', False),
+                        ('contract_date_start', operator, value),
+            ]
+
+        if operator == '=':
+            return [
+                '|',
+                    '&',
+                        ('date_version', '=', value),
+                        '|',
+                            ('contract_date_start', '=', False),
+                            ('contract_date_start', '<=', value),
+                    '&',
+                        ('contract_date_start', '=', value),
+                        ('date_version', '<=', value),
+            ]
+
+        if operator == '!=':
+            return ['!', *self._search_start_date('=', value)]
+
+        return NotImplemented
 
     def _search_end_date(self, operator, value):
-        return [('contract_date_end', operator, value)]
+
+        def _compare_dates(date_end, operator, value):
+            if operator == '=':
+                return date_end == value
+            if operator == '!=':
+                return date_end != value
+            if operator == 'in':
+                return date_end in value
+            if not date_end:
+                return False
+            if operator == '>':
+                return date_end > value
+            if operator == '>=':
+                return date_end >= value
+            if operator == '<':
+                return date_end < value
+            if operator == '<=':
+                return date_end <= value
+            return False
+
+        all_versions = self.search([])
+        matching_ids = []
+
+        next_version_map = {}
+        prev_version_per_employee = {}
+
+        for version in all_versions:
+            emp_id = version.employee_id.id
+            if emp_id in prev_version_per_employee:
+                next_version_map[prev_version_per_employee[emp_id].id] = version
+            prev_version_per_employee[emp_id] = version
+
+        for version in all_versions:
+            next_version = next_version_map.get(version.id)
+            date_version_end = next_version.date_version + relativedelta(days=-1) if next_version else False
+
+            if date_version_end and version.contract_date_end:
+                date_end = min(date_version_end, version.contract_date_end)
+            elif date_version_end:
+                date_end = date_version_end
+            else:
+                date_end = version.contract_date_end
+
+            if _compare_dates(date_end, operator, value):
+                matching_ids.append(version.id)
+
+        return [('id', 'in', matching_ids)]
 
     @api.model
     def _get_marital_status_selection(self):
