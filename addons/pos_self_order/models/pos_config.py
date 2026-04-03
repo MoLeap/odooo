@@ -111,7 +111,7 @@ class PosConfig(models.Model):
             'default_fiscal_position_id', 'use_pricelist', 'module_pos_restaurant', 'is_header_or_footer',
             'rounding_method', 'cash_rounding', 'only_round_cash_method', 'has_active_session',
             'available_preset_ids', 'default_preset_id', 'use_presets', 'iface_tax_included',
-            'status', 'self_ordering_image_background_ids', 'preparation_printer_ids', 'default_receipt_printer_id',
+            'status', 'self_ordering_image_background_ids', 'preparation_printer_ids',
             'receipt_printer_ids', 'use_order_printer', 'other_devices', 'pos_snooze_ids', 'self_ordering_primary_color',
         ]
 

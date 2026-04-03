@@ -13,6 +13,7 @@ export class BasePrinter {
         this.product_categories_ids = printer.product_categories_ids;
         this.pos_config_ids = printer.pos_config_ids;
         this.use_lna = printer.use_lna;
+        this.iface_cashdrawer = printer.iface_cashdrawer;
     }
 
     async print(image) {
