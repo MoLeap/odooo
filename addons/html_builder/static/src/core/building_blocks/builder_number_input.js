@@ -56,6 +56,19 @@ export class BuilderNumberInput extends Component {
     }
 
     /**
+     * Returns element style for `em`, otherwise document root style.
+     *
+     * @param {boolean} isUnitEM - True if either source or target unit is "em".
+     * @returns {CSSStyleDeclaration}
+     **/
+    getStyle(isUnitEM) {
+        const editingElement = this.env.getEditingElement();
+        return isUnitEM
+            ? getComputedStyle(editingElement)
+            : getHtmlStyle(editingElement.ownerDocument);
+    }
+
+    /**
      * @param {string | number} values - Values separated by spaces or a number
      * @param {(string) => string} convertSingleValueFn - Convert a single value
      */
@@ -76,7 +89,10 @@ export class BuilderNumberInput extends Component {
         return this.convertSpaceSplitValues(rawValue, (value) => {
             const unit = this.props.unit;
             const { savedValue, savedUnit } = value.match(
-                /(?<savedValue>[\d.e+-]+)(?<savedUnit>\w*)/
+                // [+-]? - optional sign
+                // \d*\.?\d+ - number (int or decimal)
+                // (?:e[+-]?\d+)? - optional scientific notation
+                /(?<savedValue>[+-]?\d*\.?\d+(?:e[+-]?\d+)?)(?<savedUnit>\w*)/
             ).groups;
             if (savedUnit || this.props.saveUnit) {
                 // Convert value from saveUnit to unit
@@ -84,7 +100,9 @@ export class BuilderNumberInput extends Component {
                     parseFloat(savedValue),
                     savedUnit || this.props.saveUnit,
                     unit,
-                    getHtmlStyle(this.env.getEditingElement().ownerDocument)
+                    this.getStyle(
+                        unit === "em" || savedUnit === "em" || this.props.saveUnit === "em"
+                    )
                 );
             }
             // Put *at most* 3 decimal digits
@@ -144,7 +162,7 @@ export class BuilderNumberInput extends Component {
                     value,
                     unit,
                     saveUnit,
-                    getHtmlStyle(this.env.getEditingElement().ownerDocument)
+                    this.getStyle(unit === "em" || saveUnit === "em")
                 );
             }
             if (unit && applyWithUnit) {
