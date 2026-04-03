@@ -495,17 +495,23 @@ export class LinkPlugin extends Plugin {
         );
     }
 
-    getProps({ linkElement, isImage, applyCallback, state }) {
+    getLinkPopoverProps({
+        linkElement,
+        isImage,
+        applyCallback,
+        containerElement,
+        cursorsToRestore,
+    }) {
         return {
             document: this.document,
             linkElement,
             isImage: isImage,
-            containerElement: closestElement(state.selection.anchorNode),
+            containerElement: containerElement,
             ignoreDOMMutations: this.dependencies.history.ignoreDOMMutations,
             onApply: (...args) => {
                 delete this._isNavigatingByMouse;
                 applyCallback(...args);
-                this.closeLinkTools(state.cursorsToRestore);
+                this.closeLinkTools(cursorsToRestore);
                 this.dependencies.selection.focusEditable();
                 this.dependencies.history.addStep();
             },
@@ -567,31 +573,29 @@ export class LinkPlugin extends Plugin {
                 { type: "danger" }
             );
         }
-        const state = {
-            selection: this.dependencies.selection.getEditableSelection(),
-            cursorsToRestore: this.dependencies.selection.preserveSelection(),
-        };
-        const commonAncestor = closestElement(state.selection.commonAncestorContainer);
-        linkElement = linkElement || findInSelection(state.selection, "a");
+        let selection = this.dependencies.selection.getEditableSelection();
+        let cursorsToRestore = this.dependencies.selection.preserveSelection();
+        const commonAncestor = closestElement(selection.commonAncestorContainer);
+        linkElement = linkElement || findInSelection(selection, "a");
         this.type = type;
         if (
             linkElement &&
-            (!linkElement.contains(state.selection.anchorNode) ||
-                !linkElement.contains(state.selection.focusNode))
+            (!linkElement.contains(selection.anchorNode) ||
+                !linkElement.contains(selection.focusNode))
         ) {
-            this.extendLinkToSelection(linkElement, state.selection);
-            linkElement = findInSelection(state.selection, "a");
+            this.extendLinkToSelection(linkElement, selection);
+            linkElement = findInSelection(selection, "a");
             this.dependencies.history.addStep();
-            state.cursorsToRestore = this.dependencies.selection.preserveSelection();
+            cursorsToRestore = this.dependencies.selection.preserveSelection();
         }
         this.linkInDocument = linkElement;
         if (!linkElement) {
             // create a new link element
-            linkElement = this.createLink(undefined, state.selection.textContent());
+            linkElement = this.createLink(undefined, selection.textContent());
         }
 
-        const selectionTextContent = state.selection?.textContent();
-        const isImage = !!findInSelection(state.selection, "img");
+        const selectionTextContent = selection?.textContent();
+        const isImage = !!findInSelection(selection, "img");
 
         const applyCallback = (url, label, classes, linkTarget, attachmentId, relValue) => {
             if (this.linkInDocument) {
@@ -621,7 +625,7 @@ export class LinkPlugin extends Plugin {
                         cleanZWChars(this.linkInDocument.innerText) !== label
                     ) {
                         this.linkInDocument.innerText = label;
-                        state.cursorsToRestore = null;
+                        cursorsToRestore.restore = null;
                     }
                 }
             } else if (url) {
@@ -633,7 +637,7 @@ export class LinkPlugin extends Plugin {
                     if (relValue) {
                         link.setAttribute("rel", relValue);
                     }
-                    const image = isImage && findInSelection(state.selection, "img");
+                    const image = isImage && findInSelection(selection, "img");
                     const figure =
                         image?.parentElement?.matches("figure[contenteditable=false]") &&
                         image.parentElement;
@@ -647,12 +651,12 @@ export class LinkPlugin extends Plugin {
                             baseContainer.append(link);
                         }
                     } else {
-                        const content = this.dependencies.selection.extractContent(state.selection);
+                        const content = this.dependencies.selection.extractContent(selection);
                         link.append(content);
                         link.normalize();
-                        state.cursorsToRestore = null;
-                        state.selection = this.dependencies.selection.getEditableSelection();
-                        const anchorClosestElement = closestElement(state.selection.anchorNode);
+                        cursorsToRestore.restore = null;
+                        selection = this.dependencies.selection.getEditableSelection();
+                        const anchorClosestElement = closestElement(selection.anchorNode);
                         if (commonAncestor !== anchorClosestElement) {
                             // We force the cursor after the anchorClosestElement
                             // To be sure the link is inserted in the correct place in the dom.
@@ -674,7 +678,7 @@ export class LinkPlugin extends Plugin {
                         link.setAttribute("target", linkTarget);
                     }
                     this.linkInDocument = link;
-                    state.cursorsToRestore = null;
+                    cursorsToRestore.restore = null;
                     this.dependencies.dom.insert(link);
                 }
             }
@@ -684,11 +688,13 @@ export class LinkPlugin extends Plugin {
         };
 
         this.restoreSavePoint = this.dependencies.history.makeSavePoint();
-        const props = this.getProps({
+        const containerElement = closestElement(selection.anchorNode);
+        const props = this.getLinkPopoverProps({
             linkElement,
             isImage,
             applyCallback,
-            state,
+            containerElement,
+            cursorsToRestore,
         });
 
         const popover = this.getActivePopover(linkElement);
