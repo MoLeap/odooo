@@ -67,7 +67,9 @@ publicWidget.registry.websiteLinksCodeEditor = publicWidget.Widget.extend({
      */
     _submitCode: function () {
         var initCode = $('#edit-code-form #init_code').val();
-        var newCode = $('#edit-code-form #new_code').val();
+        var newCode = $("#edit-code-form #new_code")
+            .val()
+            .replace(/[^a-zA-Z0-9_-]/g, "");
         var self = this;
 
         if (newCode === '') {
@@ -75,8 +77,6 @@ publicWidget.registry.websiteLinksCodeEditor = publicWidget.Widget.extend({
             self.$('.o_website_links_code_error').show();
             return;
         }
-
-        this._showNewCode(newCode);
 
         if (initCode === newCode) {
             this._showNewCode(newCode);
