@@ -30,10 +30,40 @@ class ProductTemplate(models.Model):
         """
         if not self.is_storable or self.allow_out_of_stock_order:
             return False
-        return not self.product_variant_id or self.product_variant_id._is_sold_out()
+        return not self.product_variant_ids or all(
+            variant._is_sold_out() for variant in self.product_variant_ids
+        )
 
     def _website_show_quick_add(self):
         return super()._website_show_quick_add() and not self._is_sold_out()
+
+    def _get_ribbon(self, price_vals=None, auto_assign_ribbons=None, variant=None):
+        if auto_assign_ribbons is None:
+            # On product page, the auto_assign_ribbons are not provided.
+            auto_assign_ribbons = self.env["product.ribbon"].search_fetch([
+                ("assign", "!=", "manual")
+            ])
+        if (variant and not variant._is_sold_out()) or (not variant and not self._is_sold_out()):
+            auto_assign_ribbons = auto_assign_ribbons.filtered(
+                lambda ribbon: ribbon.assign != "out_of_stock"
+            )
+        return super()._get_ribbon(price_vals, auto_assign_ribbons, variant)
+
+    def _get_first_possible_combination(self, necessary_values=None):
+        if self.env.context.get("website_id"):
+            combinations = self._get_possible_combinations(necessary_values)
+            return next(
+                filter(self._is_combination_available, combinations),
+                super()._get_first_possible_combination(necessary_values),
+            )
+        return super()._get_first_possible_combination(necessary_values)
+
+    def _is_combination_available(self, combination):
+        try:
+            variant = self._get_variant_for_combination(combination)
+            return variant and not variant._is_sold_out()
+        except ValueError:
+            return False
 
     def _get_additionnal_combination_info(self, product_or_template, quantity, uom, date, website):
         res = super()._get_additionnal_combination_info(
