@@ -786,13 +786,11 @@ class PaymentTransaction(models.Model):
         tx = self or self._search_by_reference(provider_code, payment_data)
         if tx:
             tx.ensure_one()
-            previous_state = tx.state
-            tx._validate_amount(payment_data)
-            if tx.state == "error" and tx.state != previous_state:
-                return tx
             tx._apply_updates(payment_data)
-            if tx.tokenize and tx.state in {"authorized", "done"}:
-                tx._tokenize(payment_data)
+            if tx.state in {"authorized", "done"}:
+                tx._validate_amount(payment_data)
+                if tx.state != "error" and tx.tokenize:
+                    tx._tokenize(payment_data)
         return tx
 
     @api.model
@@ -855,7 +853,7 @@ class PaymentTransaction(models.Model):
 
         if not amount or not currency_code:
             error_message = _("The amount or currency is missing from the payment data.")
-            self._set_error(error_message)
+            self._set_error(error_message, extra_allowed_states=("done",))
             return
 
         # Negate the amount for refunds, as refunds have a negative amount in Odoo, but all
@@ -873,14 +871,14 @@ class PaymentTransaction(models.Model):
             error_message = _(
                 "The amount from the payment data doesn't match the one from the transaction."
             )
-            self._set_error(error_message)
+            self._set_error(error_message, extra_allowed_states=("done",))
             return
 
         if currency_code != self.currency_id.name:
             error_message = _(
                 "The currency from the payment data doesn't match the one from the transaction."
             )
-            self._set_error(error_message)
+            self._set_error(error_message, extra_allowed_states=("done",))
 
     def _extract_amount_data(self, payment_data):  # noqa: ARG002
         """Extract the amount, currency and rounding precision from the payment data.
