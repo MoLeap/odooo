@@ -157,22 +157,21 @@ export class Logger {
     }
 }
 
+/**
+ * A Set that maintains a maximum size by evicting the oldest entries once the capacity
+ * threshold is exceeded.
+ */
 export class BoundedSet extends Set {
     constructor(maxSize) {
         super();
-        this.capacity = maxSize * 1.25;
+        this.maxSize = maxSize;
     }
 
     add(item) {
         super.add(item);
-        if (this.size > this.capacity) {
-            let amountToRemove = this.size - this.capacity;
-            for (item of this) {
-                this.delete(item);
-                if (--amountToRemove === 0) {
-                    break;
-                }
-            }
+        if (this.size > this.maxSize) {
+            const oldest = this.values().next().value;
+            this.delete(oldest);
         }
         return this;
     }

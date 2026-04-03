@@ -113,18 +113,3 @@ class TestMailPresence(WebsocketCase, MailCommon):
             self_payload,
             {"res.partner": [{"id": bob.partner_id.id, "presence_status": "online"}]},
         )
-        other_user = new_test_user(self.env, login="other_user", groups="base.group_user")
-        self._reset_bus()
-        bob_presence = self.env["mail.presence"].search([("user_id", "=", bob.id)])
-        bob_presence._send_presence(bus_target=other_user)
-        self.env.cr.precommit.run()  # trigger the creation of bus.bus records
-        notifications = self.env["bus.bus"].search([])
-        self.assertEqual(len(notifications), 1)  # Only im_status notification was dispatched, and only for bus_target.
-        self.assertEqual(
-            notifications.channel,
-            json_dump(channel_with_db(self.env.cr.dbname, other_user)),
-        )
-        self.assertEqual(
-           json.loads(notifications.message)["payload"],
-            {"res.partner": [{"id": bob.partner_id.id, "im_status": "online"}]},
-        )

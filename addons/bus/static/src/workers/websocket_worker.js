@@ -49,16 +49,15 @@ const logger = new Logger("bus_websocket_worker");
  * for SharedWorker and this class implements it.
  */
 export class WebsocketWorker {
-    static OUTGOING_BATCH_DELAY = 300;
+    static OUTGOING_BATCH_DELAY = 500;
     INITIAL_RECONNECT_DELAY = 1000;
     RECONNECT_JITTER = 1000;
     CONNECTION_CHECK_DELAY = 60_000;
 
     /**
-     * @type {Set<number>}
-     *
-     * Notifications ids that were already received. Useful to filter rare duplicates.
-     */
+     * @type {Set<number>} Notifications ids that were already received. Used to
+     * guaarantee at-most-once delivery.
+     * */
     seenNotificationIds = new BoundedSet(10_000);
 
     constructor(name) {
