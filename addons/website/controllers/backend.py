@@ -78,15 +78,16 @@ class WebsiteBackend(Home):
         }
         return features_info
 
-    @http.route('/odoo/action-website.website_preview', type='http', auth="user", readonly=Home._web_client_readonly)
-    def action_website_preview(self, website_id=None, **kw):
-        _add_context_from_query_website_id(self.env, website_id)
-        return self.web_client('action-website.website_preview', **kw)
+    @http.route()
+    def web_client(self, s_action=None, **kw):
+        if s_action == 'action-website.website_preview':
+            _add_context_from_query_website_id(self.env, kw.get('website_id'))
+        return super().web_client(s_action, **kw)
 
 
 class WebsiteWebClient(WebClient):
 
-    @http.route('/web/bundle/<string:bundle_name>', auth='public', methods=['GET'], readonly=True)
+    @http.route()
     def bundle(self, bundle_name, website_id=None, **bundle_params):
         _add_context_from_query_website_id(self.env, website_id)
         return super().bundle(bundle_name, **bundle_params)
