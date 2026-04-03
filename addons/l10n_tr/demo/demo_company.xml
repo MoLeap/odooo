@@ -7,7 +7,7 @@
         <field name="street2">Mavişehir Sokak, 5. Kat</field>
         <field name="city">İç Anadolu Bölgesi</field>
         <field name="country_id" ref="base.tr"/>
-        <field name="state_id" ref="base.state_tr_81"/>
+        <field name="state_id" ref="l10n_tr.state_tr_81"/>
         <field name="zip">06810</field>
         <field name="phone">+90 501 234 56 78</field>
         <field name="email">info@company.trexample.com</field>
@@ -22,7 +22,7 @@
         <field name="street2">Kaya Sokak No: 15</field>
         <field name="city">Ürgüp</field>
         <field name="country_id" ref="base.tr"/>
-        <field name="state_id" ref="base.state_tr_50"/>
+        <field name="state_id" ref="l10n_tr.state_tr_50"/>
         <field name="zip">50240</field>
         <field name="phone">+90 509 987 12 34</field>
         <field name="email">demo.elektronik@company.trexample.com</field>
@@ -37,7 +37,7 @@
         <field name="street2">Konak Sokak, No: 45</field>
         <field name="city">Konak Belediyesi</field>
         <field name="country_id" ref="base.tr"/>
-        <field name="state_id" ref="base.state_tr_35"/>
+        <field name="state_id" ref="l10n_tr.state_tr_35"/>
         <field name="zip">35100</field>
         <field name="phone">+90 500 987 56 00</field>
         <field name="email">kamu@gmail.trexample.com</field>
@@ -52,7 +52,7 @@
         <field name="street2">Daire: 7, Kat: 3</field>
         <field name="city">Beyoğlu</field>
         <field name="country_id" ref="base.tr"/>
-        <field name="state_id" ref="base.state_tr_34"/>
+        <field name="state_id" ref="l10n_tr.state_tr_34"/>
         <field name="zip">34000</field>
         <field name="phone">+90 599 987 56 00</field>
         <field name="email">ayseyilmaz@trexample.com</field>
