@@ -21,6 +21,7 @@ export class ShopPage extends Interaction {
         },
         '.o_wsale_attribute_search_bar': { 't-on-input': this.searchAttributeValues },
         '.o_wsale_view_more_btn': { 't-on-click': this.onToggleViewMoreLabel },
+        '.o_wsale_apply_filters_btn': {'t-on-click': this._onApplyFiltersClick },
     };
 
     setup() {
@@ -47,12 +48,61 @@ export class ShopPage extends Interaction {
      *
      * @param {Event} ev
      */
-    onChangeAttribute(ev) {
+    async onChangeAttribute(ev) {
+        const form = ev.currentTarget.closest('form');
+        const searchParams = this._getSearchParams(form); // Extracted for reuse
+        const url = new URL(form.action);
+
+        const isMobile = window.matchMedia('(max-width: 991px)').matches;
+        if (isMobile) {
+            searchParams.append('is_ajax_count', 'true');
+            const countUrl = `${url.pathname}?${searchParams.toString()}`;
+            const response = await fetch(countUrl);
+            const data = await response.json();
+
+            const applyBtn = document.querySelector('#o_wsale_apply_filters_btn');
+            if (applyBtn) {
+                applyBtn.textContent = `Apply Filters (${data.count})`;
+            }
+        }
+        else {
+            searchParams.append('is_ajax', 'true');
+            const gridUrl = `${url.pathname}?${searchParams.toString()}`;
+            await this._fetchAndApplyGrid(gridUrl, searchParams, url.pathname);
+        }
+    }
+
+    async _onApplyFiltersClick(ev) {
+        ev.preventDefault();
+        const form = document.querySelector('#o_wsale_offcanvas form.js_attributes');
+        const searchParams = this._getSearchParams(form);
+        const url = new URL(form.action);
+
+        redirect(`${url.pathname}?${searchParams.toString()}`);
+    }
+
+    async _fetchAndApplyGrid(fetchUrl, searchParams, pathname) {
         const productGrid = this.el.querySelector('.o_wsale_products_grid_table_wrapper');
         if (productGrid) {
             productGrid.classList.add('opacity-50');
         }
-        const form = ev.currentTarget.closest('form');
+
+        const response = await fetch(fetchUrl)
+        const html = await response.text()
+        const newGrid = document.createElement('div');
+        newGrid.innerHTML = html;
+
+        if (productGrid && newGrid) {
+            productGrid.innerHTML = newGrid.innerHTML;
+            productGrid.classList.remove('opacity-50');
+        }
+
+        searchParams.delete('is_ajax');
+        const cleanUrl = `${pathname}?${searchParams.toString()}`;
+        window.history.pushState({ path: cleanUrl }, '', cleanUrl);
+    }
+
+    _getSearchParams(form) {
         const filters = form.querySelectorAll('input:checked, select');
         const attributeValues = new Map();
         const tags = new Set();
@@ -80,7 +130,7 @@ export class ShopPage extends Interaction {
         if (tags.size) {
             searchParams.set('tags', [...tags].join(','));
         }
-        redirect(`${url.pathname}?${searchParams.toString()}`);
+        return searchParams;
     }
 
     /**
