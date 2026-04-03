@@ -479,21 +479,20 @@ class MrpSubcontractingPurchaseTest(TestAccountSubcontractingFlows):
 
         self.company.days_to_purchase = 2
         # Case 1 Vendor lead time >= Manufacturing lead time + DTPMO
-        seller = self.env['product.supplierinfo'].create({
-            'product_tmpl_id': self.finished.product_tmpl_id.id,
-            'partner_id': self.subcontractor_partner1.id,
+        self.finished.seller_ids.write({
             'price': 12.0,
             'delay': 10,
         })
+        seller = self.finished.seller_ids
 
         self.bom.produce_delay = 3
         self.bom.days_to_prepare_mo = 4
-        delays, _ = rule._get_lead_days(self.finished, supplierinfo=seller)
+        delays, _ = rule._get_lead_days(self.finished, orderpoint_partner=seller.partner_id)
         self.assertEqual(delays['total_delay'], seller.delay + self.company.days_to_purchase)
         # Case 2 Vendor lead time < Manufacturing lead time + DTPMO
         self.bom.produce_delay = 5
         self.bom.days_to_prepare_mo = 6
-        delays, _ = rule._get_lead_days(self.finished, supplierinfo=seller)
+        delays, _ = rule._get_lead_days(self.finished, orderpoint_partner=seller.partner_id)
         self.assertEqual(delays['total_delay'], self.bom.produce_delay + self.bom.days_to_prepare_mo + self.company.days_to_purchase)
 
     def test_subcontracting_lead_days_on_overview(self):

@@ -43,7 +43,7 @@ class TestMrpSubcontractingCommon(TransactionCase):
             bom_line.product_qty = 1
         cls.bom = bom_form.save()
 
-        cls.env['product.supplierinfo'].create({
+        cls.subcontracting_supplier = cls.env['product.supplierinfo'].create({
             'product_tmpl_id': cls.finished.product_tmpl_id.id,
             'partner_id': cls.subcontractor_partner1.id,
         })
