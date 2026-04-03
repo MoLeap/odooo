@@ -52,12 +52,14 @@ function createOdooChartRuntime(chart, getters) {
     const { datasets, labels } = chart.dataSource.getHierarchicalData();
 
     const definition = chart.getDefinition();
+    const defaultBackground = getters.getSpreadsheetTheme().backgroundColor
     const locale = getters.getLocale();
 
     const chartData = {
         labels,
         dataSetsValues: datasets.map((ds) => ({ data: ds.data, label: ds.label })),
         locale,
+        background: definition.background || defaultBackground,
     };
 
     const config = {
@@ -73,7 +75,7 @@ function createOdooChartRuntime(chart, getters) {
                 title: getChartTitle(definition, getters),
                 legend: { display: false },
                 tooltip: getTreeMapChartTooltip(definition, chartData),
-                background: { color: chart.background },
+                background: { color: chartData.background },
             },
             onHover: onOdooChartItemHover(),
             onClick: onTreemapOdooChartItemClick(getters, chart),

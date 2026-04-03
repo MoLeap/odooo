@@ -47,6 +47,7 @@ function createOdooChartRuntime(chart, getters) {
     const { datasets, labels } = chart.dataSource.getData();
 
     const definition = chart.getDefinition();
+    const defaultBackground = getters.getSpreadsheetTheme().backgroundColor
     const locale = getters.getLocale();
 
     const chartData = {
@@ -56,6 +57,7 @@ function createOdooChartRuntime(chart, getters) {
         availableRegions: getters.getGeoChartAvailableRegions(),
         geoFeatureNameToId: getters.geoFeatureNameToId,
         getGeoJsonFeatures: getters.getGeoJsonFeatures,
+        background: definition.background || defaultBackground,
     };
 
     const config = {
@@ -71,7 +73,7 @@ function createOdooChartRuntime(chart, getters) {
                 title: getChartTitle(definition, getters),
                 tooltip: getGeoChartTooltip(definition, chartData),
                 legend: { display: false },
-                background: { color: chart.background },
+                background: { color: chartData.background },
             },
             onHover: onGeoOdooChartItemHover(),
             onClick: onGeoOdooChartItemClick(getters, chart),

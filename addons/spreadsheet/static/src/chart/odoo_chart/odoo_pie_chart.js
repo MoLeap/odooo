@@ -50,6 +50,7 @@ chartRegistry.add("odoo_pie", {
 function createOdooChartRuntime(chart, getters) {
     const { datasets, labels } = chart.dataSource.getData();
     const definition = chart.getDefinition();
+    const defaultBackground = getters.getSpreadsheetTheme().backgroundColor
     definition.dataSets = datasets.map(() => ({ trend: definition.trend }));
 
     const chartData = {
@@ -57,6 +58,7 @@ function createOdooChartRuntime(chart, getters) {
         dataSetsValues: datasets.map((ds) => ({ data: ds.data, label: ds.label })),
         locale: getters.getLocale(),
         topPadding: getTopPaddingForDashboard(definition, getters),
+        background: definition.background || defaultBackground,
     };
 
     const config = {
@@ -76,7 +78,7 @@ function createOdooChartRuntime(chart, getters) {
                     changeTypeToSpreadsheetChart(definition),
                     chartData
                 ),
-                background: { color: chart.background },
+                background: { color: chartData.background },
             },
             onHover: onOdooChartItemHover(),
             onClick: onOdooChartItemClick(getters, chart),

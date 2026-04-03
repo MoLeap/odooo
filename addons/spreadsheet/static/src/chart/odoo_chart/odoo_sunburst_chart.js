@@ -52,12 +52,14 @@ function createOdooChartRuntime(chart, getters) {
     const { datasets, labels } = chart.dataSource.getHierarchicalData();
 
     const definition = chart.getDefinition();
+    const defaultBackground = getters.getSpreadsheetTheme().backgroundColor
     const locale = getters.getLocale();
 
     const chartData = {
         labels,
         dataSetsValues: datasets.map((ds) => ({ data: ds.data, label: ds.label })),
         locale,
+        background: definition.background || defaultBackground,
     };
 
     const config = {
@@ -76,7 +78,7 @@ function createOdooChartRuntime(chart, getters) {
                 tooltip: getSunburstChartTooltip(definition, chartData),
                 sunburstLabelsPlugin: getSunburstShowValues(definition, chartData),
                 sunburstHoverPlugin: { enabled: true },
-                background: { color: chart.background },
+                background: { color: chartData.background },
             },
             onHover: onOdooChartItemHover(),
             onClick: onSunburstOdooChartItemClick(getters, chart),

@@ -50,6 +50,7 @@ chartRegistry.add("odoo_funnel", {
 
 function createOdooChartRuntime(chart, getters) {
     const definition = chart.getDefinition();
+    const defaultBackground = getters.getSpreadsheetTheme().backgroundColor
 
     let { datasets, labels } = chart.dataSource.getData();
     if (definition.cumulative) {
@@ -62,6 +63,7 @@ function createOdooChartRuntime(chart, getters) {
         labels,
         dataSetsValues: datasets.map((ds) => ({ data: ds.data, label: ds.label })),
         locale,
+        background: definition.background || defaultBackground,
     };
 
     const config = {
@@ -83,7 +85,7 @@ function createOdooChartRuntime(chart, getters) {
                     changeTypeToSpreadsheetChart(definition),
                     chartData
                 ),
-                background: { color: chart.background },
+                background: { color: chartData.background },
             },
             onHover: onOdooChartItemHover(),
             onClick: onOdooChartItemClick(getters, chart),
