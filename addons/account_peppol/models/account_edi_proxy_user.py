@@ -50,7 +50,7 @@ class AccountEdiProxyClientUser(models.Model):
         edi_users._peppol_get_new_documents()
 
     def _cron_peppol_get_message_status(self):
-        edi_users = self.search([('company_id.account_peppol_proxy_state', '=', 'active'), ('proxy_type', '=', 'peppol')])
+        edi_users = self.search([('company_id.account_peppol_proxy_state', 'in', ('active', 'sender')), ('proxy_type', '=', 'peppol')])
         edi_users._peppol_get_message_status()
 
     # -------------------------------------------------------------------------
@@ -321,6 +321,7 @@ class AccountEdiProxyClientUser(models.Model):
             local_state = {
                 'draft': 'not_registered',
                 'active': 'active',
+                'sender': 'sender',
                 'verified': 'pending',
                 'rejected': 'rejected',
             }.get(proxy_user.get('peppol_state'))

@@ -68,6 +68,7 @@ class ResCompany(models.Model):
             ('sent_verification', 'Verification code sent'),
             ('pending', 'Pending'),
             ('active', 'Active'),
+            ('sender', 'Can send but not receive'),
             ('rejected', 'Rejected'),
             ('canceled', 'Canceled'),
         ],
