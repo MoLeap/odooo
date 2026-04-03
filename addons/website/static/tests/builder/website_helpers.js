@@ -9,7 +9,7 @@ import { Builder } from "@html_builder/builder";
 import { SetupEditorPlugin } from "@html_builder/core/setup_editor_plugin";
 import { Plugin } from "@html_editor/plugin";
 import { defineMailModels, startServer } from "@mail/../tests/mail_test_helpers";
-import { describe } from "@odoo/hoot";
+import { describe, globals } from "@odoo/hoot";
 import { advanceTime, animationFrame, click, queryOne, tick, waitFor } from "@odoo/hoot-dom";
 import {
     contains,
@@ -39,10 +39,28 @@ import { session } from "@web/session";
 import { getTranslatedElements } from "./translated_elements_getter.hoot";
 import { BackgroundShapeOptionPlugin } from "@html_builder/plugins/background_option/background_shape_option_plugin";
 
+const prom = globals.fetch(`/web/dataset/call_kw/website/get_current_website`, {
+    method: 'post',
+    headers: {"Content-type": "application/json"},
+    body: JSON.stringify({
+        "jsonrpc": "2.0",
+        "method": "call",
+        "id": null,
+        "params": {
+            "model": "website",
+            "method": "get_current_website",
+            "args": [],
+            "kwargs": {},
+        }
+    })
+});
+
+let website_id;
 class Website extends models.Model {
     _name = "website";
-    get_current_website() {
-        return [1];  // When we try to retrieve the assets, they do not correspond to this website, which may not even exist.
+    async get_current_website() {
+        website_id = website_id || (await (await prom).json()).result[0];
+        return [website_id];
     }
 }
 
@@ -341,7 +359,7 @@ async function openBuilderSidebar(editAssetsLoaded) {
     // The next line allow us to await asynchronous fetches and cache them before it is used
     await Promise.all([
         getWebsiteSnippets(),
-        loadBundle("website.website_builder_assets?website_id=1"),  // We use id 1 for get_current_website.
+        loadBundle("website.website_builder_assets?website_id=" + website_id),
         loadBundle("html_editor.assets_image_cropper"),
     ]);
 

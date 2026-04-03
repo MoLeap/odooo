@@ -203,7 +203,7 @@ class IrHttp(models.AbstractModel):
     def _match(cls, path):
         def get_current_website_id():
             # TODO: why use session['force_website_id'] when we could had
-            #       used session['context']['website_id'] instead?!
+            #       used args and specific route
             if force_website_id := request.session.get('force_website_id'):
                 if force_website_id in request.env['website'].get_all().ids:
                     return force_website_id
