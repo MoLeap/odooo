@@ -95,6 +95,34 @@ export class CustomizeMailingPlugin extends Plugin {
             }
             this.refreshMailingVariableSelector(variable);
         }
+        this.syncRootFontSizeVariables();
+    }
+
+    /**
+     * Mirror heading font-size CSS variables onto :root so the FontPlugin
+     * toolbar (which reads from document.documentElement) shows the correct
+     * mailing values instead of Bootstrap defaults.
+     */
+    syncRootFontSizeVariables() {
+        for (const variable of Object.keys(CUSTOMIZE_MAILING_VARIABLES)) {
+            if (variable.endsWith("-font-size")) {
+                this.syncRootFontSizeVariable(variable, this.getVariableValue(variable));
+            }
+        }
+    }
+
+    syncRootFontSizeVariable(variable, value) {
+        if (!value) {
+            return;
+        }
+        // Convert px to rem since FontPlugin expects rem values.
+        const rootFontSize = parseFloat(
+            this.document.defaultView.getComputedStyle(this.document.documentElement).fontSize
+        );
+        this.document.documentElement.style.setProperty(
+            variable,
+            `${parseFloat(value) / rootFontSize}rem`
+        );
     }
 
     refreshMailingVariableSelector(variable) {
@@ -156,6 +184,9 @@ export class CustomizeMailingPlugin extends Plugin {
         this.getRule(this.cssPrefix).style.setProperty(variable, value);
         if (Boolean(currentValue) !== Boolean(value)) {
             this.refreshMailingVariableSelector(variable);
+        }
+        if (variable.endsWith("-font-size")) {
+            this.syncRootFontSizeVariable(variable, value);
         }
     }
 
