@@ -88,10 +88,9 @@ class IrModuleModule(models.Model):
                     websites_to_update = module._theme_get_stream_website_ids()
 
                     if module.state == 'to upgrade' and request:
-                        Website = self.env['website']
-                        current_website = Website.get_current_website()
-                        websites_to_update = current_website if current_website in websites_to_update else Website
-
+                        # TODO: stop using _get_current_website_id and _get_current_website_fallback
+                        website_id = self.env['ir.http']._get_current_website_id() or self.env['ir.http']._get_current_website_fallback()
+                        websites_to_update = self.env['website'].browse(website_id)
                     for website in websites_to_update:
                         module._theme_load(website)
 
