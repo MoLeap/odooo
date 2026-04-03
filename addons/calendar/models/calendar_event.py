@@ -167,6 +167,7 @@ class CalendarEvent(models.Model):
         help="""When synchronization with an external calendar is active, this description is synchronized \
         with the one of the associated meeting in that external calendar. Any update will be propagated there \
         and vice versa.""")
+    is_draft = fields.Boolean()
     user_id = fields.Many2one('res.users', 'Organizer', default=lambda self: self.env.user, index='btree_not_null')
     partner_id = fields.Many2one(
         'res.partner', string='Scheduled by', related='user_id.partner_id', readonly=True)
@@ -829,7 +830,7 @@ class CalendarEvent(models.Model):
                 detached_events = event.with_context(skip_contact_description=True)._apply_recurrence_values(recurrence_values)
                 detached_events.active = False
 
-        events.filtered(lambda event: event.start > fields.Datetime.now()).attendee_ids._send_invitation_emails()
+        events.attendee_ids._send_invitation_emails()
 
         # update activities based on calendar event data, unless already prepared
         # above manually. Heuristic: a new command (0, 0, vals) is considered as
@@ -967,12 +968,10 @@ class CalendarEvent(models.Model):
 
         current_attendees = self.filtered('active').attendee_ids
         skip_attendee_notification = self.env.context.get('skip_attendee_notification')
-        if not skip_attendee_notification and 'partner_ids' in values:
+        invited_attendees = self._get_new_invited_attendees(current_attendees, previous_attendees, vals)
+        if not skip_attendee_notification and invited_attendees:
             # we send to all partners and not only the new ones
-            (current_attendees - previous_attendees)._notify_attendees(
-                self.env.ref('calendar.calendar_template_meeting_invitation', raise_if_not_found=False),
-                force_send=True,
-            )
+            invited_attendees._send_invitation_emails()
         if not skip_attendee_notification and not self.env.context.get('is_calendar_event_new') and 'start' in values:
             start_date = fields.Datetime.to_datetime(values.get('start'))
             # Only notify on future events
@@ -1084,6 +1083,10 @@ class CalendarEvent(models.Model):
         for old_event, new_event in zip(self, new_events):
             new_event.write({'partner_ids': [(Command.set(old_event.partner_ids.ids))]})
         return new_events
+
+    def action_confirm(self):
+        self.ensure_one()
+        self.is_draft = False
 
     def action_unlink_event(self, attendee_id=None, recurrence=False):
         """
@@ -1783,6 +1786,11 @@ class CalendarEvent(models.Model):
                 contact_description.append("")  # To add a blank line between the organizer and partner details
             contact_description.extend(self._prepare_partner_contact_details_html(_("Contact Details"), first_partner))
         return Markup("<br/>").join(contact_description)
+
+    def _get_new_invited_attendees(self, current_attendees, previous_attendees, vals):
+        """Get the attendees who must receive an invitation for a modified calendar event. All of them must get it
+        when the draft state is removed as this one previously prevented invitations from being sent."""
+        return current_attendees if vals.get('is_draft') is False else current_attendees - previous_attendees
 
     @api.model
     def _prepare_partner_contact_details_html(self, section_title, partner):
