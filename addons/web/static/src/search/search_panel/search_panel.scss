@@ -163,6 +163,12 @@
     }
 }
 
+.o_search_panel_category_value_header:focus-within,
+.o_search_panel_filter_value:focus-within {
+    box-shadow: var(--SearchPanelHeader-focus, #{$focus-ring-box-shadow});
+    outline: none;
+}
+
 .o_search_panel_category_value {
     .o_toggle_fold {
         color: $text-muted;
