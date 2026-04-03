@@ -62,5 +62,21 @@ class StockMoveLine(models.Model):
                 )
                 if delta:
                     move._set_value(correction_quantity=delta)
+<<<<<<< 950fc8ef095827aea3772d6082dc4d13c61e50cf
         if move_to_update:
             self.env['stock.move'].browse(move_to_update)._set_value()
+||||||| fbdd5239f5039586406bf868d33a8dfd9e295e07
+        if moves_to_update := self.env['stock.move'].browse(move_to_update_ids):
+            moves_to_update._set_value()
+=======
+        if moves_to_update := self.env['stock.move'].browse(move_to_update_ids):
+            moves_to_update._set_value()
+
+    def _is_consigned_valued_line(self):
+        """ return true if the move line would have been considered in the _get_valued_qty() method except for
+        the _should_exclude_for_valuation criteria (.i.e the line would have been valued if it wasn't consigned)
+        """
+        return self.picked and self._should_exclude_for_valuation() and\
+            (self.move_id._is_in() and not self.location_id._should_be_valued() and self.location_dest_id._should_be_valued()
+            or self.move_id._is_out() and self.location_id._should_be_valued() and not self.location_dest_id._should_be_valued())
+>>>>>>> 6a2a38ce36f2b109c0ed780e3910ca0bd34efa0b
