@@ -134,6 +134,14 @@ class Data_RecycleModel(models.Model):
             } for record in records_to_recycle if record.id not in mapped_existing_records[recycle_model]]
 
             if recycle_model.recycle_mode == 'automatic':
+                existing_records = self.env['data_recycle.record'].search([
+                    ('recycle_model_id', '=', recycle_model.id)
+                ])
+                for i in range(0, len(existing_records), DR_CREATE_STEP_AUTO):
+                    existing_batch = existing_records[i:i + DR_CREATE_STEP_AUTO]
+                    existing_batch.action_validate()
+                    if batch_commits:
+                        self.env.cr.commit()
                 for records_to_create_batch in split_every(DR_CREATE_STEP_AUTO, records_to_create):
                     self.env['data_recycle.record'].create(records_to_create_batch).action_validate()
                     if batch_commits and not is_test:
