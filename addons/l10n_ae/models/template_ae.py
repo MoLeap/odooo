@@ -28,7 +28,6 @@ class AccountChartTemplate(models.AbstractModel):
                 'account_fiscal_country_id': 'base.ae',
                 'bank_account_code_prefix': '101',
                 'cash_account_code_prefix': '105',
-                'transfer_account_code_prefix': '100',
                 'account_default_pos_receivable_account_id': 'uae_account_102012',
                 'income_currency_exchange_account_id': 'uae_account_500011',
                 'expense_currency_exchange_account_id': 'uae_account_400053',
