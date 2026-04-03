@@ -200,6 +200,7 @@ export class BaseProductPageAction extends BuilderAction {
     }
 
     async extraMediaSave(el, type, attachments, extraImageEls) {
+        console.warn('Saving extra media with attachments: ', attachments, ' and type: ', type);
         if (type === "image") {
             for (const index in attachments) {
                 const attachment = attachments[index];
