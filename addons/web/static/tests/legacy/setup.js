@@ -242,6 +242,7 @@ function patchSessionInfo() {
         },
         db: "test",
         registry_hash: "05500d71e084497829aa807e3caa2e7e9782ff702c15b2f57f87f2d64d049bd0",
+        browser_cache_secret: "23aeb0ff5d46cfa8aa44163720d871ac",
         is_admin: true,
         is_system: true,
         username: "thewise@odoo.com",
