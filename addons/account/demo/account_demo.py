@@ -342,20 +342,6 @@ class AccountChartTemplate(models.AbstractModel):
             limit=1,
         )
         return {
-            'demo_bank_statement_1': {
-                'name': "Opening Statement: First Synchronization",
-                'balance_end_real': 4253.0,
-                'balance_start': 5103.0,
-                'attachment_ids': [Command.set(['ir_attachment_bank_statement_1'])],
-                'line_ids': [
-                    Command.create({
-                        'journal_id': bnk_journal.id,
-                        'payment_ref': 'Office rent',
-                        'amount': -850.0,
-                        'date': (fields.Date.today() + relativedelta(months=-2)).strftime('%Y-%m-%d'),
-                    }),
-                ]
-            },
             'demo_bank_statement_2': {
                 'name': f'{bnk_journal.name} - {(fields.Date.today() + relativedelta(months=-1)).strftime("%Y-%m-%d")}',
                 'balance_end_real': 6678.0,
