@@ -131,7 +131,9 @@ class Cart(PaymentPortal):
             )
 
         added_qty_per_line = {}
-        values = order_sudo.with_context(skip_cart_verification=True)._cart_add(
+        values = order_sudo.with_context(
+            skip_cart_verification=True, website_sale_is_ecommerce=True
+        )._cart_add(
             product_id=product_id,
             quantity=quantity,
             uom_id=uom_id,
@@ -169,7 +171,9 @@ class Cart(PaymentPortal):
                         _("The given product does not exist therefore it cannot be added to cart.")
                     )
 
-                product_values = order_sudo.with_context(skip_cart_verification=True)._cart_add(
+                product_values = order_sudo.with_context(
+                    skip_cart_verification=True, website_sale_is_ecommerce=True
+                )._cart_add(
                     product_id=product_data["product_id"],
                     quantity=product_data["quantity"],
                     uom_id=product_data.get("uom_id"),

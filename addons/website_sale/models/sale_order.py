@@ -27,6 +27,12 @@ class SaleOrder(models.Model):
         readonly=True,
     )
 
+    is_ecommerce_order = fields.Boolean(
+        string="Is eCommerce Order",
+        readonly=True,
+        help="Technical field indicating this order was created from the eCommerce flow.",
+        default=False,
+    )
     cart_recovery_email_sent = fields.Boolean(string="Cart recovery email already sent")
     shop_warning = fields.Char(string="Warning")
 
@@ -202,6 +208,8 @@ class SaleOrder(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if self.env.context.get("website_sale_is_ecommerce"):
+                vals["is_ecommerce_order"] = True
             if vals.get("website_id"):
                 website = self.env["website"].browse(vals["website_id"])
                 if "company_id" in vals:
@@ -224,6 +232,9 @@ class SaleOrder(models.Model):
 
     def action_preview_sale_order(self):
         action = super().action_preview_sale_order()
+        if self.website_id:
+            # Update the context with the website used in the SO
+            self.website_id._force()
         if action["url"].startswith("/"):
             # URL should always be relative, safety check
             action["url"] = f"/@{action['url']}"
