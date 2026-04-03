@@ -178,7 +178,7 @@ class StockMove(models.Model):
     is_locked = fields.Boolean(compute='_compute_is_locked', readonly=True)
     is_initial_demand_editable = fields.Boolean('Is initial demand editable', compute='_compute_is_initial_demand_editable')
     is_quantity_done_editable = fields.Boolean('Is quantity done editable', compute='_compute_is_quantity_done_editable')
-    reference = fields.Char(compute='_compute_reference', string="Reference", store=True)
+    reference = fields.Char(compute='_compute_reference', string="Reference", store=True, readonly=False)
     move_lines_count = fields.Integer(compute='_compute_move_lines_count')
     package_level_id = fields.Many2one('stock.package_level', 'Package Level', check_company=True, copy=False)
     picking_type_entire_packs = fields.Boolean(related='picking_type_id.show_entire_packs', readonly=True)
