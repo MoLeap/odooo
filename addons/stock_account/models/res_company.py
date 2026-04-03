@@ -146,6 +146,7 @@ class ResCompany(models.Model):
             products = self.env['product.product'].with_company(self).search([('is_storable', '=', True)])
 
         accounts_by_product = {}
+        products = products.prefetch_needed()
         for product in products:
             accounts = product._get_product_accounts()
             accounts_by_product[product] = {
