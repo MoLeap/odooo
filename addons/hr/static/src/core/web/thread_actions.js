@@ -1,5 +1,6 @@
 import { registerThreadAction } from "@mail/core/common/thread_actions";
 import { _t } from "@web/core/l10n/translation";
+import { user } from "@web/core/user";
 
 registerThreadAction("open-hr-profile", {
     condition: ({ channel, owner }) =>
@@ -8,14 +9,20 @@ registerThreadAction("open-hr-profile", {
         channel.correspondent?.partner_id?.employeeId &&
         !owner.isDiscussSidebarChannelActions,
     icon: "fa fa-fw fa-id-card",
-    name: _t("Open Profile"),
-    onSelected: async ({ channel, store }) =>
-        store.env.services.action.doAction({
-            type: "ir.actions.act_window",
-            res_id: channel.correspondent.partner_id?.employeeId,
-            res_model: "hr.employee.public",
-            views: [[false, "form"]],
-        }),
+    name: _t("View Profile"),
+    onSelected: async ({ channel, store }) => {
+        const action = await store.env.services.orm.call(
+            "hr.employee",
+            "get_formview_action",
+            [channel.correspondent.partner_id?.employeeId],
+            {
+                context: {
+                    allow_company_ids: user.context.allowed_company_ids,
+                },
+            }
+        );
+        store.env.services.action.doAction(action);
+    },
     async setup({ channel }) {
         let employeeId;
         if (channel?.correspondent?.partner_id && !channel.correspondent.partner_id.employeeId) {
