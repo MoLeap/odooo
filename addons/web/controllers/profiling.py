@@ -62,15 +62,6 @@ class Profiling(Controller):
         if not profiles:
             raise request.not_found()
 
-        if action == 'memory_open':
-            memory_profile = profiles._generate_memory_profile(profiles._parse_params(kwargs))
-            encoded_memory_profile = json.dumps(memory_profile).encode('utf_8')
-            context = {
-                'profile': profiles,
-                'memory_graph': base64.b64encode(encoded_memory_profile).decode('utf-8'),
-                }
-            return request.render('web.view_memory', context)
-
         context = {
             'default_params': profiles._default_profile_params(),
             'profile_str': profile_str,
