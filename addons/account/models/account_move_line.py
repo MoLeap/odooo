@@ -890,10 +890,14 @@ class AccountMoveLine(models.Model):
                 continue
             if line.move_id.is_sale_document(include_receipts=True):
                 document_type = 'sale'
+                product_taxes = line.product_id.taxes_id
             elif line.move_id.is_purchase_document(include_receipts=True):
                 document_type = 'purchase'
+                product_taxes = line.product_id.supplier_taxes_id
             else:
                 document_type = 'other'
+                product_taxes = line.product_id.taxes_id
+            product_taxes = product_taxes._filter_taxes_by_company(line.company_id)
             line.price_unit = line.product_id._get_tax_included_unit_price(
                 line.move_id.company_id,
                 line.move_id.currency_id,
@@ -901,6 +905,7 @@ class AccountMoveLine(models.Model):
                 document_type,
                 fiscal_position=line.move_id.fiscal_position_id,
                 product_uom=line.product_uom_id,
+                product_taxes=product_taxes,
             )
 
     @api.depends('product_id', 'product_uom_id')
