@@ -6,7 +6,7 @@ from datetime import date, datetime, time
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.fields import Domain
-from odoo.tools import SQL, split_every
+from odoo.tools import SQL, split_every, ormcache
 
 
 class ProductTemplate(models.Model):
@@ -472,7 +472,7 @@ class ProductProduct(models.Model):
                         in_qty = move._get_valued_qty()
                         in_value = move.value
                         if at_date or move.is_dropship:
-                            in_value = move._get_value(at_date=at_date)
+                            in_value = move._get_value(at_date=at_date, ignore_manual_update=move.id not in self._get_moves_with_manual_value())
                         if lot:
                             lot_qty = move._get_valued_qty(lot)
                             in_value = (in_value * lot_qty / in_qty) if in_qty else 0
@@ -538,7 +538,7 @@ class ProductProduct(models.Model):
             last_move = move
             move_value = move.value
             if at_date:
-                move_value = move._get_value(at_date=at_date)
+                move_value = move._get_value(at_date=at_date, ignore_manual_update=move.id not in self._get_moves_with_manual_value())
             if qty_on_first_move:
                 valued_qty = move._get_valued_qty()
                 in_qty = qty_on_first_move
@@ -639,6 +639,14 @@ class ProductProduct(models.Model):
                 for product in products:
                     if product.id in new_standard_price_by_product:
                         product.with_context(disable_auto_revaluation=True).sudo().standard_price = new_standard_price_by_product[product.id]
+
+    @ormcache()
+    def _get_moves_with_manual_value(self):
+        """Return frozenset of move IDs with manual product.value."""
+        self.env.cr.execute(
+            "SELECT DISTINCT move_id FROM product_value WHERE move_id IS NOT NULL"
+        )
+        return frozenset(row[0] for row in self.env.cr.fetchall())
 
     # -------------------------------------------------------------------------
     # Old to remove
