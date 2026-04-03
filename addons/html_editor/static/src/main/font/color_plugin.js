@@ -69,6 +69,7 @@ export class ColorPlugin extends Plugin {
 
         /** Handlers */
         selectionchange_handlers: this.updateSelectedColor.bind(this),
+        table_selectionchange_handlers: this.updateSelectedColor.bind(this),
         remove_format_handlers: this.removeAllColor.bind(this),
         normalize_handlers: this.normalize.bind(this),
     };
@@ -105,12 +106,32 @@ export class ColorPlugin extends Plugin {
     }
 
     updateSelectedColor() {
+        let overridenBackgroundStyle;
+        for (const processor of this.getResource("selected_background_style_processors")) {
+            overridenBackgroundStyle = processor();
+        }
+        if (overridenBackgroundStyle) {
+            const overridenBackgroundColor = overridenBackgroundStyle.backgroundColor;
+            const overridenBackgroundImage = overridenBackgroundStyle.backgroundImage;
+            this.selectedColors.backgroundColor =
+                overridenBackgroundImage !== "none"
+                    ? overridenBackgroundImage
+                    : rgbaToHex(overridenBackgroundColor);
+        }
         const nodes = this.dependencies.selection.getTargetedNodes().filter(isTextNode);
         if (nodes.length === 0) {
+            this.selectedColors.color = "";
+            if (!overridenBackgroundStyle) {
+                this.selectedColors.backgroundColor = "'#00000000'";
+            }
             return;
         }
         const el = closestElement(nodes[0]);
         if (!el) {
+            this.selectedColors.color = "";
+            if (!overridenBackgroundStyle) {
+                this.selectedColors.backgroundColor = "'#00000000'";
+            }
             return;
         }
         const elStyle = getComputedStyle(el);
@@ -135,8 +156,10 @@ export class ColorPlugin extends Plugin {
 
         this.selectedColors.color =
             hasGradient && hasTextGradientClass ? backgroundImage : rgbaToHex(elStyle.color);
-        this.selectedColors.backgroundColor =
-            hasGradient && !hasTextGradientClass ? backgroundImage : rgbaToHex(backgroundColor);
+        if (!overridenBackgroundStyle) {
+            this.selectedColors.backgroundColor =
+                hasGradient && !hasTextGradientClass ? backgroundImage : rgbaToHex(backgroundColor);
+        }
     }
 
     /**

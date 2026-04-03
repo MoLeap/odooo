@@ -94,6 +94,8 @@ export class TablePlugin extends Plugin {
             node.nodeName === "TABLE" || tableInnerComponents.has(node.nodeName),
         fully_selected_node_predicates: (node) => !!closestElement(node, ".o_selected_td"),
         traversed_nodes_processors: this.adjustTraversedNodes.bind(this),
+        selected_background_style_processors: this.getSelectedBackgroundStyle.bind(this),
+
         normalize_handlers: this.distributeTableColorsToAllCells.bind(this),
     };
 
@@ -598,6 +600,7 @@ export class TablePlugin extends Plugin {
                 }
             }
         }
+        this.dispatchTo("table_selectionchange_handlers");
     }
 
     onMousedown(ev) {
@@ -760,6 +763,33 @@ export class TablePlugin extends Plugin {
                 }
             }
         }
+    }
+
+    getSelectedBackgroundStyle() {
+        const selectedTds = Array.from(this.editable.querySelectorAll(".o_selected_td"));
+        if (selectedTds.length === 0) {
+            return null;
+        }
+
+        const firstStyle = getComputedStyle(selectedTds[0]);
+        const backgroundColor = firstStyle.backgroundColor;
+        const backgroundImage = firstStyle.backgroundImage;
+        // If the first selected cell doesn't have any background style, we
+        // consider that there's no common background style.
+        if (backgroundImage === "none" && backgroundColor === "rgba(0, 0, 0, 0)") {
+            return null;
+        }
+
+        const allSameStyle = selectedTds.slice(1).every((td) => {
+            const s = getComputedStyle(td);
+            return s.backgroundColor === backgroundColor && s.backgroundImage === backgroundImage;
+        });
+
+        if (!allSameStyle) {
+            return null;
+        }
+
+        return { backgroundImage, backgroundColor };
     }
 
     /**
