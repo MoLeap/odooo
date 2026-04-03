@@ -839,6 +839,14 @@ class AccountEdiCommon(models.AbstractModel):
         if not float_is_zero(delivered_qty * price_unit, currency.decimal_places) and price_subtotal is not None:
             inferred_discount = 100 * (1 - (price_subtotal - charge_amount) / currency.round(delivered_qty * price_unit))
             discount = inferred_discount if not float_is_zero(inferred_discount, currency.decimal_places) else 0.0
+        elif discount_amount:
+            # Create a fixed discount
+            charges.append({
+                'amount': -discount_amount,
+                'line_quantity': quantity,
+                'reason': "Discount",
+                'reason_code': "95",
+            })
 
         # Sometimes, the xml received is very bad; e.g.:
         #   * unit price = 0, qty = 0, but price_subtotal = -200
@@ -951,7 +959,7 @@ class AccountEdiCommon(models.AbstractModel):
         """
         Handle the charges on the document line at import.
 
-        For each charge on the line, it creates a new aml.
+        Each charge on the line, is applied to the line.
         Special case: if the ReasonCode == 'AEO', there is a high chance the xml was produced by Odoo and the
         corresponding line had a fixed tax, so it first tries to find a matching fixed tax to apply to the current aml.
         """
@@ -972,6 +980,9 @@ class AccountEdiCommon(models.AbstractModel):
 
             price_subtotal_before = line_values['price_unit'] * charge['line_quantity'] * (1.0 - line_values['discount'] / 100.0)
             price_subtotal_after = price_subtotal_before + charge['amount']
+            if charge['amount'] < 0:
+                line_values['discount'] = (1 - (price_subtotal_after / price_subtotal_before)) * 100.0
+                continue
             line_values['price_unit'] += charge['amount'] / charge['line_quantity']
             new_price_subtotal_before_discount = line_values['price_unit'] * charge['line_quantity']
             line_values['discount'] = (1 - (price_subtotal_after / new_price_subtotal_before_discount)) * 100.0
