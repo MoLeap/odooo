@@ -27,6 +27,7 @@ export class BuilderNumberInput extends Component {
         max: { type: Number, optional: true },
         composable: { type: Boolean, optional: true },
         applyWithUnit: { type: Boolean, optional: true },
+        batchable: { type: Boolean, optional: true },
     };
     static components = { BuilderComponent, BuilderNumberInputBase };
     static defaultProps = {
@@ -51,6 +52,7 @@ export class BuilderNumberInput extends Component {
             defaultValue: this.props.default === null ? null : this.props.default?.toString(),
             formatRawValue: this.formatRawValue.bind(this),
             parseDisplayValue: this.parseDisplayValue.bind(this),
+            batchable: this.props.batchable,
         });
         this.commit = commit;
         this.preview = preview;

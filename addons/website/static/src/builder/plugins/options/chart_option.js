@@ -193,6 +193,8 @@ export class ChartOption extends BaseOptionComponent {
         // click on a table inner cell
         else if (datasetIndex !== -1 && datasetIndex !== cellRowEl.children.length - 2) {
             this.updateCurrentCell({ datasetIndex, dataIndex });
+        } else if (datasetIndex === -1) {
+            this.updateCurrentCell({ datasetIndex: null, dataIndex: null });
         }
     }
     /**
@@ -292,6 +294,40 @@ export class ChartOption extends BaseOptionComponent {
             rowEl
                 .querySelector(".o_builder_matrix_remove_row")
                 .classList.remove("visually-hidden-focusable");
+        }
+    }
+
+    onPasteValues(ev) {
+        ev.preventDefault();
+
+        const clipText = (ev.clipboardData || window.clipboardData).getData("text");
+        const clipRows = clipText.split("\n");
+        for (let i = 0; i < clipRows.length; i++) {
+            clipRows[i] = clipRows[i].split("\t");
+        }
+
+        let tdEl = ev.target.closest("td");
+        let trEl = tdEl.parentElement;
+
+        const tdEls = trEl.querySelectorAll(":scope > td");
+        const colIndex = [...tdEls].indexOf(tdEl);
+        const trEls = trEl.parentElement.querySelectorAll(":scope > tr");
+        const rowIndex = [...trEls].indexOf(trEl);
+
+        const nbCols = tdEls.length - 1;
+        const nbRows = trEls.length - 1;
+
+        for (let i = 0; i < clipRows.length && i + rowIndex < nbRows; i++) {
+            for (let j = 0; j < clipRows[i].length && j + colIndex < nbCols; j++) {
+                const value = parseInt(clipRows[i][j]);
+                const inputEl = tdEl.querySelector("input");
+                inputEl.value = value;
+                const changeEv = new Event("change", { value: value });
+                inputEl.dispatchEvent(changeEv);
+                tdEl = tdEl.nextElementSibling;
+            }
+            trEl = trEl.nextElementSibling;
+            tdEl = [...trEl.querySelectorAll(":scope > td")].at(colIndex);
         }
     }
 }

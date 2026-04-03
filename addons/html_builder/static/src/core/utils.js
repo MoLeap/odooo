@@ -915,6 +915,7 @@ export function useInputBuilderComponent({
     defaultValue,
     formatRawValue = (rawValue) => rawValue,
     parseDisplayValue = (displayValue) => displayValue,
+    batchable = false,
 } = {}) {
     const comp = useComponent();
     const { getAllActions, callOperation } = getAllActionsAndOperations(comp);
@@ -950,7 +951,10 @@ export function useInputBuilderComponent({
         return await Promise.all(proms);
     }
 
-    const applyOperation = comp.env.editor.shared.history.makePreviewableAsyncOperation(callApply);
+    const applyOperation = comp.env.editor.shared.history.makePreviewableAsyncOperation(
+        callApply,
+        batchable
+    );
     const operationWithReload = useOperationWithReload(callApply, reload);
     function getState(editingElement) {
         if (!isConnectedElement(editingElement)) {
