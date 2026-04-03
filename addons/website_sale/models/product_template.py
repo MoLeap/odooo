@@ -8,7 +8,7 @@ from werkzeug import urls
 from odoo import _, api, fields, models
 from odoo.fields import Domain
 from odoo.http import request
-from odoo.tools import float_is_zero, is_html_empty
+from odoo.tools import float_is_zero, float_round, is_html_empty
 from odoo.tools.sql import SQL, column_exists, create_column
 from odoo.tools.translate import adapt_translated_field_value, html_translate
 
@@ -146,6 +146,11 @@ class ProductTemplate(models.Model):
     )
     description = fields.Html(index="trigram")
     description_sale = fields.Text(index="trigram")
+
+    allow_out_of_stock_order = fields.Boolean(string="Sell when Out-of-Stock", default=True)
+    available_threshold = fields.Float(string="Show Threshold", default=5.0)
+    show_availability = fields.Boolean(string="Show availability Qty", default=False)
+    out_of_stock_message = fields.Html(string="Out-of-Stock Message", translate=html_translate)
 
     # === INDEXES === #
 
@@ -637,6 +642,38 @@ class ProductTemplate(models.Model):
             # the product
             combination_info["compare_list_price"] = 0
 
+        if not product_or_template.is_storable:
+            return combination_info
+
+        combination_info.update({
+            "is_storable": True,
+            "allow_out_of_stock_order": product_or_template.allow_out_of_stock_order,
+            "available_threshold": product_or_template.available_threshold,
+        })
+        if product_or_template.is_product_variant:
+            product_sudo = product_or_template.sudo()
+            computed_qty = product_sudo.uom_id._compute_quantity(
+                website._get_product_available_qty(product_sudo), to_unit=uom, round=False
+            )
+            free_qty = float_round(computed_qty, precision_digits=0, rounding_method="DOWN")
+            cart_quantity = 0.0
+            if not product_sudo.allow_out_of_stock_order:
+                cart_quantity = product_sudo.uom_id._compute_quantity(
+                    request.cart._get_cart_qty(product_sudo.id), to_unit=uom
+                )
+            digits = self.env["decimal.precision"].precision_get("Product Unit")
+            rounding = 10**-digits
+            combination_info.update({
+                "free_qty": free_qty,
+                "cart_qty": cart_quantity,
+                "uom_name": uom.name,
+                "uom_rounding": rounding,
+                "show_availability": product_sudo.show_availability,
+                "out_of_stock_message": product_sudo.out_of_stock_message,
+            })
+        else:
+            combination_info.update({"free_qty": 0, "cart_qty": 0})
+
         return combination_info
 
     def _get_dynamic_attribute_images(self, combination_ids, website_id):
@@ -1015,7 +1052,7 @@ class ProductTemplate(models.Model):
 
     def _website_show_quick_add(self):
         self.ensure_one()
-        if not self.filtered_domain(self.env["website"]._product_domain()):
+        if self._is_sold_out() or not self.filtered_domain(self.env["website"]._product_domain()):
             return False
         website = self.env["website"].get_current_website()
         return not (
@@ -1178,3 +1215,18 @@ class ProductTemplate(models.Model):
         self.ensure_one()
 
         return bool(self.valid_product_template_attribute_line_ids)
+
+    def _is_sold_out(self):
+        """Return whether the product is sold out (no available quantity).
+
+        If a product inventory is not tracked, or if it's allowed to be sold regardless
+        of availabilities, the product is never considered sold out.
+
+        Note: only checks the availability of the first variant of the template.
+
+        :return: whether the product can still be sold
+        :rtype: bool
+        """
+        if not self.is_storable or self.allow_out_of_stock_order:
+            return False
+        return not self.product_variant_id or self.product_variant_id._is_sold_out()
