@@ -407,17 +407,17 @@ describe("Selection collapsed", () => {
 
         test("should unwrap a block next to an inline unbreakable element", async () => {
             await testEditor({
-                contentBefore: `<div><p>abc</p><div class="o_image"></div><p>[]def</p></div>`,
+                contentBefore: `<div><p>abc</p><div class="o_file_box"></div><p>[]def</p></div>`,
                 stepFunction: async (editor) => {
                     deleteBackward(editor);
                 },
-                contentAfter: `<div><p>abc</p><div class="o_image"></div>[]def</div>`,
+                contentAfter: `<div><p>abc</p><div class="o_file_box"></div>[]def</div>`,
             });
         });
 
         test("should remove an inline unbreakable contenteditable='false' sibling element", async () => {
             await testEditor({
-                contentBefore: `<div><p>abc</p><div class="o_image"></div>[]def</div>`,
+                contentBefore: `<div><p>abc</p><div class="o_file_box"></div>[]def</div>`,
                 stepFunction: async (editor) => {
                     deleteBackward(editor);
                 },
@@ -495,16 +495,16 @@ describe("Selection collapsed", () => {
 
         test("should merge paragraph with previous one containing a media element", async () => {
             await testEditor({
-                contentBefore: `<p>abc</p><p style="margin-bottom: 0px;"><o-image class="o_image" contenteditable="false"></o-image></p><p>[]def</p>`,
+                contentBefore: `<p>abc</p><p style="margin-bottom: 0px;"><o-file-box class="o_file_box" contenteditable="false"></o-file-box></p><p>[]def</p>`,
                 stepFunction: deleteBackward,
-                contentAfterEdit: `<p>abc</p><p style="margin-bottom: 0px;"><o-image class="o_image" contenteditable="false"></o-image>[]def</p>`,
-                contentAfter: `<p>abc</p><p style="margin-bottom: 0px;"><o-image class="o_image"></o-image>[]def</p>`,
+                contentAfterEdit: `<p>abc</p><p style="margin-bottom: 0px;"><o-file-box class="o_file_box" contenteditable="false"></o-file-box>[]def</p>`,
+                contentAfter: `<p>abc</p><p style="margin-bottom: 0px;"><o-file-box class="o_file_box"></o-file-box>[]def</p>`,
             });
         });
 
         test("should remove a media element inside a p", async () => {
             await testEditor({
-                contentBefore: `<p>abc</p><p style="margin-bottom: 0px;"><o-image class="o_image" contenteditable="false"></o-image>[]def</p>`,
+                contentBefore: `<p>abc</p><p style="margin-bottom: 0px;"><o-file-box class="o_file_box" contenteditable="false"></o-file-box>[]def</p>`,
                 stepFunction: deleteBackward,
                 contentAfter: `<p>abc</p><p style="margin-bottom: 0px;">[]def</p>`,
             });
@@ -512,7 +512,7 @@ describe("Selection collapsed", () => {
 
         test("should remove a link to uploaded document", async () => {
             await testEditor({
-                contentBefore: `<p>abc<a href="#" title="document" data-mimetype="application/pdf" class="o_image" contenteditable="false"></a>[]</p>`,
+                contentBefore: `<p>abc<span class="o_file_box" contenteditable="false"><a href="#" title="document" data-mimetype="application/pdf"></a></span>[]</p>`,
                 stepFunction: deleteBackward,
                 contentAfter: `<p>abc[]</p>`,
             });
@@ -520,7 +520,7 @@ describe("Selection collapsed", () => {
 
         test("should remove a link to uploaded document at the beginning of the editable", async () => {
             await testEditor({
-                contentBefore: `<p><a href="#" title="document" data-mimetype="application/pdf" class="o_image" contenteditable="false"></a>[]</p>`,
+                contentBefore: `<p><span class="o_file_box" contenteditable="false"><a href="#" title="document" data-mimetype="application/pdf"></a></span>[]</p>`,
                 stepFunction: deleteBackward,
                 contentAfter: `<p>[]<br></p>`,
             });
