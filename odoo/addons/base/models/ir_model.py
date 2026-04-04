@@ -2119,21 +2119,14 @@ class IrModelAccess(models.Model):
     @api.model
     @tools.ormcache('model_name', 'access_mode', cache='stable')
     def _get_access_groups(self, model_name, access_mode='read'):
-        """ Return the group expression object that represents the users who
-        have ``access_mode`` to the model ``model_name``.
+        """ Return the group ids for each access rule. Used in `ir.ui.view`.
         """
         assert access_mode in ('read', 'write', 'create', 'unlink'), 'Invalid access mode'
         model = self.env['ir.model']._get(model_name)
-        accesses = self.sudo().search([
+        accesses = self.sudo().search_fetch([
             (f'perm_{access_mode}', '=', True), ('model_id', '=', model.id),
-        ])
-
-        group_definitions = self.env['res.groups']._get_group_definitions()
-        if not accesses:
-            return group_definitions.empty
-        if not all(access.group_id for access in accesses):  # there is some global access
-            return group_definitions.universe
-        return group_definitions.from_ids(accesses.group_id.ids)
+        ], ['group_id'])
+        return tuple(access.group_id.id for access in accesses)
 
     # The context parameter is useful when the method translates error messages.
     # But as the method raises an exception in that case,  the key 'lang' might
