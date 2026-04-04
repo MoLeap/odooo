@@ -2117,28 +2117,6 @@ class IrModelAccess(models.Model):
     perm_unlink = fields.Boolean(string='Delete Access')
 
     @api.model
-    def group_names_with_access(self, model_name, access_mode):
-        """ Return the names of visible groups which have been granted
-            ``access_mode`` on the model ``model_name``.
-
-           :rtype: list
-        """
-        assert access_mode in ('read', 'write', 'create', 'unlink'), 'Invalid access mode'
-        lang = self.env.lang or 'en_US'
-        self.env.cr.execute(f"""
-            SELECT COALESCE(c.name->>%s, c.name->>'en_US'), COALESCE(g.name->>%s, g.name->>'en_US')
-              FROM ir_model_access a
-              JOIN ir_model m ON (a.model_id = m.id)
-              JOIN res_groups g ON (a.group_id = g.id)
-         LEFT JOIN res_groups_privilege c ON (c.id = g.privilege_id)
-             WHERE m.model = %s
-               AND a.active = TRUE
-               AND a.perm_{access_mode} = TRUE
-          ORDER BY c.name, g.name NULLS LAST
-        """, [lang, lang, model_name])
-        return [('%s/%s' % x) if x[0] else x[1] for x in self.env.cr.fetchall()]
-
-    @api.model
     @tools.ormcache('model_name', 'access_mode', cache='stable')
     def _get_access_groups(self, model_name, access_mode='read'):
         """ Return the group expression object that represents the users who
@@ -2209,7 +2187,19 @@ class IrModelAccess(models.Model):
             'document_model': model,
         }
 
-        groups = "\n".join(f"\t- {g}" for g in self.group_names_with_access(model, mode))
+        lang = self.env.lang or 'en_US'
+        self.env.cr.execute(f"""
+            SELECT COALESCE(COALESCE(c.name->>%s, c.name->>'en_US') || '/', '') || COALESCE(g.name->>%s, g.name->>'en_US')
+              FROM ir_model_access a
+              JOIN ir_model m ON (a.model_id = m.id)
+              JOIN res_groups g ON (a.group_id = g.id)
+         LEFT JOIN res_groups_privilege c ON (c.id = g.privilege_id)
+             WHERE m.model = %s
+               AND a.active = TRUE
+               AND a.perm_{mode} = TRUE
+          ORDER BY c.name, g.name NULLS LAST
+        """, [lang, lang, model])
+        groups = "\n".join(f"\t- {g}" for (g,) in self.env.cr.fetchall())
         if groups:
             group_info = str(ACCESS_ERROR_GROUPS) % {'groups_list': groups}
         else:
