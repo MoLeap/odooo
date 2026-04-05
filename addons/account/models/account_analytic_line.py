@@ -122,10 +122,12 @@ class AccountAnalyticLine(models.Model):
             affected_move_lines._update_analytic_distribution()
         return res
 
+    @api.ondelete(at_uninstall=False)
+    def _ondelete_invalidate(self):
+        # invalidate once we delete the lines
+        return self.env.invalidate_all
+
     def unlink(self):
-        self.env.flush_all()
-        if not self:
-            return False
         affected_move_lines = self.move_line_id
         res = super().unlink()
         #self.env.invalidate_all()  # reset all caches as before
