@@ -10,6 +10,7 @@
     "depends": [
         "website",
         "sale",
+        "stock",
         "website_payment",
         "website_mail",
         "portal_rating",
