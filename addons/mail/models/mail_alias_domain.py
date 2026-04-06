@@ -141,7 +141,7 @@ class AliasDomain(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        """ Sanitize bounce_alias / catchall_alias / default_from """
+        """ Sanitize name / bounce_alias / catchall_alias / default_from """
         for vals in vals_list:
             self._sanitize_configuration(vals)
 
@@ -164,13 +164,15 @@ class AliasDomain(models.Model):
         return alias_domains
 
     def write(self, vals):
-        """ Sanitize bounce_alias / catchall_alias / default_from """
+        """ Sanitize name / bounce_alias / catchall_alias / default_from """
         self._sanitize_configuration(vals)
         return super().write(vals)
 
     @api.model
     def _sanitize_configuration(self, config_values):
         """ Tool sanitizing configuration values for domains """
+        if config_values.get('name'):
+            config_values['name'] = self.env['mail.alias']._sanitize_alias_name(config_values['name'])
         if config_values.get('bounce_alias'):
             config_values['bounce_alias'] = self.env['mail.alias']._sanitize_alias_name(config_values['bounce_alias'])
         if config_values.get('catchall_alias'):
