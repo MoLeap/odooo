@@ -174,7 +174,7 @@ class SaleOrder(models.Model):
     )
     journal_id = fields.Many2one(
         "account.journal",
-        string="Invoicing Journal",
+        string="Journal",
         compute="_compute_journal_id",
         store=True,
         readonly=False,

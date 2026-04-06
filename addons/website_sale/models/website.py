@@ -272,6 +272,12 @@ class Website(models.Model):
         domain=[("model", "=", "sale.order")],
         default=_default_confirmation_email_template,
     )
+    journal_id = fields.Many2one(
+        "account.journal",
+        string="Invoicing Journal",
+        domain=[("type", "=", "sale")],
+        groups="account.group_account_user",
+    )
 
     # === COMPUTE METHODS ===#
 

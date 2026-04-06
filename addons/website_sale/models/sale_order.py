@@ -180,6 +180,11 @@ class SaleOrder(models.Model):
                     or order.partner_id.parent_id.user_id.id
                 )
 
+    def _compute_journal_id(self):
+        super()._compute_journal_id()
+        if self.website_id:
+            self.journal_id = self.website_id.journal_id
+
     def _default_team_id(self):
         return super()._default_team_id() or self.website_id.salesteam_id.id
 
