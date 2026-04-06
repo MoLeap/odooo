@@ -1,8 +1,6 @@
 import { Plugin } from "@html_editor/plugin";
 import { registry } from "@web/core/registry";
 import { _t } from "@web/core/l10n/translation";
-import { withSequence } from "@html_editor/utils/resource";
-import { WebsiteLinkPopover } from "./website_link_popover/website_link_popover";
 
 export class WebsiteLinkPlugin extends Plugin {
     static id = "websiteLinkPlugin";
@@ -15,6 +13,7 @@ export class WebsiteLinkPlugin extends Plugin {
                 description: _t("Tells search engines not to follow this link"),
                 attribute: "rel",
                 value: "nofollow",
+                isMultiValueAttr: true,
             },
             {
                 id: "noreferrer",
@@ -22,6 +21,7 @@ export class WebsiteLinkPlugin extends Plugin {
                 description: _t("Removes referrer information sent to the target site"),
                 attribute: "rel",
                 value: "noreferrer",
+                isMultiValueAttr: true,
             },
             {
                 id: "sponsored",
@@ -29,6 +29,7 @@ export class WebsiteLinkPlugin extends Plugin {
                 description: _t("Indicates the link is sponsored or paid content"),
                 attribute: "rel",
                 value: "sponsored",
+                isMultiValueAttr: true,
             },
             {
                 id: "open_in_new_tab",
@@ -46,14 +47,8 @@ export class WebsiteLinkPlugin extends Plugin {
                 attribute: "rel",
                 value: "noopener",
                 requires: "open_in_new_tab",
+                isMultiValueAttr: true,
             },
-        ],
-        link_popovers: [
-            withSequence(20, {
-                PopoverClass: WebsiteLinkPopover,
-                isAvailable: () => true,
-                getProps: (props) => props,
-            }),
         ],
     };
 }

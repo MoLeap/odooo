@@ -74,6 +74,14 @@ export class LinkPopover extends Component {
             linkElement.hash?.length && this.isAbsoluteURLInCurrentDomain(linkElement.href)
                 ? "_self"
                 : "_blank";
+        const advancedAttributeOptions = this.props.advancedAttributeOptions.reduce((result, option) => {
+            const attrValue = linkElement.getAttribute(option.attribute);
+            const isChecked = option.isMultiValueAttr
+                ? attrValue?.includes(option.value)
+                : attrValue === option.value;
+            result[option.id] = { ...option, isChecked };
+            return result;
+        }, {});
         this.state = useState({
             editing: this.props.LinkPopoverState.editing,
             // `.getAttribute("href")` instead of `.href` to keep relative url
@@ -98,7 +106,7 @@ export class LinkPopover extends Component {
             showLabel: !linkElement.childElementCount,
             stripDomain: true,
             showAdvancedOptions: false,
-            advancedAttributeOptions: this.props.advancedAttributeOptions,
+            advancedAttributeOptions,
         });
 
         this.updateDocumentState();
@@ -146,13 +154,26 @@ export class LinkPopover extends Component {
     }
 
     prepareLinkParams() {
+        const attributes = {
+            href: this.state.url,
+            class: this.classes,
+        };
+        for (const opt of Object.values(this.state.advancedAttributeOptions)) {
+            const { attribute, isChecked, value, isMultiValueAttr } = opt;
+            if(!isChecked) {
+                continue;
+            }
+            if (isMultiValueAttr) {
+                const currentAttribute = attributes[attribute];
+                attributes[attribute] = currentAttribute ? `${currentAttribute} ${value}` : value;
+            } else {
+                attributes[attribute] = value;
+            }
+        }
         return {
             label: this.state.label,
             attachmentId: this.state.attachmentId,
-            attributes: {
-                href: this.state.url,
-                class: this.classes,
-            },
+            attributes,
         };
     }
 
