@@ -2748,13 +2748,26 @@ export class PosStore extends WithLazyGetterTrap {
             }
         }
 
+        const filteredList = this.filterExcludedProducts(recordIterator);
+
+        if (
+            !isSearchByWord &&
+            !this.selectedCategory?.id &&
+            this.areAllProductsSpecial(filteredList)
+        ) {
+            return [];
+        }
+
+        return this.orderProductBySequenceAndFav(filteredList);
+    }
+
+    filterExcludedProducts(products) {
         const filteredList = [];
         const excludedProductIds = new Set(this.getExcludedProductIds());
         const availableCateg = new Set(
             (this.config.iface_available_categ_ids || []).map((c) => c.id)
         );
-
-        for (const p of recordIterator) {
+        for (const p of products) {
             if (filteredList.length >= 100) {
                 break;
             }
@@ -2773,16 +2786,7 @@ export class PosStore extends WithLazyGetterTrap {
 
             filteredList.push(p);
         }
-
-        if (
-            !isSearchByWord &&
-            !this.selectedCategory?.id &&
-            this.areAllProductsSpecial(filteredList)
-        ) {
-            return [];
-        }
-
-        return this.orderProductBySequenceAndFav(filteredList);
+        return filteredList;
     }
 
     get productToDisplayByCateg() {
@@ -2824,7 +2828,8 @@ export class PosStore extends WithLazyGetterTrap {
         }
 
         for (const catId of selectedCategoryIds) {
-            const products = byCateg[catId] || [];
+            let products = byCateg[catId] || [];
+            products = this.filterExcludedProducts(products);
             const filtered = searchWord
                 ? this.getProductsBySearchWord(searchWord, products)
                 : products;
