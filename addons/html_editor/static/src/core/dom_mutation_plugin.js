@@ -19,9 +19,9 @@ import { withSequence } from "@html_editor/utils/resource";
  * COMMITS
  */
 /**
- * @typedef { import("../utils/commit").EditorCommit } EditorCommit
- * @typedef { import("../utils/commit").EditorCommitType } EditorCommitType
- * @typedef { import("@html_editor/utils/commit").EditorCommitId } EditorCommitId
+ * @typedef { import("./history_plugin").EditorCommit } EditorCommit
+ * @typedef { import("./history_plugin").EditorCommitType } EditorCommitType
+ * @typedef { import("./history_plugin").EditorCommitId } EditorCommitId
  *
  * @typedef { Object } DomMutationCommitData
  * @property { SerializedMutation[] } mutations      // the mutations to apply/revert

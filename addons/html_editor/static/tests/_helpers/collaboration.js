@@ -3,7 +3,7 @@ import { CollaborationPlugin } from "@html_editor/others/collaboration/collabora
 import { MAIN_PLUGINS } from "@html_editor/plugin_sets";
 import { createDOMPathGenerator } from "@html_editor/utils/dom_traversal";
 import { DIRECTIONS } from "@html_editor/utils/position";
-import { EditorCommit } from "@html_editor/utils/commit";
+import { EditorCommit } from "@html_editor/core/history_plugin";
 import { after, expect } from "@odoo/hoot";
 import { setupEditor } from "./editor";
 
@@ -13,7 +13,7 @@ import { setupEditor } from "./editor";
  *
  * @typedef { Object } PeerInfo
  * @property { string } peerId
- * @property { import("@html_editor/utils/commit").EditorCommit[] } commits
+ * @property { import("@html_editor/core/history_plugin").EditorCommit[] } commits
  * @property { Editor } editor
  * @property { import("@html_editor/collaboration/collaboration_plugin").CollaborationPlugin } collaborationPlugin
  * @property { import("@html_editor/plugin").HistoryPlugin } historyPlugin

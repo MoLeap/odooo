@@ -9,8 +9,8 @@ const HISTORY_SNAPSHOT_BUFFER_TIME = 1000 * 10;
  * @typedef { Object } CollaborationPluginConfig
  * @property { string } peerId
  *
- * @typedef { import("../../utils/commit").EditorCommit } EditorCommit
- * @typedef { import("../../utils/commit").EditorCommitType } EditorCommitType
+ * @typedef { import("@html_editor/core/history_plugin").EditorCommit } EditorCommit
+ * @typedef { import("@html_editor/core/history_plugin").EditorCommitType } EditorCommitType
  */
 
 /**
