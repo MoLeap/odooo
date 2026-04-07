@@ -41,6 +41,7 @@ import {
 import { waitForDataLoaded } from "@spreadsheet/helpers/model";
 import { insertListInSpreadsheet } from "../helpers/list";
 
+import { createSheet, deleteSheet } from "../helpers/commands";
 const { DEFAULT_LOCALE, PIVOT_STATIC_TABLE_CONFIG } = spreadsheet.constants;
 const { toZone } = spreadsheet.helpers;
 const { cellMenuRegistry } = spreadsheet.registries;
@@ -122,11 +123,11 @@ test("Numeric/monetary fields are correctly loaded and displayed", async () => {
 
     // prettier-ignore
     expect(getFormattedValueGrid(model, "A2:C6")).toEqual({
-        A2: "74.40€",    B2: "10.00",  C2: "1",
-        A3: "$74.80",    B3: "11.00",  C3: "2",
-        A4: "4.00€",     B4: "95.00",  C4: "3",
-        A5: "$1,000.00", B5: "15.00",  C5: "4",
-        A6: "$0.00",     B6: "0.00",   C6: "0",
+        A2: "74.40€", B2: "10.00", C2: "1",
+        A3: "$74.80", B3: "11.00", C3: "2",
+        A4: "4.00€", B4: "95.00", C4: "3",
+        A5: "$1,000.00", B5: "15.00", C5: "4",
+        A6: "$0.00", B6: "0.00", C6: "0",
     });
 });
 
@@ -789,19 +790,19 @@ test("can edit list sorting", async () => {
     });
     // prettier-ignore
     const initialGrid = [
-        ["Foo", "Bar",   "Date", "Probability", "Money!"],
-        [12,     true,   42474,  10,                74.4],
-        [1,      true,   42669,  11,                74.8],
-        [17,     true,   42719,  95,                   4],
-        [2,      false,  42715,  15,                1000],
+        ["Foo", "Bar", "Date", "Probability", "Money!"],
+        [12, true, 42474, 10, 74.4],
+        [1, true, 42669, 11, 74.8],
+        [17, true, 42719, 95, 4],
+        [2, false, 42715, 15, 1000],
     ]
     // prettier-ignore
     const orderedGrid = [
-        ["Foo", "Bar",   "Date", "Probability", "Money!"],
-        [17,     true,   42719,   95,                  4],
-        [12,     true,   42474,   10,               74.4],
-        [1,      true,   42669,   11,               74.8],
-        [2,      false,  42715,   15,               1000],
+        ["Foo", "Bar", "Date", "Probability", "Money!"],
+        [17, true, 42719, 95, 4],
+        [12, true, 42474, 10, 74.4],
+        [1, true, 42669, 11, 74.8],
+        [2, false, 42715, 15, 1000],
     ]
     const [listId] = model.getters.getListIds();
     expect(model.getters.getListDefinition(listId).orderBy).toEqual([]);
@@ -900,7 +901,7 @@ test("Can see record with link to list cell", async function () {
         },
     });
     const { model, env } = await createSpreadsheetWithList();
-    model.dispatch("CREATE_SHEET", { sheetId: "42" });
+    createSheet(model, { sheetId: "42" });
     model.dispatch("ACTIVATE_SHEET", {
         sheetIdFrom: model.getters.getActiveSheetId(),
         sheetIdTo: "42",
@@ -941,7 +942,7 @@ test("Can see record on vectorized list index", async function () {
         },
     });
     const { model, env } = await createSpreadsheetWithList();
-    model.dispatch("CREATE_SHEET", { sheetId: "42" });
+    createSheet(model, { sheetId: "42" });
     model.dispatch("ACTIVATE_SHEET", {
         sheetIdFrom: model.getters.getActiveSheetId(),
         sheetIdTo: "42",
@@ -1370,8 +1371,8 @@ test("isListUnused getter", async () => {
     const sheetId = model.getters.getActiveSheetId();
     expect(model.getters.isListUnused("1")).toBe(false);
 
-    model.dispatch("CREATE_SHEET", { sheetId: "2" });
-    model.dispatch("DELETE_SHEET", { sheetId: sheetId });
+    createSheet(model, { sheetId: "2" });
+    deleteSheet(model, sheetId);
     expect(model.getters.isListUnused("1")).toBe(true);
 
     setCellContent(model, "A1", '=ODOO.LIST.HEADER(1, "foo")');
