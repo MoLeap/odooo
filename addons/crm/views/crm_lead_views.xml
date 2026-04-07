@@ -935,6 +935,7 @@
                     <filter string="Open Opportunities" name="open_opportunities"
                         domain="[('probability', '&lt;', 100), ('type', '=', 'opportunity'), ('active', '=', True)]"
                         help="Open Opportunities"/>
+                    <filter string="Sales Teams" name="crm_sales_teams" values="team_id"/>
                     <separator/>
                     <filter string="Unread Messages" name="message_needaction" domain="[('message_needaction', '=', True)]" groups="mail.group_mail_notification_type_inbox"/>
                     <separator/>
