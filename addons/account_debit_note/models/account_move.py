@@ -21,14 +21,14 @@ class AccountMove(models.Model):
             inv.debit_note_count = data_map.get(inv.id, 0.0)
 
     def action_view_debit_notes(self):
-        self.ensure_one()
-        return {
-            'type': 'ir.actions.act_window',
-            'name': _('Debit Notes'),
-            'res_model': 'account.move',
-            'view_mode': 'list,form',
-            'domain': [('debit_origin_id', '=', self.id)],
-        }
+        return self.debit_note_ids._get_records_action(
+            name=self.env._("Debit Notes"),
+        )
+
+    def action_open_debit_note_origin_entry(self):
+        return self.debit_origin_id._get_records_action(
+            name=self.env._("Invoices"),
+        )
 
     def action_debit_note(self):
         action = self.env.ref('account_debit_note.action_view_account_move_debit')._get_action_dict()
