@@ -375,6 +375,7 @@ class Website(models.CachedModel):
 
         # invalidate cache for `company.website_id` to be recomputed
         if 'sequence' in values or 'company_id' in values:
+            self.env.registry.clear_cache()
             (original_company | self.company_id)._compute_website_id()
 
         if 'cookies_bar' in values:
