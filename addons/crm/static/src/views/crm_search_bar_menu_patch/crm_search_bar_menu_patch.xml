@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="crm.TeamSearchBarMenu" t-inherit="web.SearchBarMenu" t-inherit-mode="extension">
+        <xpath expr="//Dropdown" position="after">
+            <Dropdown
+                t-if="this.crmTeamFilterItem"
+                menuClass="'o_search_bar_menu d-flex flex-wrap flex-lg-nowrap w-100 w-md-auto mx-md-auto'"
+                beforeOpen.bind="() => this.onToggle(this.crmTeamFilterItem)"
+                position="'bottom-end'"
+                bottomSheet="false">
+                <button
+                    t-attf-class="{{this.env.isSmall ? '' : 'o-dropdown-caret'}} o_crm_team_dropdown_toggler d-print-none btn btn-outline-secondary rounded ms-2"
+                    title="Toggle Crm Team Search Dropdown">
+                    <!-- data-hotkey="shift+q" -->
+                    <i t-if="this.env.isSmall" class="fa fa-users"/>
+                    <t t-else="">Teams</t>
+                </button>
+                <t t-set-slot="content">
+
+                    <div class="o_dropdown_container o_filter_menu w-100 w-lg-auto h-100 border-end">
+
+                        <t t-foreach="this.crmTeamFilterItem.options" t-as="option" t-key="option.id">
+                            <CheckboxItem class="{ o_item_option: true, selected: option.isActive, 'text-truncate': true }"
+                                t-out="option.description"
+                                checked="option.isActive"
+                                closingMode="'none'"
+                                onSelected="() => this.onFilterSelected({ itemId: this.crmTeamFilterItem.id, optionId: option.id })"
+                            />
+                        </t>
+
+                        <DropdownItem t-if="this.crmTeamFilterItem.limit and this.crmTeamFilterItem.count > this.crmTeamFilterItem.limit" class="'o_item_option'" closingMode="'none'" onSelected.bind="() => this.onLoadMoreOptions(this.crmTeamFilterItem.id)">More...</DropdownItem>
+
+                    </div>
+
+                </t>
+            </Dropdown>
+        </xpath>
+    </t>
+
+</templates>
