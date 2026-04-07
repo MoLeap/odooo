@@ -69,9 +69,10 @@ class WebsiteSaleVariantController(Controller):
                 values={"all_product_tags": all_tags.filtered("visible_to_customers")},
             )
 
-        combination_info["packaging_selector"] = request.env["ir.ui.view"]._render_template(
-            "website_sale.product_packaging_selector",
-            values={"product": product_template, "product_variant": product},
+        # Render extra fields spec section for the new variant
+        combination_info["extra_fields_html"] = request.env["ir.ui.view"]._render_template(
+            "website_sale.product_spec_section",
+            {"product": product_template, "product_variant": product, "website": request.website},
         )
 
         return combination_info
