@@ -1,3 +1,4 @@
+import { CW_LIVECHAT_STEP } from "@im_livechat/core/common/chat_window_model_patch";
 import { registerThreadAction, threadActionsRegistry } from "@mail/core/common/thread_actions";
 import "@mail/discuss/call/common/thread_actions";
 
@@ -6,7 +7,9 @@ import { patch } from "@web/core/utils/patch";
 
 registerThreadAction("restart", {
     condition: ({ owner, thread }) =>
-        thread?.chatbot?.canRestart && !owner.isDiscussSidebarChannelActions,
+        thread?.chatbot?.canRestart &&
+        !owner.isDiscussSidebarChannelActions &&
+        owner.props.chatWindow.livechatStep !== CW_LIVECHAT_STEP.FEEDBACK,
     icon: "fa fa-fw fa-refresh",
     name: _t("Restart Conversation"),
     open: ({ owner, thread }) => {
