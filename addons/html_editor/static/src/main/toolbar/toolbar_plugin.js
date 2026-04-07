@@ -163,8 +163,16 @@ export class ToolbarPlugin extends Plugin {
     resources = {
         selectionchange_handlers: this.handleSelectionChange.bind(this),
         selection_leave_handlers: () => this.closeToolbar(),
-        selection_enter_handlers: () => this.updateToolbar(),
-        step_added_handlers: () => this.updateToolbar(),
+        selection_enter_handlers: () => {
+            if (this.state.active) {
+                this.updateToolbar();
+            }
+        },
+        step_added_handlers: () => {
+            if (this.state.active) {
+                this.updateToolbar();
+            }
+        },
         user_commands: {
             id: "expandToolbar",
             run: () => {
@@ -213,7 +221,7 @@ export class ToolbarPlugin extends Plugin {
                 closeOnPointerdown: false,
             });
         }
-        this.state = reactive({ buttonGroups: [], namespace: undefined });
+        this.state = reactive({ buttonGroups: [], namespace: undefined, active: true });
 
         this.onSelectionChangeActive = true;
         this.debouncedUpdateToolbar = debounce(this._updateToolbar, DELAY_TOOLBAR_OPEN);
@@ -262,14 +270,32 @@ export class ToolbarPlugin extends Plugin {
                     if (isMacOS() && ev.metaKey) {
                         this.pendingArrowKey = true;
                     }
+                } else if (
+                    this.overlay.isOpen &&
+                    !document.querySelector(".o-we-toolbar-dropdown")
+                ) {
+                    if (ev.key === "Tab") {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        document.querySelector(".o-we-toolbar[data-namespace] button")?.focus();
+                    } else if (ev.key === "Escape") {
+                        ev.stopPropagation();
+                        this.closeToolbar();
+                        this.state.active = false;
+                    }
                 }
             });
             this.addDomListener(this.editable, "keyup", (ev) => {
-                if (ev.key?.startsWith("Arrow")) {
-                    this.pendingArrowKey = false;
-                    this.onSelectionChangeActive = true;
-                    this.debouncedUpdateToolbar();
+                const isArrowKey = ev.key?.startsWith("Arrow");
+                const isSelectAll = ev.key === "a" && (ev.ctrlKey || ev.metaKey);
+                if (!isArrowKey && !isSelectAll) {
+                    return;
                 }
+                if (isArrowKey) {
+                    this.pendingArrowKey = false;
+                }
+                this.onSelectionChangeActive = true;
+                this.debouncedUpdateToolbar();
             });
             if (isMacOS()) {
                 this.addDomListener(this.document, "selectionchange", () => {
@@ -288,6 +314,7 @@ export class ToolbarPlugin extends Plugin {
             class: "shadow rounded my-2",
             getSelection: () => this.dependencies.selection.getSelectionData(),
             focusEditable: () => this.dependencies.selection.focusEditable(),
+            closeToolbar: () => this.closeToolbar(),
             state: this.state,
         };
     }
@@ -365,7 +392,7 @@ export class ToolbarPlugin extends Plugin {
     }
 
     handleSelectionChange(selectionData) {
-        if (this.onSelectionChangeActive) {
+        if (this.onSelectionChangeActive && this.state.active) {
             this.updateToolbar(selectionData);
         }
     }
@@ -418,6 +445,7 @@ export class ToolbarPlugin extends Plugin {
             // Do not reposition the toolbar if it's already open.
             if (!this.overlay.isOpen) {
                 this.overlay.open({ props: this.toolbarProps });
+                this.state.active = true;
             }
             this.updateButtonsStates(selectionData.editableSelection, filteredtargetedNodes);
         } else {
