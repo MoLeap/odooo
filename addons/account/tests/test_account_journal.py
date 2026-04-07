@@ -400,6 +400,31 @@ class TestAccountJournalAlias(AccountTestInvoicingCommon, MailCommon):
             {'balance': -115.0, 'account_id': autobalance_account.id},
         ])
 
+    def test_statement_line_counterpart_with_default_tax(self):
+        """
+        Test that a bank statement line whose counterpart account has a
+        default tax does not crash and falls back to the suspense account
+        for the auto-balancing line.
+        """
+        cash_journal = self.company_data['default_journal_cash']
+        profit_account = self.company_data['default_account_revenue'].copy()
+        profit_account.tax_ids = [Command.set(self.company_data['default_tax_sale'].ids)]
+
+        statement_line = self.env['account.bank.statement.line'].create({
+            'journal_id': cash_journal.id,
+            'payment_ref': 'Cash difference (Profit)',
+            'amount': 100.0,
+            'counterpart_account_id': profit_account.id,
+        })
+
+        suspense_account = self.env.company.account_journal_suspense_account_id
+        self.assertRecordValues(statement_line.move_id.line_ids, [
+            {'balance': 100.0, 'account_id': cash_journal.default_account_id.id},
+            {'balance': -100.0, 'account_id': profit_account.id},
+            {'balance': -15.0, 'account_id': self.company_data['default_account_tax_sale'].id},
+            {'balance': 15.0, 'account_id': suspense_account.id},
+        ])
+
     def test_send_email_to_alias_from_other_company(self):
         user_company_2 = new_test_user(
             self.env,

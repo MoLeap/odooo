@@ -2843,7 +2843,7 @@ class AccountMove(models.Model):
     def _get_automatic_balancing_account(self):
         """ Small helper for special cases where we want to auto balance a move with a specific account. """
         self.ensure_one()
-        if self.journal_id.default_account_id:
+        if self.journal_id.default_account_id and not self.statement_line_id:
             return self.journal_id.default_account_id.id
         return self.company_id.account_journal_suspense_account_id.id
 
