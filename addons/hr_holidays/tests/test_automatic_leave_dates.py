@@ -334,7 +334,7 @@ class TestAutomaticLeaveDates(TestHrHolidaysCommon):
         self.env.user.tz = 'Europe/Brussels'
         calendar = self.env['resource.calendar'].create({
             'name': 'auto next day',
-            'schedule_type': 'variable',
+            'calendar_type': 'variable',
             'hours_per_day': 6.28,
             'days_per_week': 7,
             'hours_per_week': 40,
@@ -381,7 +381,7 @@ class TestAutomaticLeaveDates(TestHrHolidaysCommon):
         self.env.user.tz = 'Europe/Brussels'
         calendar = self.env['resource.calendar'].create({
             'name': 'auto next day',
-            'schedule_type': 'variable',
+            'calendar_type': 'variable',
             'attendance_ids': [(5, 0, 0),
                                (0, 0, {'date': datetime(2019, 9, 9), 'hour_from': 8, 'hour_to': 12})],
         })

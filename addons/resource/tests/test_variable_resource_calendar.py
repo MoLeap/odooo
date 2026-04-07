@@ -14,10 +14,10 @@ class TestVariableResourceCalendar(TransactionCase):
         super().setUpClass()
         cls.variable_calendar, cls.fixed_calendar = cls.env['resource.calendar'].create([{
             'name': 'Test Variable Calendar',
-            'schedule_type': 'variable',
+            'calendar_type': 'variable',
         }, {
             'name': 'Test Fixed Calendar',
-            'schedule_type': 'fixed',
+            'calendar_type': 'fixed',
         }])
 
     def test_attendance_intervals_batch_variable_calendar(self):
@@ -108,7 +108,7 @@ class TestVariableResourceCalendar(TransactionCase):
         })
         self.assertEqual(attendance.dayofweek, '1', "Attendance with no date should keep the manually set dayofweek")
 
-    def test_change_schedule_type(self):
+    def test_change_calendar_type(self):
         calendar = self.env['resource.calendar'].create({
             'name': 'Test Attendance Unlinking',
             # By default it should be fixed schedule type
@@ -117,7 +117,7 @@ class TestVariableResourceCalendar(TransactionCase):
 
         with Form(calendar) as calendar_form:
             # Should NOT raise an error.
-            calendar_form.schedule_type = 'variable'
+            calendar_form.calendar_type = 'variable'
 
         self.assertEqual(len(calendar.attendance_ids), 0, "Changing schedule type should unlink attendances of the other type")
 
@@ -127,12 +127,12 @@ class TestVariableResourceCalendar(TransactionCase):
             'hour_from': 8,
             'hour_to': 17,
         })
-        calendar.schedule_type = 'fixed'
+        calendar.calendar_type = 'fixed'
         self.assertEqual(len(calendar.attendance_ids), 0, "Changing schedule type should unlink attendances of the other type")
 
         calendar = self.env['resource.calendar'].create({
             'name': 'Test Attendance Unlinking 2',
-            'schedule_type': 'variable',
+            'calendar_type': 'variable',
         })
         self.assertEqual(len(calendar.attendance_ids), 0, "Variable calendar should not have default attendances created.")
 

@@ -50,4 +50,4 @@ export const scheduleTypeConfirmRadioField = {
     displayName: _t("Confirm the schedule type change"),
 };
 
-registry.category("fields").add("schedule_type_confirm_radio", scheduleTypeConfirmRadioField);
+registry.category("fields").add("calendar_type_confirm_radio", scheduleTypeConfirmRadioField);

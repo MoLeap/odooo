@@ -13,7 +13,7 @@ class TestVariableResourceCalendarPerformance(TransactionCase):
         super().setUpClass()
         cls.variable_calendar = cls.env['resource.calendar'].create({
             'name': 'Test Variable Calendar',
-            'schedule_type': 'variable',
+            'calendar_type': 'variable',
             'attendance_ids': [
                 (0, 0, {
                     'date': date(1, 1, 1) + timedelta(days=d, weeks=w),

@@ -63,7 +63,7 @@ class ResourceCalendarAttendance(models.Model):
     # value but can be manually overridden.
     duration_hours = fields.Float(compute='_compute_duration_hours', string='Hours', store=True, readonly=False)
     calendar_id = fields.Many2one("resource.calendar", string="Resource's Calendar", required=True, index=True, ondelete='cascade')
-    schedule_type = fields.Selection(related='calendar_id.schedule_type', readonly=True)
+    calendar_type = fields.Selection(related='calendar_id.calendar_type', readonly=True)
     duration_based = fields.Boolean(compute='_compute_duration_based', store=True)
     day_period = fields.Selection([
         ('morning', 'Morning'),
@@ -343,7 +343,7 @@ class ResourceCalendarAttendance(models.Model):
                         (a.recurrency_type == 'weeks' and not (date_obj - a.date).days % 7 and not ((date_obj - a.date).days // 7) % a.recurrency_interval)
                     )
                 )
-        return self.filtered(lambda a: (a.date == date_obj or is_recurrent_attendance_today(a)) if a.calendar_id.schedule_type == 'variable' else (a.dayofweek == str(date_obj.weekday())))
+        return self.filtered(lambda a: (a.date == date_obj or is_recurrent_attendance_today(a)) if a.calendar_id.calendar_type == 'variable' else (a.dayofweek == str(date_obj.weekday())))
 
     def _filter_between_dates(self, date_from, date_to):
         def _is_between_dates(att):
@@ -352,7 +352,7 @@ class ResourceCalendarAttendance(models.Model):
                 if att.recurrency:
                     return att.date <= date_to and att.recurrency_until >= date_from
                 return date_from <= att.date <= date_to
-            return att.calendar_id.schedule_type != 'variable'
+            return att.calendar_id.calendar_type != 'variable'
 
         return self.filtered(_is_between_dates)
 

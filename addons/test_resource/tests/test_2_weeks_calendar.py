@@ -17,7 +17,7 @@ class Test2WeeksCalendar(TransactionCase):
         cls.two_weeks_cal_fixed = cls.env['resource.calendar'].create([
             {
                 "name": "2-weeks calendar",
-                "schedule_type": "variable",
+                "calendar_type": "variable",
                 "attendance_ids": [(
                     0, 0, {
                         "hour_from": att[0],
@@ -42,7 +42,7 @@ class Test2WeeksCalendar(TransactionCase):
         cls.two_weeks_cal_duration = cls.env['resource.calendar'].create([
             {
                 "name": "2-weeks calendar",
-                "schedule_type": "variable",
+                "calendar_type": "variable",
                 "attendance_ids": [(
                     0, 0, {
                         "duration_hours": att[0],
@@ -194,7 +194,7 @@ class Test2WeeksCalendar(TransactionCase):
         # Define a mid time
         resource_calendar = self.env['resource.calendar'].create({
             'name': 'Calendar Mid-Time',
-            'schedule_type': 'variable',
+            'calendar_type': 'variable',
             'full_time_required_hours': 40,
             'days_per_week': 2.5,
             'hours_per_day': 8,
@@ -222,7 +222,7 @@ class Test2WeeksCalendar(TransactionCase):
         calendar = self.env['resource.calendar'].create([
             {
                 "name": "2-weeks calendar",
-                "schedule_type": "variable",
+                "calendar_type": "variable",
                 "attendance_ids": [],
             },
         ])
@@ -274,7 +274,7 @@ class Test2WeeksCalendar(TransactionCase):
         """
         self.env.company.resource_calendar_id = self.env['resource.calendar'].create({
             "name": "2-weeks calendar",
-            "schedule_type": "variable",
+            "calendar_type": "variable",
             "attendance_ids": [],
         })
         self.env['res.company'].create({'name': 'New Company'})
