@@ -42,11 +42,7 @@ class SpecificationsPlugin extends Plugin {
                             [parseInt(el.dataset.extraFieldId)]
                         );
                         this.clearLoadedSpecs();
-                        await this.config.reloadEditor({
-                            target: this.dependencies.builderOptions.getReloadSelector(
-                                this.document.querySelector(".o_wsale_specss")
-                            )
-                        });
+                        window.location.reload();
                     },
                 }];
             },
@@ -80,14 +76,14 @@ class SpecificationsPlugin extends Plugin {
         if (!this._loadedSpecs) {
             const websiteId = this.services.website.currentWebsite.id;
 
-            const [fields, categories, extraFields] = await Promise.all([
+            const [rawFields, categories, extraFields] = await Promise.all([
                 this.services.orm.searchRead(
                     "ir.model.fields",
                     [
-                        ["model", "=", "product.template"],
-                        ["ttype", "in", ["char", "binary"]],
+                        ["model", "in", ["product.template", "product.product"]],
+                        ["name", "in", ["default_code", "barcode", "country_of_origin"]],
                     ],
-                    ["id", "name", "field_description"]
+                    ["id", "name", "field_description", "model"]
                 ),
                 this.services.orm.searchRead(
                     "product.attribute.category",
@@ -101,20 +97,19 @@ class SpecificationsPlugin extends Plugin {
                 ),
             ]);
 
+            // Deduplicate by name, prefer product.product over product.template
+            const fieldsByName = {};
+            for (const field of rawFields) {
+                if (!fieldsByName[field.name] || field.model === "product.product") {
+                    fieldsByName[field.name] = field;
+                }
+            }
+            const fields = Object.values(fieldsByName);
+
             this._categories.splice(0, this._categories.length, ...categories);
             this._extraFields.splice(0, this._extraFields.length, ...extraFields);
 
             this._loadedSpecs = { fields };
-
-            const displayNameField = fields.find((f) => f.name === "display_name");
-            if (displayNameField) {
-                const el = this.document.querySelector(
-                    ".o_wsale_specss"
-                );
-                if (el && !el.dataset.pendingFieldId) {
-                    el.dataset.pendingFieldId = String(displayNameField.id);
-                }
-            }
         }
         return this._loadedSpecs;
     }

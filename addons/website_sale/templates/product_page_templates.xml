@@ -1337,14 +1337,17 @@
     <template id="website_sale.product_spec_section" name="Product Spec Section">
         <t t-set="attrib_categories" t-value="product.valid_product_template_attribute_line_ids._prepare_categories_for_display()"/>
         <t t-set="extra_fields_by_category" t-value="website.get_extra_spec_fields_by_category()"/>
-        <t t-set="has_extra_fields" t-value="any(product.sudo()[extra_field.name] for fields in extra_fields_by_category.values() for extra_field in fields)"/>
-        <t t-if="attrib_categories or extra_fields_by_category or editable">
-
+        <t t-set="has_extra_fields" t-value="any(
+            (product_variant.sudo()[ef.name] if ef.field_model == 'product.product' else product.sudo()[ef.name])
+            for fields in extra_fields_by_category.values()
+            for ef in fields
+        )"/>
+        <t t-if="attrib_categories or has_extra_fields or editable">
             <section t-attf-class="pt32 pb32 #{spec_extra_class or ''}" id="product_full_spec">
                 <div class="container o_wsale_specss" t-attf-style="#{editable and 'min-height: 50px;' or ''}">
-                    <t t-if="attrib_categories or has_extra_fields">
+                <t t-if="attrib_categories or has_extra_fields">
                         <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h2 class="m-0 h3">Specifications</h2>
+                        <h2 class="m-0 h3">Specifications</h2>
                         </div>
                         <div id="product_specifications">
                             <div class="row">
@@ -1352,7 +1355,10 @@
                                     <t t-foreach="attrib_categories" t-as="category">
                                         <t t-set="category_attrib_lines" t-value="attrib_categories[category]"/>
                                         <t t-set="category_extra_fields" t-value="extra_fields_by_category.get(category, website.env['website.sale.extra.field'])"/>
-                                        <t t-set="has_visible_extra_fields" t-value="any(product.sudo()[extra_field.name] for extra_field in category_extra_fields)"/>
+                                        <t t-set="has_visible_extra_fields" t-value="any(
+                                            (product_variant.sudo()[ef.name] if ef.field_model == 'product.product' else product.sudo()[ef.name])
+                                            for ef in category_extra_fields
+                                        )"/>
                                         <div t-if="category_attrib_lines or has_visible_extra_fields" class="col-lg-6">
                                             <t t-call="website_sale.specifications_table"/>
                                         </div>
@@ -1360,7 +1366,10 @@
                                 </t>
                                 <t t-foreach="extra_fields_by_category" t-as="ef_category">
                                     <t t-if="not attrib_categories or ef_category not in attrib_categories">
-                                        <t t-set="has_visible_fields" t-value="any(product.sudo()[extra_field.name] for extra_field in extra_fields_by_category[ef_category])"/>
+                                        <t t-set="has_visible_fields" t-value="any(
+                                            (product_variant.sudo()[ef.name] if ef.field_model == 'product.product' else product.sudo()[ef.name])
+                                            for ef in extra_fields_by_category[ef_category]
+                                        )"/>
                                         <div t-if="has_visible_fields" class="col-lg-6">
                                             <t t-set="category" t-value="ef_category"/>
                                             <t t-set="category_attrib_lines" t-value="product.env['product.template.attribute.line']"/>
@@ -1385,7 +1394,8 @@
 
     <template id="website_sale.product_attributes_top" inherit_id="website_sale.product" active="False" name="Product Specifications Top">
         <xpath expr="//div[@id='product_detail_main']" position="after">
-            <t t-call="website_sale.product_spec_section" spec_extra_class="'o_wsale_spec_top'">
+            <t t-call="website_sale.product_spec_section">
+                <t t-set="spec_extra_class" t-value="'o_wsale_spec_top'"/>
             </t>
         </xpath>
     </template>
@@ -1405,7 +1415,10 @@
             <t t-foreach="attrib_categories" t-as="category">
                 <t t-set="category_attrib_lines" t-value="attrib_categories[category]"/>
                 <t t-set="category_extra_fields" t-value="extra_fields_by_category.get(category, website.env['website.sale.extra.field'])"/>
-                <t t-set="has_visible_extra_fields" t-value="any(product.sudo()[extra_field.name] for extra_field in category_extra_fields)"/>
+                <t t-set="has_visible_extra_fields" t-value="any(
+                    (product_variant.sudo()[ef.name] if ef.field_model == 'product.product' else product.sudo()[ef.name])
+                    for ef in category_extra_fields
+                )"/>
                 <t t-if="category_attrib_lines or has_visible_extra_fields">
                     <div class="accordion-item">
                         <div class="accordion-header my-0 h6">
@@ -1435,7 +1448,10 @@
             </t>
             <t t-foreach="extra_fields_by_category" t-as="ef_category">
                 <t t-if="ef_category not in attrib_categories">
-                    <t t-set="has_visible_fields" t-value="any(product.sudo()[extra_field.name] for extra_field in extra_fields_by_category[ef_category])"/>
+                    <t t-set="has_visible_fields" t-value="any(
+                        (product_variant.sudo()[ef.name] if ef.field_model == 'product.product' else product.sudo()[ef.name])
+                        for ef in extra_fields_by_category[ef_category]
+                    )"/>
                     <t t-if="has_visible_fields">
                         <t t-set="category" t-value="ef_category"/>
                         <t t-set="category_attrib_lines" t-value="product.env['product.template.attribute.line']"/>
@@ -1469,7 +1485,7 @@
         </xpath>
     </template>
 
-   <template id="specifications_table" name="Specifications Table">
+    <template id="specifications_table" name="Specifications Table">
         <table t-attf-class="table {{is_accordion and 'table-sm mb-0'}}">
 
             <!-- Category header — shown in bottom/top views, accordion has its own header button -->
@@ -1515,7 +1531,11 @@
             <!-- Extra fields -->
             <t t-if="category_extra_fields">
                 <t t-foreach="category_extra_fields" t-as="extra_field">
-                    <t t-set="field_value" t-value="product.sudo()[extra_field.name]"/>
+                    <t t-set="field_value" t-value="
+                        product_variant.sudo()[extra_field.name]
+                        if extra_field.field_model == 'product.product'
+                        else product.sudo()[extra_field.name]
+                    "/>
                     <tr t-if="field_value" t-att-data-extra-field-id="extra_field.id">
                         <td t-attf-class="w-25 ps-0 {{extra_field_last and is_accordion and 'border-bottom-0' or ''}}">
                             <span t-out="extra_field.label"/>
