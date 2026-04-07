@@ -5,6 +5,7 @@ import difflib
 import io
 import pprint
 import unittest
+from unittest.mock import patch
 
 from PIL import Image
 
@@ -1346,3 +1347,56 @@ class test_failures(TransactionCase):
             [],
             {'has_headers': True, 'separator': ',', 'quoting': '"'})
         self.assertFalse(results['messages'], "results should be empty on successful import")
+
+
+@tagged('at_install', '-post_install')
+class TestPermissions(TransactionCase):
+    @unittest.skipUnless(
+        can_import("openpyxl"), "openpyxl not available",
+    )
+    def test_import_image_by_url_as_non_admin_user(self):
+        img_buf = io.BytesIO()
+        Image.new('RGB', (1, 1), '#FF0000').save(img_buf, 'PNG')
+        image_data = img_buf.getvalue()
+
+        with patch(
+            "odoo.addons.base_import.models.base_import.Base_ImportImport._import_file_by_url",
+            return_value=image_data,
+        ):
+            demo_user = self.env['res.users'].create({
+                'name': 'Demo User',
+                'login': 'demo_user',
+                'group_ids': [
+                    (6, 0, [
+                        self.env.ref('base.group_user').id,
+                        self.env.ref('base.group_partner_manager').id,
+                    ]),
+                ],
+            })
+            self.env = self.env(user=demo_user)
+
+            file_content = generate_xlsx({
+                'name': ['Test Partner'],
+                'image_1920': ['https://example.com/logo.png'],
+            })
+            import_wizard = self.env["base_import.import"].create(
+                {
+                    "res_model": "res.partner",
+                    "file": BinaryBytes(file_content),
+                    "file_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                }
+            )
+            results = import_wizard.execute_import(
+                ['name', 'image_1920'],
+                ['Name', 'Image'],
+                {
+                    "has_headers": True,
+                    "limit": 1,
+                },
+            )
+
+        self.assertFalse(
+            results["messages"],
+            f"Non-admin user should be able to import images via URL, but got errors: {results['messages']}",
+        )
+        self.assertEqual(results['name'], ['Test Partner'])
