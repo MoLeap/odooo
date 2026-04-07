@@ -72,9 +72,19 @@ export class AttributeSelection extends Component {
     }
 
     availableAttributeValue(attribute) {
-        return this.selfOrder.config.self_ordering_mode === "kiosk"
+        return this.isKiosk()
             ? attribute.product_template_value_ids.filter((a) => !a.is_custom)
             : attribute.product_template_value_ids;
+    }
+
+    isKiosk() {
+        return this.selfOrder.config.self_ordering_mode === "kiosk";
+    }
+
+    attributesToDisplay(attrs) {
+        return this.isKiosk()
+            ? attrs.filter((a) => a.product_template_value_ids.some((v) => !v.is_custom))
+            : attrs;
     }
 
     initAttribute() {
@@ -104,7 +114,10 @@ export class AttributeSelection extends Component {
             for (const value of attr.product_template_value_ids) {
                 if (attr.attribute_id.display_type === "multi") {
                     this.selectedValues[attr.id][value.id] = initValue(value);
-                } else if (typeof this.selectedValues[attr.id] !== "number") {
+                } else if (
+                    typeof this.selectedValues[attr.id] !== "number" &&
+                    !(this.isKiosk() && value.is_custom)
+                ) {
                     this.selectedValues[attr.id] = initValue(value);
                 }
 
