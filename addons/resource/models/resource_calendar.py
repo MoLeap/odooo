@@ -188,6 +188,7 @@ class ResourceCalendar(models.Model):
         vals_list = super().copy_data(default=default)
         return [dict(vals, name=self.env._("%s (copy)", calendar.name)) for calendar, vals in zip(self, vals_list)]
 
+    @api.model_create_multi
     def create(self, vals_list):
         new_ids = super().create(vals_list)
         new_ids._get_attendances_to_unlink().unlink()

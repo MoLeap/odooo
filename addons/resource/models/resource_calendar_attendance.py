@@ -111,7 +111,7 @@ class ResourceCalendarAttendance(models.Model):
         "A recurrency should finish after the first occurence",
     )
 
-    _check_duration = models.Constraint(
+    _check_duration_hours = models.Constraint(
         "CHECK(duration_hours != 0)",
         "An attendance should have a duration",
     )
@@ -153,10 +153,11 @@ class ResourceCalendarAttendance(models.Model):
         self._check_overlap(formatted_date)
         self._check_types(formatted_date)
 
-    def _check_attendances(self):
+    def _check_attendances_variable(self):
         ids_to_check = set(self.ids)
         # Search to get all attendances that can be in conflict with the new ones
-        all_dates = self.mapped('date')
+        if not (all_dates := [d for d in self.mapped('date') if d]):
+            return
         min_date = min(all_dates)
         max_date_list = all_dates + [d.recurrency_until for d in self if d.recurrency]
         max_date = max(max_date_list)
@@ -231,14 +232,15 @@ class ResourceCalendarAttendance(models.Model):
                 attendances_to_validate = attendances | self.browse(ids_in_conflict)
                 attendances_to_validate._check_attendance(attendance_date)
 
+    @api.model_create_multi
     def create(self, vals_list):
         new_ids = super().create(vals_list)
-        new_ids._check_attendances()
+        new_ids._check_attendances_variable()
         return new_ids
 
     def write(self, vals):
         res = super().write(vals)
-        self._check_attendances()
+        self._check_attendances_variable()
         return res
 
     @api.onchange('hour_from')
