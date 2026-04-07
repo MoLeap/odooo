@@ -48,6 +48,7 @@
         'views/mailing_mailing_views.xml',
         'views/mailing_subscription_optout_views.xml',
         'views/mailing_subscription_views.xml',
+        'views/mailing_templates_views.xml',
         'views/res_config_settings_views.xml',
         'views/utm_campaign_views.xml',
         'views/mailing_menus.xml',
@@ -156,6 +157,8 @@
         'web.assets_backend': [
             'mass_mailing/static/src/components/**/*',
             'mass_mailing/static/src/views/mailing_preview_form_view.js',
+            'mass_mailing/static/src/views/format_utils.js',
+            'mass_mailing/static/src/views/fields/**/*',
             'mass_mailing/static/src/editor/**/*',
             'mass_mailing/static/src/fields/**/*',
             'mass_mailing/static/src/themes/*',
