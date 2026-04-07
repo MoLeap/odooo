@@ -5,7 +5,7 @@
             <div class="overflow-auto d-flex align-items-baseline ms-3 me-1">
                 <span class="o-mail-ActivityListPopoverItem-name flex-grow-1 flex-basis-0 text-truncate">
                     <t t-if="this.props.activity.summary">
-                        <b class="text-900 me-2 text-truncate" t-out="this.props.activity.summary"/>
+                        [draft]<b class="text-900 me-2 text-truncate" t-out="this.props.activity.summary"/>
                     </t>
                     <t t-if="!this.props.activity.summary and this.props.activity.activity_type_id">
                         <b class="text-900 me-2 text-truncate" t-out="this.props.activity.activity_type_id[1]"/>

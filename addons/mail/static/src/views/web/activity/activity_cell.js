@@ -44,6 +44,8 @@ export class ActivityCell extends Component {
         return formatDate(luxon.DateTime.fromISO(this.props.reportingDate));
     }
     get displayedSummaries() {
+        console.log("those are the summaries");
+        console.log(this.props.summaries);
         const summariesWithContent = this.props.summaries.filter((textContent) => !!textContent);
         const extras = this.props.summaries.length - summariesWithContent.length
         if (summariesWithContent.length > 0 && extras > 0) {

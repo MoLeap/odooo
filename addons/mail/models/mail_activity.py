@@ -190,10 +190,12 @@ class MailActivity(models.Model):
     @api.depends('activity_type_id')
     def _compute_summary(self):
         for activity in self:
+            print("it will compute the summary")
             if activity.activity_type_id.summary:
                 activity.summary = activity.activity_type_id.summary
             elif not activity.summary:
                 activity.summary = activity.activity_type_id.name
+            print(activity.summary)
 
     @api.depends('activity_type_id')
     def _compute_user_id(self):
@@ -821,6 +823,11 @@ class MailActivity(models.Model):
             user_assigned_ids = ongoing.user_id.ids
             attachments = [attachments_by_id[attach.id] for attach in completed.attachment_ids]
 
+            # print("here are the grouped activities from the mailActivity model")
+            # for activity in activities:
+            #     print("this is the summary")
+            #     print(activity.summary)
+
             grouped_activities[res_id][activity_type_id.id] = {
                 'count_by_state': dict(Counter(
                     self._compute_state_from_date(act.date_deadline, user_tz) if act.active else 'done'
@@ -829,7 +836,7 @@ class MailActivity(models.Model):
                 'reporting_date': ongoing and date_deadline or date_done or None,
                 'state': self._compute_state_from_date(date_deadline, user_tz) if ongoing else 'done',
                 'user_assigned_ids': user_assigned_ids,
-                'summaries': [act.summary if act.summary else '' for act in activities],
+                'summaries': [f"[draft] {act.summary}" if act.summary else '' for act in activities],
             }
             if attachments:
                 most_recent_attachment = max(attachments, key=lambda a: (a['create_date'], a['id']))
