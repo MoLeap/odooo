@@ -195,8 +195,8 @@ export class DomMutationPlugin extends Plugin {
             this.observer.takeRecords();
             this.mutations = [];
         },
-        pending_commit_data_processors: (data, origin) => {
-            this.flush(!!origin);
+        pending_commit_data_processors: (data) => {
+            this.flush(!!data.origin);
             return { ...data, mutations: [...this.mutations] };
         },
         on_commit_restored_handlers: () => {

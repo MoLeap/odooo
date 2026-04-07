@@ -349,11 +349,11 @@ export class BuilderOptionsPlugin extends Plugin {
         return this.target;
     }
 
-    processCommitData(data, origin) {
+    processCommitData(data) {
         return {
             ...data,
-            currentTarget: origin ? origin.data.currentTarget : this.targetState.current,
-            nextTarget: origin ? origin.data.nextTarget : this.targetState.next,
+            currentTarget: data.origin ? data.origin.data.currentTarget : this.targetState.current,
+            nextTarget: data.origin ? data.origin.data.nextTarget : this.targetState.next,
         };
     }
 

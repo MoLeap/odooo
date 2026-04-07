@@ -53,7 +53,7 @@ import { EditorCommit } from "../utils/commit";
  * @typedef {((commit: EditorCommit) => boolean | undefined)[]} is_commit_reversible_predicates
  * @typedef {((commit: EditorCommit) => boolean | undefined)[]} has_commit_changes_predicates
  *
- * @typedef { ((data: EditorCommitData, origin?: EditorCommit) => EditorCommitData | undefined)[] } pending_commit_data_processors
+ * @typedef { ((data: EditorCommitData) => EditorCommitData | undefined)[] } pending_commit_data_processors
  * @typedef {((data: EditorCommitData<"standard">) => EditorCommitData<"standard"> | undefined)[]} snapshot_commit_data_processors
  * @typedef { ((data: EditorCommitData<"savePoint">) => EditorCommitData<"savePoint"> | void)[] } save_point_data_processors
  */
@@ -179,10 +179,8 @@ export class HistoryPlugin extends Plugin {
         // is truly accessible when executing the `onChange` callback. It is
         // useful for external components if they execute `can(Undo|Redo)`.
         const data = this.processCommitData({
-            data: {
-                batchable,
-                authorTimestamp: this.authorTimestamp,
-            },
+            batchable,
+            authorTimestamp: this.authorTimestamp,
         });
         const commit = new EditorCommit({ data });
         return this.writeCommit(commit);
@@ -226,10 +224,8 @@ export class HistoryPlugin extends Plugin {
             this.revertedCommits.add(revertedCommit.id);
             /** @type { EditorCommitData<"undo"> } */
             const commitData = this.processCommitData({
-                data: {
-                    batchable: revertedCommit.data.batchable,
-                    commitTimestamp: revertedCommit.data.commitTimestamp,
-                },
+                batchable: revertedCommit.data.batchable,
+                commitTimestamp: revertedCommit.data.commitTimestamp,
                 origin: revertedCommit,
             });
             this.writeCommit(
@@ -254,10 +250,8 @@ export class HistoryPlugin extends Plugin {
             this.revertedCommits.add(revertedCommit.id);
             /** @type { EditorCommitData<"redo"> } */
             const commitData = this.processCommitData({
-                data: {
-                    batchable: revertedCommit.data.batchable,
-                    commitTimestamp: revertedCommit.data.commitTimestamp,
-                },
+                batchable: revertedCommit.data.batchable,
+                commitTimestamp: revertedCommit.data.commitTimestamp,
                 origin: revertedCommit,
             });
             this.writeCommit(
@@ -617,14 +611,12 @@ export class HistoryPlugin extends Plugin {
     }
 
     /**
-     * @template { import("../utils/commit").WritableEditorCommitType } [T="standard"]
-     * @param { Object } [param0 = {}]
-     * @param { EditorCommitData<T> } [param0.data = {}]
-     * @param { EditorCommit } [param0.origin]
+     * @template { WritableEditorCommitType } [T="standard"]
+     * @param { EditorCommitData<T> } [data = {}]
      * @returns { EditorCommitData<T> }
      */
-    processCommitData({ data = {}, origin } = {}) {
-        return this.processThrough("pending_commit_data_processors", data, origin);
+    processCommitData(data = {}) {
+        return this.processThrough("pending_commit_data_processors", data);
     }
 
     /**

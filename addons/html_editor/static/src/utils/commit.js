@@ -8,11 +8,27 @@
  * @typedef { Record<string, any> & (
  *   T extends "savePoint"
  *     ? {
- *           origin: EditorCommit<Exclude<EditorCommitType, "savePoint">>,
  *           hasBeenRestored: boolean,
- *           lastRevertedChanges?: EditorCommitData<Exclude<EditorCommitType, "savePoint">>,
+ *           lastRevertedChanges?: EditorCommitData<WritableEditorCommitType>,
+ *           origin: EditorCommit<WritableEditorCommitType>,
  *       }
- *     : T extends ("standard" | "undo" | "redo")
+ *     : T extends "undo"
+ *       ? {
+ *           authorTimestamp?: number,
+ *           commitTimestamp?: number,
+ *           previousCommitId?: EditorCommitId,
+ *           batchable?: boolean,
+ *           origin: EditorCommit<"standard" | "redo">,
+ *       }
+ *     : T extends "redo"
+ *       ? {
+ *           authorTimestamp?: number,
+ *           commitTimestamp?: number,
+ *           previousCommitId?: EditorCommitId,
+ *           batchable?: boolean,
+ *           origin: EditorCommit<"undo">,
+ *       }
+ *     : T extends "standard"
  *       ? {
  *           authorTimestamp?: number,
  *           commitTimestamp?: number,
@@ -23,6 +39,7 @@
  *           authorTimestamp?: number,
  *           commitTimestamp?: number,
  *           previousCommitId?: EditorCommitId,
+ *           origin: EditorCommit<WritableEditorCommitType>,
  *         }
  * ) } EditorCommitData<T>
  */
