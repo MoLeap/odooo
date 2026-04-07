@@ -1,5 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import ast
 from odoo import Command, fields
 from odoo.addons.sale_project.tests.test_project_profitability import TestProjectProfitabilityCommon
 from odoo.addons.stock_account.tests.test_anglo_saxon_valuation_reconciliation_common import ValuationReconciliationTestCommon
@@ -84,6 +85,7 @@ class TestSaleProjectStockProfitability(TestProjectProfitabilityCommon, Valuatio
                 'data': [{
                     'action': {
                         'args': f'["cost_of_goods_sold", [["id", "in", [{invoice.id}]]], {invoice.id}]',
+                        'context': {'active_test': False, 'record_ids': [invoice.id]},
                         'name': 'action_profitability_items',
                         'type': 'object',
                     },
@@ -98,3 +100,26 @@ class TestSaleProjectStockProfitability(TestProjectProfitabilityCommon, Valuatio
                 }
             }
         )
+        project = sale_order.project_ids
+        sale_order_2 = self.env['sale.order'].create({
+            'partner_id': self.partner.id,
+            'analytic_account_id': project.analytic_account_id.id,
+            'project_id': project.id,
+            'order_line': [Command.create({'product_id': other_avco_product.id, 'product_uom_qty': 10})],
+        })
+        sale_order_2.action_confirm()
+        delivery = sale_order_2.picking_ids
+        delivery.move_ids.quantity = 10
+        delivery.button_validate()
+        sale_order_2._create_invoices()
+        invoice_2 = sale_order_2.invoice_ids[0]
+        invoice_2.invoice_date = fields.Date.today()
+        invoice_2.action_post()
+        costs = project._get_profitability_items()['costs']['data']
+        context = costs[0]['action']['context']
+        args = ast.literal_eval(costs[0]['action']['args'])
+        section = args[0]
+        domain = args[1]
+        action = project.with_context(context).action_profitability_items(section, domain)
+        # Ensure that the action domain correctly includes move_ids from both invoices
+        self.assertEqual(action['domain'], [('move_id', 'in', [invoice.id, invoice_2.id]), ('display_type', '=', 'cogs')])
