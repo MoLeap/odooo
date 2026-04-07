@@ -495,6 +495,70 @@ export class LinkPlugin extends Plugin {
         );
     }
 
+    getLinkPopoverProps({
+        linkElement,
+        isImage,
+        applyCallback,
+        containerElement,
+        cursorsToRestore,
+    }) {
+        return {
+            document: this.document,
+            linkElement,
+            isImage: isImage,
+            containerElement: containerElement,
+            ignoreDOMMutations: this.dependencies.history.ignoreDOMMutations,
+            onApply: (...args) => {
+                delete this._isNavigatingByMouse;
+                applyCallback(...args);
+                this.closeLinkTools(cursorsToRestore);
+                this.dependencies.selection.focusEditable();
+                this.dependencies.history.addStep();
+            },
+            onChange: applyCallback,
+            onDiscard: () => {
+                this.restoreSavePoint();
+                if (linkElement.isConnected) {
+                    this.openLinkTools(linkElement);
+                } else {
+                    this.linkInDocument = null;
+                    this.currentOverlay.close();
+                }
+                this.dependencies.selection.focusEditable();
+            },
+            onRemove: () => {
+                this.removeLinkInDocument();
+                this.linkInDocument = null;
+                this.currentOverlay.close();
+            },
+            onCopy: () => {
+                this.linkInDocument = null;
+                this.currentOverlay.close();
+            },
+            onEdit: () => {
+                this.restoreSavePoint = this.dependencies.history.makeSavePoint();
+            },
+            getInternalMetaData: this.getInternalMetaData,
+            getExternalMetaData: this.getExternalMetaData,
+            getAttachmentMetadata: this.getAttachmentMetadata,
+            recordInfo: this.config.getRecordInfo?.() || {},
+            canEdit:
+                !this.linkInDocument || !this.linkInDocument.classList.contains("o_link_readonly"),
+            canRemove:
+                this.linkInDocument &&
+                this.linkInDocument.parentElement.isContentEditable &&
+                !this.dependencies.delete.isUnremovable(this.linkInDocument),
+            canUpload: this.config.allowFile,
+            onUpload: this.config.onAttachmentChange,
+            type: this.type || "",
+            LinkPopoverState: this.LinkPopoverState,
+            showReplaceTitleBanner: this.newlyInsertedLinks.has(linkElement),
+            includeStyling: !this.config.hideStylingInLinkPopover,
+            allowTargetBlank: this.config.allowTargetBlank,
+            allowStripDomain: this.config.allowStripDomain,
+        };
+    }
+
     /**
      * open the Link popover to edit links
      *
@@ -561,7 +625,7 @@ export class LinkPlugin extends Plugin {
                         cleanZWChars(this.linkInDocument.innerText) !== label
                     ) {
                         this.linkInDocument.innerText = label;
-                        cursorsToRestore = null;
+                        cursorsToRestore.restore = null;
                     }
                 }
             } else if (url) {
@@ -590,7 +654,7 @@ export class LinkPlugin extends Plugin {
                         const content = this.dependencies.selection.extractContent(selection);
                         link.append(content);
                         link.normalize();
-                        cursorsToRestore = null;
+                        cursorsToRestore.restore = null;
                         selection = this.dependencies.selection.getEditableSelection();
                         const anchorClosestElement = closestElement(selection.anchorNode);
                         if (commonAncestor !== anchorClosestElement) {
@@ -614,7 +678,7 @@ export class LinkPlugin extends Plugin {
                         link.setAttribute("target", linkTarget);
                     }
                     this.linkInDocument = link;
-                    cursorsToRestore = null;
+                    cursorsToRestore.restore = null;
                     this.dependencies.dom.insert(link);
                 }
             }
@@ -624,61 +688,14 @@ export class LinkPlugin extends Plugin {
         };
 
         this.restoreSavePoint = this.dependencies.history.makeSavePoint();
-        const props = {
-            document: this.document,
+        const containerElement = closestElement(selection.anchorNode);
+        const props = this.getLinkPopoverProps({
             linkElement,
-            isImage: isImage,
-            containerElement: closestElement(selection.anchorNode),
-            ignoreDOMMutations: this.dependencies.history.ignoreDOMMutations,
-            onApply: (...args) => {
-                delete this._isNavigatingByMouse;
-                applyCallback(...args);
-                this.closeLinkTools(cursorsToRestore);
-                this.dependencies.selection.focusEditable();
-                this.dependencies.history.addStep();
-            },
-            onChange: applyCallback,
-            onDiscard: () => {
-                this.restoreSavePoint();
-                if (linkElement.isConnected) {
-                    this.openLinkTools(linkElement);
-                } else {
-                    this.linkInDocument = null;
-                    this.currentOverlay.close();
-                }
-                this.dependencies.selection.focusEditable();
-            },
-            onRemove: () => {
-                this.removeLinkInDocument();
-                this.linkInDocument = null;
-                this.currentOverlay.close();
-            },
-            onCopy: () => {
-                this.linkInDocument = null;
-                this.currentOverlay.close();
-            },
-            onEdit: () => {
-                this.restoreSavePoint = this.dependencies.history.makeSavePoint();
-            },
-            getInternalMetaData: this.getInternalMetaData,
-            getExternalMetaData: this.getExternalMetaData,
-            getAttachmentMetadata: this.getAttachmentMetadata,
-            recordInfo: this.config.getRecordInfo?.() || {},
-            canEdit:
-                !this.linkInDocument || !this.linkInDocument.classList.contains("o_link_readonly"),
-            canRemove:
-                this.linkInDocument &&
-                this.linkInDocument.parentElement.isContentEditable &&
-                !this.dependencies.delete.isUnremovable(this.linkInDocument),
-            canUpload: this.config.allowFile,
-            onUpload: this.config.onAttachmentChange,
-            type: this.type || "",
-            LinkPopoverState: this.LinkPopoverState,
-            showReplaceTitleBanner: this.newlyInsertedLinks.has(linkElement),
-            includeStyling: !this.config.hideStylingInLinkPopover,
-            allowTargetBlank: this.config.allowTargetBlank,
-            allowStripDomain: this.config.allowStripDomain,
-        };
+            isImage,
+            applyCallback,
+            containerElement,
+            cursorsToRestore,
+        });
 
         const popover = this.getActivePopover(linkElement);
         if (popover) {
@@ -728,7 +745,7 @@ export class LinkPlugin extends Plugin {
                         { normalize: false }
                     );
                     link.remove();
-                } else if (cursors) {
+                } else if (cursors?.restore) {
                     cursors.restore();
                 } else {
                     this.dependencies.selection.setCursorEnd(link);
