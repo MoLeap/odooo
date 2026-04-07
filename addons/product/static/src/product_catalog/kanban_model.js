@@ -46,7 +46,7 @@ export class ProductCatalogKanbanModel extends RelationalModel {
                 orderLinesInfo = this._getSampleOrderLineInfo();
             }
             for (const record of records) {
-                record.productCatalogData = orderLinesInfo[record.id];
+                record.productCatalogData = orderLinesInfo[record.id] || {};
             }
         }
         return result;
