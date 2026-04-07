@@ -701,6 +701,7 @@ class CalendarEvent(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        print("pass inside the calendar event create")
         # Prevent sending update notification when _inverse_dates is called
         self = self.with_context(is_calendar_event_new=True)
         defaults = self.browse().default_get([
@@ -739,14 +740,19 @@ class CalendarEvent(models.Model):
             if existing_event and orig_activity_ids.activity_type_id.category == 'meeting':
                 existing_type = orig_activity_ids.activity_type_id
 
+        print("has it an activity type ?")
         if meeting_activity_types:
+            print("yes it has")
             for values in vals_list:
+                print("has a vals_list")
                 # created from calendar: try to create an activity on the related record
                 if values['meeting_activity_ids'] and not existing_event:
+                    print("will not pass no existing event")
                     continue
                 res_model = all_models.filtered(lambda m: m.id == values['res_model_id'])
                 res_id = values['res_id']
                 if not res_model or not res_id or res_model.model in excluded_models or not res_model.is_mail_activity:
+                    print("will not pass. Has not mail activity")
                     continue
 
                 meeting_activity_type = self.env['mail.activity.type']
@@ -756,6 +762,8 @@ class CalendarEvent(models.Model):
                     meeting_activity_type = meeting_activity_types.filtered(
                         lambda act: act.res_model in {False, res_model.model}
                     )
+                print("does the record has an meeting activity type ?")
+                print(meeting_activity_type)
                 if not meeting_activity_type:
                     continue
 
@@ -768,10 +776,14 @@ class CalendarEvent(models.Model):
                     activity_vals['note'] = values['description']
                 if values['name']:
                     activity_vals['summary'] = values['name']
+                if values['is_draft'] and activity_vals['summary']:
+                    activity_vals['summary'] += "[Draft] "
                 if values['start']:
                     activity_vals['date_deadline'] = self._get_activity_deadline_from_start(fields.Datetime.from_string(values['start']), values['allday'])
                 if values['user_id']:
                     activity_vals['user_id'] = values['user_id']
+                print("this is the new activity")
+                print(activity_vals)
                 values['meeting_activity_ids'] = [(0, 0, activity_vals)]
 
         self._set_videocall_location(vals_list)

@@ -192,8 +192,10 @@ class MailActivity(models.Model):
         for activity in self:
             print("it will compute the summary")
             if activity.activity_type_id.summary:
+                print("the activity type has a summary")
                 activity.summary = activity.activity_type_id.summary
             elif not activity.summary:
+                print("acitivity has no summary")
                 activity.summary = activity.activity_type_id.name
             print(activity.summary)
 
