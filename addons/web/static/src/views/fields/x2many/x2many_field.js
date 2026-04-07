@@ -86,17 +86,20 @@ export class X2ManyField extends Component {
             updateRecord,
             isMany2Many: this.isMany2Many,
         });
-        this._openRecord = (params) => {
+        this._openRecord = (params, viewConfig) => {
             const activeElement = document.activeElement;
-            openRecord({
-                ...params,
-                controls: this.controls,
-                onClose: () => {
-                    if (activeElement) {
-                        activeElement.focus();
-                    }
+            openRecord(
+                {
+                    ...params,
+                    controls: this.controls,
+                    onClose: () => {
+                        if (activeElement) {
+                            activeElement.focus();
+                        }
+                    },
                 },
-            });
+                viewConfig
+            );
         };
         this.canOpenRecord =
             this.props.viewMode === "list"
@@ -287,7 +290,7 @@ export class X2ManyField extends Component {
         return this.props.context;
     }
 
-    async onAdd({ context, editable } = {}) {
+    async onAdd({ context, editable, viewConfig } = {}) {
         context = makeContext([this.props.context, context]);
         if (this.isMany2Many) {
             const domain = getFieldDomain(this.props.record, this.props.name, this.props.domain);
@@ -304,20 +307,23 @@ export class X2ManyField extends Component {
                 await this.list.leaveEditMode({ canAbandon: false });
             }
             if (!this.list.editedRecord) {
-                return this.addInLine({ context, editable });
+                return this.addInLine({ context, editable, viewConfig });
             }
             return;
         }
-        return this._openRecord({ context });
+        return this._openRecord({ context }, viewConfig);
     }
 
-    async openRecord(record) {
+    async openRecord(record, viewConfig) {
         if (this.canOpenRecord) {
-            return this._openRecord({
-                record,
-                context: this.props.context,
-                readonly: this.props.readonly,
-            });
+            return this._openRecord(
+                {
+                    record,
+                    context: this.props.context,
+                    readonly: this.props.readonly,
+                },
+                viewConfig
+            );
         }
     }
 }

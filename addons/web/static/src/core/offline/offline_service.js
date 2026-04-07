@@ -210,7 +210,10 @@ class OfflineManager extends Reactive {
         if (!this.offline) {
             const key = this._generateKey(actionId, viewType, resId);
             let value;
-            if (["form", "kanban_quick_create", "list_quick_create"].includes(viewType)) {
+            if (
+                ["form", "kanban_quick_create", "list_quick_create"].includes(viewType) ||
+                viewType.startsWith("one2many")
+            ) {
                 value = true;
             } else {
                 value = (await this._idb.read(this._visitedUITable, key)) || {};

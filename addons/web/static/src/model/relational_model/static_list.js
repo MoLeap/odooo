@@ -170,7 +170,7 @@ export class StaticList extends DataPoint {
      */
     addNewRecord(params) {
         return this.model.mutex.exec(async () => {
-            const { activeFields, context, mode, position, withoutParent } = params;
+            const { activeFields, context, mode, position, withoutParent, viewConfig } = params;
             const record = await this._createNewRecordDatapoint({
                 activeFields,
                 context,
@@ -178,6 +178,7 @@ export class StaticList extends DataPoint {
                 withoutParent,
                 manuallyAdded: true,
                 mode,
+                viewConfig,
             });
             await this._addRecord(record, { position });
             await this._onUpdate({ withoutOnchange: !record._checkValidity({ silent: true }) });
@@ -276,7 +277,7 @@ export class StaticList extends DataPoint {
      * @param {RelationalRecord} [record]
      * @returns {RelationalRecord}
      */
-    extendRecord(params, record) {
+    extendRecord(params, record, viewConfig) {
         return this.model.mutex.exec(async () => {
             // extend fields and activeFields of the list with those given in params
             completeActiveFields(this.config.activeFields, params.activeFields);
@@ -355,6 +356,7 @@ export class StaticList extends DataPoint {
                     context: params.context,
                     withoutParent: params.withoutParent,
                     manuallyAdded: true,
+                    viewConfig,
                 });
                 record._activeFieldsToRestore = { ...this.config.activeFields };
                 record._noUpdateParent = true;
@@ -854,8 +856,10 @@ export class StaticList extends DataPoint {
                 activeFields: params.activeFields || this.activeFields,
                 fields: this.fields,
                 context: Object.assign({}, this.context, params.context),
+                isMonoRecord: true,
             },
-            { changes, evalContext: this.evalContext }
+            { changes, evalContext: this.evalContext },
+            params.viewConfig
         );
 
         if (this.canResequence() && this.records.length) {

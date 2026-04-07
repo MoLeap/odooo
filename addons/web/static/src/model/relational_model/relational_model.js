@@ -660,7 +660,10 @@ export class RelationalModel extends Model {
         let cache = params.cache;
         if (!cache && Object.keys(viewConfig).length) {
             const promise = Promise.resolve({ root: this.root });
-            cache = { ...this._getCacheParams(config, promise, viewConfig), noCache: false };
+            cache = {
+                ...this._getCacheParams(config, promise, viewConfig),
+                noCache: !this.offline.offline,
+            };
         }
         const data = await this._onchange(config, { ...params, cache });
         return data;

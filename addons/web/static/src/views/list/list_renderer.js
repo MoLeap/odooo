@@ -363,7 +363,17 @@ export class ListRenderer extends Component {
 
     add(params) {
         if (this.canCreate) {
-            this.props.onAdd(params);
+            const viewType = [
+                this.activeActions.type, // one2many or many2many
+                this.props.nestedKeyOptionalFieldsData.field, // field Name
+                params.context, // control context
+                "list", // subViewType
+            ];
+            const viewConfig = {
+                actionId: this.env.config.actionId,
+                viewType: viewType.filter(Boolean).join(),
+            };
+            this.props.onAdd({ ...params, viewConfig });
         }
     }
 
@@ -906,6 +916,25 @@ export class ListRenderer extends Component {
                 record.resId
             ) ||
             this.isInlineEditable(record)
+        );
+    }
+
+    isControlAvailableOffline(control) {
+        //TODO: refactor in a private function !
+        const viewType = [
+            this.activeActions.type, // one2many or many2many
+            this.props.nestedKeyOptionalFieldsData.field, // field Name
+            control.context, // control context
+            "list", // subViewType
+        ];
+
+        return (
+            !this.offlineService.offline ||
+            this.offlineService.isAvailableOffline(
+                this.env.config.actionId,
+                viewType.filter(Boolean).join(),
+                false
+            )
         );
     }
 

@@ -894,11 +894,11 @@ async function getFormViewInfo({ list, context, activeField, viewService, env })
 export function useAddInlineRecord({ addNew }) {
     let creatingRecord = false;
 
-    async function addInlineRecord({ context, editable }) {
+    async function addInlineRecord({ context, editable, viewConfig }) {
         if (!creatingRecord) {
             creatingRecord = true;
             try {
-                await addNew({ context, mode: "edit", position: editable });
+                await addNew({ context, mode: "edit", position: editable, viewConfig });
             } finally {
                 creatingRecord = false;
             }
@@ -922,7 +922,7 @@ export function useOpenX2ManyRecord({
     const addDialog = useOwnedDialogs();
     const viewMode = activeField.viewMode;
 
-    async function openRecord({ record, readonly, context, title, controls, onClose }) {
+    async function openRecord({ record, readonly, context, title, controls, onClose }, viewConfig) {
         if (!title) {
             title = record
                 ? _t("Open: %s", activeField.string)
@@ -960,7 +960,7 @@ export function useOpenX2ManyRecord({
             params.context = makeContext([list.context, context]);
             params.withoutParent = isMany2Many;
         }
-        record = await list.extendRecord(params, record);
+        record = await list.extendRecord(params, record, viewConfig);
 
         const _onClose = () => {
             list.editedRecord?.switchMode("readonly");
@@ -991,7 +991,7 @@ export function useOpenX2ManyRecord({
     }
 
     let recordIsOpen = false;
-    return (params) => {
+    return (params, viewConfig) => {
         if (recordIsOpen) {
             return;
         }
@@ -1009,7 +1009,7 @@ export function useOpenX2ManyRecord({
         };
 
         try {
-            return openRecord(params);
+            return openRecord(params, viewConfig);
         } catch (e) {
             recordIsOpen = false;
             throw e;
