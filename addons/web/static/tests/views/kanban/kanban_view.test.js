@@ -5632,7 +5632,7 @@ test("resequence a record twice", async () => {
 
 test("basic support for widgets (being Owl Components)", async () => {
     class MyComponent extends Component {
-        static template = xml`<div t-att-class="this.props.class" t-esc="this.value"/>`;
+        static template = xml`<div t-att-class="this.props.class" t-out="this.value"/>`;
         static props = ["*"];
         get value() {
             return JSON.stringify(this.props.record.data);
@@ -6520,7 +6520,7 @@ test("kanban view with monetary and currency fields without widget", async () =>
 
 test("kanban widget can extract props from attrs", async () => {
     class TestWidget extends Component {
-        static template = xml`<div class="o-test-widget-option" t-esc="this.props.title"/>`;
+        static template = xml`<div class="o-test-widget-option" t-out="this.props.title"/>`;
         static props = ["*"];
     }
     const testWidget = {
@@ -6628,7 +6628,7 @@ test("Missing t-key is automatically filled with a warning", async () => {
                 <templates>
                     <t t-name="card">
                         <div>
-                            <span t-foreach="[1, 2, 3]" t-as="i" t-esc="i" />
+                            <span t-foreach="[1, 2, 3]" t-as="i" t-out="i" />
                         </div>
                     </t>
                 </templates>
@@ -6906,7 +6906,7 @@ test("can use JSON in kanban template", async () => {
                 <templates>
                     <t t-name="card">
                         <div>
-                            <span t-foreach="JSON.parse(record.foo.raw_value)" t-as="v" t-key="v_index" t-esc="v"/>
+                            <span t-foreach="JSON.parse(record.foo.raw_value)" t-as="v" t-key="v_index" t-out="v"/>
                         </div>
                     </t>
                 </templates>
@@ -7109,7 +7109,7 @@ test("no leak of TransactionInProgress (not grouped case)", async () => {
 test("fieldDependencies support for fields", async () => {
     const customField = {
         component: class CustomField extends Component {
-            static template = xml`<span t-esc="this.props.record.data.int_field"/>`;
+            static template = xml`<span t-out="this.props.record.data.int_field"/>`;
             static props = ["*"];
         },
         fieldDependencies: [{ name: "int_field", type: "integer" }],
@@ -7136,7 +7136,7 @@ test("fieldDependencies support for fields", async () => {
 test("fieldDependencies support for fields: dependence on a relational field", async () => {
     const customField = {
         component: class CustomField extends Component {
-            static template = xml`<span t-esc="this.props.record.data.product_id.display_name"/>`;
+            static template = xml`<span t-out="this.props.record.data.product_id.display_name"/>`;
             static props = ["*"];
         },
         fieldDependencies: [{ name: "product_id", type: "many2one", relation: "product" }],
