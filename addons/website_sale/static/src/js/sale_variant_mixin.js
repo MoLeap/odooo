@@ -388,6 +388,11 @@ var VariantMixin = {
             $product.trigger('view_item_event', combination['product_tracking_info']);
         }
         const addToCart = $parent.find('#add_to_cart_wrap');
+        const ctaWrapper = $parent.find('#o_wsale_cta_wrapper');
+        if (ctaWrapper.length) {
+            const showBox = !combination.prevent_zero_price_sale || !!$parent.find('#product_option_block').children().length;
+            ctaWrapper.toggleClass('o_wsale_cta_wrapper_boxed border rounded p-3', showBox);
+        }
         const contactUsButton = $parent.parents('#product_details').find('#contact_us_wrapper');
         const productPrice = $parent.find('.product_price');
         const quantity = $parent.find('.css_quantity');
