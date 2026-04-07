@@ -821,3 +821,47 @@ comment-->1000.0</TaxExclusiveAmount></xpath>"""
         self.assertEqual(due_date.text, '20251231')
         self.assertEqual(days.text, '15')
         self.assertEqual(percent.text, '3.0')
+
+    def test_import_bill_description_only_line_purchase_matching(self):
+        """Test if it's possible to click the button of Purchase Matching without generating any error after importing
+        a vendor bill with description-only lines (and without any product)."""
+        if self.env['ir.module.module']._get('purchase').state != 'installed':
+            self.skipTest('purchase is not installed')
+
+        vendor = self.env['res.partner'].create({
+            'name': 'My Belgian Partner',
+            'vat': 'BE0477472701',
+            'email': 'mypartner@email.com',
+        })
+
+        invoice = self.env['account.move'].create({
+            'partner_id': vendor.id,
+            'move_type': 'out_invoice',
+            'invoice_line_ids': [Command.create({
+                'product_id': self.product_a.id,
+                'quantity': 20.0,
+                'price_unit': 1.677,
+            })],
+        })
+        invoice.action_post()
+
+        xml_root = etree.fromstring(self.env['account.edi.xml.ubl_bis3']._export_invoice(invoice)[0])
+        item_node = xml_root.xpath("//*[local-name()='InvoiceLine'][1]/*[local-name()='Item']")[0]
+        item_node.xpath("./*[local-name()='Name']")[0].text = 'Product with only description'
+        item_node.xpath("./*[local-name()='Description']")[0].text = 'This product is a fake product'
+
+        xml_attachment = self.env['ir.attachment'].create({
+            'raw': etree.tostring(xml_root),
+            'name': 'test_invoice.xml',
+            'mimetype': 'application/xml',
+        })
+
+        bill = self._import_invoice_as_attachment_on(attachment=xml_attachment, journal=self.company_data['default_journal_purchase'])
+
+        self.assertFalse(bill.invoice_line_ids.product_id)
+        action = bill.action_purchase_matching()
+        domain = action.get('domain', [])
+        matches = self.env[action['res_model']].search(domain)
+        self.assertTrue(matches, 'Purchase matching should return lines to display')
+        vals_list = matches.read(['product_uom_qty', 'product_uom_price', 'reference'])
+        self.assertTrue(vals_list, 'Purchase matching lines should be readable without crashing')
