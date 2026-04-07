@@ -17,6 +17,13 @@ export function uuidv4() {
     });
 }
 
+export function getDeviceUuid() {
+    if (!localStorage.getItem("device_uuid")) {
+        localStorage.setItem("device_uuid", uuidv4());
+    }
+    return localStorage.getItem("device_uuid");
+}
+
 export function constructAttributeString(line) {
     let attributeString = "";
 

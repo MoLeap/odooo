@@ -1,7 +1,4 @@
 import { formatCurrency } from "@point_of_sale/app/models/utils/currency";
-import { logPosMessage } from "@point_of_sale/app/utils/pretty_console_log";
-
-const CONSOLE_COLOR = "#FF8269";
 
 /**
  * This module provides functions to format order and order line data for customer display.
@@ -15,26 +12,10 @@ export class CustomerDisplayPosAdapter {
 
     setup() {
         this.data = {};
-        this.channel = new BroadcastChannel("UPDATE_CUSTOMER_DISPLAY");
     }
 
     dispatch(pos) {
-        this.channel.postMessage(JSON.parse(JSON.stringify(this.data)));
-        pos.data
-            .call("pos.config", "update_customer_display", [
-                [pos.config.id],
-                this.data,
-                localStorage.getItem("device_uuid"),
-            ])
-            .catch((error) => {
-                logPosMessage(
-                    "CustomerDisplay",
-                    "dispatch",
-                    "Failed to update customer display",
-                    CONSOLE_COLOR,
-                    [error]
-                );
-            });
+        pos.posWebrtc.send(this.data);
     }
 
     displayScreenSaver() {

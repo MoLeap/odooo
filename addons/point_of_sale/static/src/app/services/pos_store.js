@@ -8,6 +8,7 @@ import {
     Counter,
     orderUsageUTCtoLocalUtil,
     getTimeUtil,
+    getDeviceUuid,
 } from "@point_of_sale/utils";
 import { ConnectionLostError } from "@web/core/network/rpc";
 import { _t } from "@web/core/l10n/translation";
@@ -78,6 +79,7 @@ export class PosStore extends WithLazyGetterTrap {
         "alert",
         "pos_router",
         "mail.sound_effects",
+        "pos_webrtc",
     ];
 
     constructor() {
@@ -99,6 +101,7 @@ export class PosStore extends WithLazyGetterTrap {
             action,
             pos_router,
             alert,
+            pos_webrtc,
         }
     ) {
         this.env = env;
@@ -114,6 +117,7 @@ export class PosStore extends WithLazyGetterTrap {
         this.router = pos_router;
         this.sound = env.services["mail.sound_effects"];
         this.notification = notification;
+        this.posWebrtc = pos_webrtc;
         this.pushOrderMutex = new Mutex();
         this.router.popStateCallback = this.handleUrlParams.bind(this);
         this.searchProductDBState = null;
@@ -446,6 +450,7 @@ export class PosStore extends WithLazyGetterTrap {
     async processServerData() {
         // Used to identify the device when several devices are connected to the same POS
         this.device = this.data.device;
+        await this.posWebrtc.init(getDeviceUuid());
 
         // These fields should be unique for the pos_config
         // and should not change during the session, so we can
