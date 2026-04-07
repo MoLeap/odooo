@@ -283,6 +283,7 @@ class TestHrAttendanceOvertime(HttpCase):
     def test_overtime_far_timezones(self):
         (self.jpn_employee | self.honolulu_employee).ruleset_id = self.ruleset
         # attendance from 10 to 21(japan time)
+<<<<<<< 46a8b02006d13fdaeadb921d23b93f044280d8a8
         self.env['hr.attendance'].create([
             {
                 'employee_id': self.jpn_employee.id,
@@ -295,6 +296,20 @@ class TestHrAttendanceOvertime(HttpCase):
                 'check_out': datetime(2021, 1, 4, 12, 0),
             }
         ])
+||||||| 69db5c2433ae1efdbf3153439679a592afcc7f5c
+        self.env['hr.attendance'].create({
+            'employee_id': self.jpn_employee.id,
+            'check_in': datetime(2021, 1, 4, 1, 0),
+            'check_out': datetime(2021, 1, 4, 12, 0),
+        })
+=======
+        att = self.env['hr.attendance'].create({
+            'employee_id': self.jpn_employee.id,
+            'check_in': datetime(2021, 1, 4, 1, 0),
+            'check_out': datetime(2021, 1, 4, 12, 0),
+        })
+        self.assertEqual(att.linked_overtime_ids.date, date(2021, 1, 4))
+>>>>>>> 0bdfb37033460dedbd198018d74d65ac824b4f71
 
         # attendance from 7 to 18 (honolulu time)
         self.env['hr.attendance'].create([
@@ -1409,3 +1424,26 @@ class TestHrAttendanceOvertime(HttpCase):
         self.assertIn(own_reader_employee, admin_lines.employee_id)
         self.assertIn(officer_employee, admin_lines.employee_id)
         self.assertIn(self.other_employee, admin_lines.employee_id)
+
+    def test_attendance_expected_hours_compute(self):
+        att = self.env['hr.attendance'].create({
+            'employee_id': self.employee.id,
+            'check_in': datetime(2023, 1, 4, 7, 0),
+            'check_out': datetime(2023, 1, 4, 18, 0)
+        })
+        self.assertEqual(att.expected_hours, 8)
+        att.check_out = datetime(2023, 1, 4, 8, 0)
+        self.assertEqual(att.expected_hours, 1)  # This is because absence management is off
+
+        self.employee.ruleset_id.company_id.absence_management = True
+        att.check_out = datetime(2023, 1, 4, 9, 0)
+        self.assertEqual(att.expected_hours, 8)
+
+        self.assertEqual(att.overtime_hours, -6)
+        self.assertEqual(att.validated_overtime_hours, -6)
+        self.assertEqual(att.expected_hours, 8)
+
+        att.linked_overtime_ids.manual_duration = 10
+        self.assertEqual(att.overtime_hours, -6)
+        self.assertEqual(att.validated_overtime_hours, 10)
+        self.assertEqual(att.expected_hours, 8)
