@@ -2,6 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from datetime import date, timedelta
+from unittest.mock import patch
 from freezegun import freeze_time
 
 from odoo import Command
@@ -3224,3 +3225,47 @@ class TestStockValuation(TestStockValuationCommon):
                 {'added_value': -100, 'total_quantity': 10, 'total_value': 200, 'avco_value': 20},
             ]
         )
+
+    def test_fifo_adjusted_value_at_date(self):
+        """Ensure that adjusted move value are taken into account when computing the total_value at date
+        """
+        today = Datetime.now()
+        in_move = self._make_in_move(self.product_fifo_auto, 10, 10)
+        in_move.date = today - timedelta(days=2)  # Move is made 2 days ago
+
+        #  Simulate the behavior of a purchase order with the price set to $10/unit
+        with patch.object(type(self.env['stock.move']), '_get_value_from_quotation', return_value={'value': 100, 'quantity': 10, 'description': 'From Purchase'}):
+            today_value = self.product_fifo_auto.total_value
+            yesterday_value = self.product_fifo_auto.with_context(to_date=today - timedelta(days=1)).total_value
+            self.assertEqual(today_value, 100)
+            self.assertEqual(yesterday_value, 100)
+
+            # "Adjust Valuation" in Move Analysis
+            self.env['product.value'].create({'move_id': in_move.id, 'value': 200})
+
+            today_value = self.product_fifo_auto.total_value
+            yesterday_value = self.product_fifo_auto.with_context(to_date=today - timedelta(days=1)).total_value
+            self.assertEqual(today_value, 200)
+            self.assertEqual(yesterday_value, 200)
+
+    def test_avco_adjusted_value_at_date(self):
+        """Ensure that adjusted move value are taken into account when computing the total_value at date
+        """
+        today = Datetime.now()
+        in_move = self._make_in_move(self.product_avco_auto, 10, 10)
+        in_move.date = today - timedelta(days=2)  # Move is made 2 days ago
+
+        #  Simulate the behavior of a purchase order with the price set to $10/unit
+        with patch.object(type(self.env['stock.move']), '_get_value_from_quotation', return_value={'value': 100, 'quantity': 10, 'description': 'From Purchase'}):
+            today_value = self.product_avco_auto.total_value
+            yesterday_value = self.product_avco_auto.with_context(to_date=today - timedelta(days=1)).total_value
+            self.assertEqual(today_value, 100)
+            self.assertEqual(yesterday_value, 100)
+
+            # "Adjust Valuation" in Move Analysis
+            self.env['product.value'].create({'move_id': in_move.id, 'value': 200})
+
+            today_value = self.product_avco_auto.total_value
+            yesterday_value = self.product_avco_auto.with_context(to_date=today - timedelta(days=1)).total_value
+            self.assertEqual(today_value, 200)
+            self.assertEqual(yesterday_value, 200)
