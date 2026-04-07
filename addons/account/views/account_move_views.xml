@@ -961,6 +961,20 @@
                                            invisible="adjusting_entry_origin_moves_count == 1"
                                            string="Invoices" widget="statinfo"/>
                             </button>
+                            <button name="action_open_reversal_moves"
+                                    class="oe_stat_button"
+                                    icon="fa-plus"
+                                    type="object"
+                                    invisible="reversal_move_count == 0">
+                                <field name="reversal_move_count" string="Credit notes" widget="statinfo"/>
+                            </button>
+                            <button name="action_open_reversed_entry"
+                                    class="oe_stat_button"
+                                    icon="fa-plus"
+                                    type="object"
+                                    invisible="not reversed_entry_id">
+                                <span class="o_stat_text">Invoices</span>
+                            </button>
                         </div>
 
                         <widget name="web_ribbon" title="Sent"
