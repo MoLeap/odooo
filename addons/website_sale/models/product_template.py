@@ -478,7 +478,7 @@ class ProductTemplate(models.Model):
 
         for product_b in other_products_sharing_categories[:1000]:
             categories_b = set(product_b.public_categ_ids.ids)
-            attributes_b = set(self.attribute_line_ids.value_ids.ids)
+            attributes_b = set(product_b.attribute_line_ids.value_ids.ids)
             # Jaccard coefficient (A and B / A or B)
             intersection_cat = categories_a & categories_b
             union_cat = categories_a | categories_b
