@@ -64,7 +64,7 @@ class ResourceCalendarAttendance(models.Model):
     duration_hours = fields.Float(compute='_compute_duration_hours', string='Hours', store=True, readonly=False)
     calendar_id = fields.Many2one("resource.calendar", string="Resource's Calendar", required=True, index=True, ondelete='cascade')
     calendar_type = fields.Selection(related='calendar_id.calendar_type', readonly=True)
-    duration_based = fields.Boolean(compute='_compute_duration_based', store=True)
+    duration_based = fields.Boolean(compute='_compute_duration_based', store=True, precompute=True)
     day_period = fields.Selection([
         ('morning', 'Morning'),
         ('afternoon', 'Afternoon'),
@@ -148,10 +148,9 @@ class ResourceCalendarAttendance(models.Model):
             raise UserError(self.env._("You can't have duration based and time based attendances on the same day (on %(date)s)", date=formatted_date))
 
     def _check_attendance(self, date):
-        formatted_date = format_date(self.env, date)
-        self._check_duration(formatted_date)
-        self._check_overlap(formatted_date)
-        self._check_types(formatted_date)
+        self._check_duration(date)
+        self._check_overlap(date)
+        self._check_types(date)
 
     def _check_attendances_variable(self):
         ids_to_check = set(self.ids)
@@ -163,6 +162,7 @@ class ResourceCalendarAttendance(models.Model):
         max_date = max(max_date_list)
         domain = Domain.AND([
             Domain('calendar_id', 'in', self.calendar_id.ids),
+            Domain('calendar_id.calendar_type', '=', 'variable'),
             Domain.OR([
                 Domain.AND([
                     Domain('recurrency', '=', True),
@@ -208,7 +208,7 @@ class ResourceCalendarAttendance(models.Model):
                         continue
                     new_period, new_date, new_excluded, new_until = collision
                     attendances = self.browse(new_ids)
-                    attendances._check_attendance(new_date)
+                    attendances._check_attendance(format_date(self.env, new_date))
                     next_level_recurrent_attendance_nodes.append({
                         'ids': new_ids,
                         'period': new_period,
@@ -230,7 +230,21 @@ class ResourceCalendarAttendance(models.Model):
                         ids_in_conflict.update(node['ids'])
             if ids_in_conflict or attendances:
                 attendances_to_validate = attendances | self.browse(ids_in_conflict)
-                attendances_to_validate._check_attendance(attendance_date)
+                attendances_to_validate._check_attendance(format_date(self.env, attendance_date))
+
+    def _check_attendances_fixed(self):
+        domain = Domain.AND([
+            Domain('calendar_id', 'in', self.calendar_id.ids),
+            Domain('calendar_id.calendar_type', '=', 'fixed'),
+            Domain('dayofweek', 'in', self.mapped('dayofweek')),
+            Domain('date', '=', False),
+        ])
+        dayofweek_labels = dict(self._fields['dayofweek'].get_description(self.env)['selection'])
+        other_attendances = self.env['resource.calendar.attendance'].search(domain, order='id asc')
+        for _, all_attendances in other_attendances.grouped('calendar_id').items():
+            for dayofweek, attendances in all_attendances.grouped('dayofweek').items():
+                formated_date = dayofweek_labels[dayofweek]
+                attendances._check_attendance(formated_date)
 
     @api.model_create_multi
     def create(self, vals_list):
