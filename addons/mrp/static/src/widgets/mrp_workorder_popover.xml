@@ -6,7 +6,8 @@
         <t t-foreach="this.props.infos" t-as="info" t-key="info_index">
             <i t-attf-class="oi oi-arrow-right me-2 #{ info.color }"></i><t t-out="info.msg"/><br/>
         </t>
-        <button t-if="this.props.replan" t-on-click="this.onReplanClick" class="btn btn-sm btn-primary m-1 float-end action_replan_button">Replan</button>
+        <!-- jfa.1 -->
+        <button t-if="this.props.replan" t-on-click="this.onReplanClick" class="btn btn-sm btn-primary m-1 float-end action_replan_button">Replan this work order</button>
     </div>
 
 </templates>

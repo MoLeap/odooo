@@ -147,6 +147,13 @@ class MrpWorkorder(models.Model):
     remaining_time = fields.Float('Remaining Working Time', compute='_compute_remaining_time',
                                   help="The remaining time to finish this work order.")
     color = fields.Integer('Color', related="production_id.id")
+    decoration_dates = fields.Char(compute='_compute_decoration_dates')  # technical: used in views only
+    # jfa.1 ? compute='_compute_has_conflict',
+    has_conflicts = fields.Boolean('Has conflicts', store=False, search='_search_has_conflicts')
+    # jfa.2
+    has_planning_issues = fields.Boolean('Has planning issues', store=False, search='_search_has_planning_issues')
+    # jfa.5
+    production_reference_ids = fields.Many2many(related="production_id.reference_ids", string="References", readonly=True)
 
     @api.depends('qty_ready')
     def _compute_state(self):
@@ -201,21 +208,23 @@ class MrpWorkorder(models.Model):
                 previous_finished = previous_wos.filtered('date_finished').mapped('date_finished')
                 prev_start = min(previous_starts) if previous_starts else False
                 prev_finished = max(previous_finished) if previous_finished else False
-                if wo.state == 'blocked' and prev_start and not (prev_start > wo.date_start):
-                    infos.append({
-                        'color': 'text-primary',
-                        'msg': _("Waiting the previous work order, planned from %(start)s to %(end)s",
-                            start=format_datetime(self.env, prev_start, dt_format=False),
-                            end=format_datetime(self.env, prev_finished, dt_format=False))
-                    })
-                if wo.date_finished < fields.Datetime.now():
-                    infos.append({
-                        'color': 'text-warning',
-                        'msg': _("The work order should have already been processed.")
-                    })
+                # 31/03
+                # if wo.state == 'blocked' and prev_start and not (prev_start > wo.date_start):
+                #     infos.append({
+                #         'color': 'text-primary',
+                #         'msg': _("Waiting the previous work order, planned from %(start)s to %(end)s",
+                #             start=format_datetime(self.env, prev_start, dt_format=False),
+                #             end=format_datetime(self.env, prev_finished, dt_format=False))
+                #     })
+                # if wo.date_finished < fields.Datetime.now():
+                #     infos.append({
+                #         'color': 'text-warning',
+                #         'msg': _("The work order should have already been processed.")
+                #     })
                 if prev_start and prev_start > wo.date_start:
                     infos.append({
-                        'color': 'text-danger',
+                        # jfa.2
+                        'color': 'text-warning',
                         'msg': _("Scheduled before the previous work order, planned from %(start)s to %(end)s",
                             start=format_datetime(self.env, prev_start, dt_format=False),
                             end=format_datetime(self.env, prev_finished, dt_format=False)),
@@ -233,8 +242,8 @@ class MrpWorkorder(models.Model):
                 'popoverTemplate': 'mrp.workorderPopover',
                 'infos': infos,
                 'color': color_icon,
-                'icon': 'fa-exclamation-triangle' if color_icon in ['text-warning', 'text-danger'] else 'fa-info-circle',
-                'replan': color_icon not in [False, 'text-primary']
+                'icon': 'fa-exclamation-triangle',  # if color_icon in ['text-warning', 'text-danger'] else 'fa-info-circle',
+                'replan': infos and 'reason' in infos[-1] or False,  # color_icon not in [False, 'text-primary']
             })
 
     @api.depends('production_id.qty_producing')
@@ -889,7 +898,7 @@ class MrpWorkorder(models.Model):
             WHERE
                 wo1.id IN %s
                 AND wo1.state IN ('blocked', 'ready')
-                AND wo2.state IN ('blocked', 'ready')
+                AND wo2.state IN ('blocked', 'ready', 'progress')
                 AND wo1.id != wo2.id
                 AND wo1.workcenter_id = wo2.workcenter_id
                 AND (DATE_TRUNC('second', wo2.date_start), DATE_TRUNC('second', wo2.date_finished))
@@ -990,6 +999,59 @@ class MrpWorkorder(models.Model):
 
     def _compute_current_operation_cost(self):
         return (self.get_duration() / 60.0) * (self.costs_hour or self.workcenter_id.costs_hour)
+
+    def _compute_decoration_dates(self):
+        self.decoration_dates = ''
+        now = fields.Datetime.now()
+        today = fields.Date.today()
+        for wo in self:
+            if wo.state in ['done', 'cancel']:
+                continue
+            if wo.state == 'progress':
+                if wo.date_finished and wo.date_finished < now:
+                    wo.decoration_dates = 'danger'
+            elif wo.date_start:
+                if wo.date_start.date() < today:
+                    wo.decoration_dates = 'danger'
+                elif wo.date_start.date() == today:
+                    wo.decoration_dates = 'warning'
+
+    # jfa.1
+
+    def _search_has_conflicts(self, operator, value):
+        self.flush_model(['state', 'date_start', 'date_finished', 'workcenter_id'])
+        sql = """
+            SELECT wo1.id, wo2.id
+            FROM mrp_workorder wo1, mrp_workorder wo2
+            WHERE wo1.state IN ('blocked', 'ready', 'progress')
+              AND wo2.state IN ('blocked', 'ready', 'progress')
+              AND wo1.id != wo2.id
+              AND wo1.workcenter_id = wo2.workcenter_id
+              AND (DATE_TRUNC('second', wo2.date_start), DATE_TRUNC('second', wo2.date_finished))
+                   OVERLAPS
+                  (DATE_TRUNC('second', wo1.date_start), DATE_TRUNC('second', wo1.date_finished))
+        """
+        self.env.cr.execute(sql)
+        res = set()
+        for wo1, wo2 in self.env.cr.fetchall():
+            res.update([wo1, wo2])
+        return [('id', 'in', list(res))]
+
+    # jfa.2
+    def _search_has_planning_issues(self, operator, value):
+        sql = """
+            SELECT wo1.id
+              FROM mrp_workorder wo1
+              JOIN mrp_workorder_dependencies_rel rel ON rel.workorder_id=wo1.id
+              JOIN mrp_workorder wo2 ON wo2.id=rel.blocked_by_id
+             WHERE wo1.state IN ('blocked', 'ready', 'progress')
+               AND wo2.date_start > wo1.date_start
+        """
+        self.env.cr.execute(sql)
+        res = list()
+        for wo in self.env.cr.fetchall():
+            res.append(wo)
+        return [('id', 'in', res)]
 
     def _get_current_theoretical_operation_cost(self, without_employee_cost=False):
         return (self.get_duration() / 60.0) * (self.costs_hour or self.workcenter_id.costs_hour)
