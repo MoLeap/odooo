@@ -732,11 +732,14 @@ export class FormOptionPlugin extends Plugin {
             const field = Object.assign({}, fields[getFieldName(fieldEl)]);
             const type = getFieldType(fieldEl);
 
-            const [optionText, checkType] = selectEl
-                ? [_t("Option List"), "exclusive_boolean"]
-                : type === "selection"
-                ? [_t("Radio Button List"), "exclusive_boolean"]
-                : [_t("Checkbox List"), "boolean"];
+            const [optionText, checkType] =
+                type === "many2many_selection"
+                    ? [_t("Option List"), "boolean"]
+                    : selectEl
+                    ? [_t("Option List"), "exclusive_boolean"]
+                    : type === "selection"
+                    ? [_t("Radio Button List"), "exclusive_boolean"]
+                    : [_t("Checkbox List"), "boolean"];
             const defaults = [...fieldEl.querySelectorAll("[checked], [selected]")].map((el) =>
                 isSmallInteger(el.value) ? parseInt(el.value) : el.value
             );
@@ -750,7 +753,9 @@ export class FormOptionPlugin extends Plugin {
                 addItemTitle: _t("Add New Option"),
                 checkType,
                 defaultItemName: _t("Item"),
-                hasDefault: ["one2many", "many2many"].includes(type) ? "multiple" : "unique",
+                hasDefault: ["one2many", "many2many", "many2many_selection"].includes(type)
+                    ? "multiple"
+                    : "unique",
                 defaults: JSON.stringify(defaults),
                 availableRecords: availableRecords,
                 newRecordId: isFieldCustom(fieldEl) ? getNewRecordId(fieldEl) : "",
@@ -1180,6 +1185,12 @@ export class ExistingFieldSelectTypeAction extends BuilderAction {
     apply({ editingElement: fieldEl, value, loadResult: fields }) {
         const field = getActiveField(fieldEl, { fields });
         field.type = value;
+        // For multi-select dropdown, auto-select the first record if none
+        // are selected, matching the native browser behavior of single-select
+        // dropdowns where the first option is automatically selected.
+        if (value === "many2many_selection" && field.records.length) {
+            field.records[0].selected = true;
+        }
         this.dependencies.websiteFormOption.replaceField(fieldEl, field, fields);
     }
     isApplied({ editingElement: fieldEl, value }) {
@@ -1338,6 +1349,16 @@ export class ToggleAllowEmptyAction extends BuilderAction {
         const field = getActiveField(fieldEl, { fields });
         field.allowEmpty = !field.allowEmpty;
         field.records.forEach((rec) => (rec.selected = false));
+        // When disabling "Allow Empty" on a multi-select dropdown,
+        // auto-select the first record so the field is never left
+        // with no selection.
+        if (
+            !field.allowEmpty &&
+            getFieldType(fieldEl) === "many2many_selection" &&
+            field.records.length
+        ) {
+            field.records[0].selected = true;
+        }
         this.dependencies.websiteFormOption.replaceField(fieldEl, field, fields);
     }
     isApplied({ editingElement: fieldEl }) {
