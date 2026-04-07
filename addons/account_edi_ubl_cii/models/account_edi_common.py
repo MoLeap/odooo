@@ -665,7 +665,7 @@ class AccountEdiCommon(models.AbstractModel):
                 invoice, line_values, invoice.journal_id.type,
             )
             logs += tax_logs
-            if not line_values['product_uom_id']:
+            if not line_values.get('product_id') or not line_values['product_uom_id']:
                 line_values.pop('product_uom_id')  # if no uom, pop it so it's inferred from the product_id
             lines_values.append(line_values)
             lines_values += self._retrieve_line_charges(invoice, line_values, line_values['tax_ids'])
