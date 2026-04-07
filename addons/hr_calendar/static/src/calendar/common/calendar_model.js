@@ -248,6 +248,8 @@ patch(AttendeeCalendarModel.prototype, {
         await super.updateData(...arguments);
         this.partnerColorMap = this.mapPartnersToColor(data);
         data.worklocations = await this.loadWorkLocations(data);
-        data.workingHours = await this.fetchWorkingHours(data);
+        if (this.isBusinessHoursEnabled) {
+            data.workingHours = await this.fetchWorkingHours(data);
+        }
     },
 });
