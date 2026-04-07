@@ -5,42 +5,31 @@
  */
 /**
  * @template { EditorCommitType } [T=WritableEditorCommitType]
- * @typedef { Record<string, any> & (
+ * @typedef { Record<string, any> & {
+ *   authorTimestamp?: number,
+ *   commitTimestamp?: number,
+ *   previousCommitId?: EditorCommitId,
+ * } & (
+ *   T extends "savePoint" | "restore"
+ *     ? {}
+ *     : { batchable: boolean }
+ * ) & (
+ *   T extends "standard"
+ *     ? {}
+ *     : {
+ *         origin: EditorCommit<(
+ *           T extends "undo"
+ *             ? "standard" | "redo"
+ *             : ( T extends "redo" ? "undo" : WritableEditorCommitType )
+ *         )>
+ *       }
+ * ) & (
  *   T extends "savePoint"
  *     ? {
- *           hasBeenRestored: boolean,
- *           lastRevertedChanges?: EditorCommitData<WritableEditorCommitType>,
- *           origin: EditorCommit<WritableEditorCommitType>,
+ *         hasBeenRestored: boolean,
+ *         lastRevertedChanges?: EditorCommitData<WritableEditorCommitType>,
  *       }
- *     : T extends "undo"
- *       ? {
- *           authorTimestamp?: number,
- *           commitTimestamp?: number,
- *           previousCommitId?: EditorCommitId,
- *           batchable?: boolean,
- *           origin: EditorCommit<"standard" | "redo">,
- *       }
- *     : T extends "redo"
- *       ? {
- *           authorTimestamp?: number,
- *           commitTimestamp?: number,
- *           previousCommitId?: EditorCommitId,
- *           batchable?: boolean,
- *           origin: EditorCommit<"undo">,
- *       }
- *     : T extends "standard"
- *       ? {
- *           authorTimestamp?: number,
- *           commitTimestamp?: number,
- *           previousCommitId?: EditorCommitId,
- *           batchable?: boolean,
- *       }
- *       : {
- *           authorTimestamp?: number,
- *           commitTimestamp?: number,
- *           previousCommitId?: EditorCommitId,
- *           origin: EditorCommit<WritableEditorCommitType>,
- *         }
+ *     : ()
  * ) } EditorCommitData<T>
  */
 
