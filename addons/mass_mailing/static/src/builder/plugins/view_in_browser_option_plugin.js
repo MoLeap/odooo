@@ -64,7 +64,7 @@ export class ToggleViewInBrowserAction extends BuilderAction {
     }
 
     isApplied() {
-        return this.dependencies["viewInBrowserOptionPlugin"].getViewInBrowserLink();
+        return Boolean(this.dependencies["viewInBrowserOptionPlugin"].getViewInBrowserLink());
     }
 }
 
