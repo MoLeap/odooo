@@ -126,7 +126,7 @@ const checkWebsiteFilters = [
 const deleteSelectedPage = [
     {
         content: "Click on Action",
-        trigger: ".o_cp_action_menus button",
+        trigger: ".o_cp_action_menus button:text(actions)",
         run: "click",
     },
     {
@@ -148,7 +148,7 @@ const deleteSelectedPage = [
         run: "click",
     },
 ];
-const homePage = 'tr:contains("Home")';
+const homePage = "tr:has(td:contains(Home):has(.fa-home))";
 
 const duplicateSinglePage = [
     {
@@ -249,7 +249,19 @@ registerWebsitePreviewTour(
         {
             content: "Click on Home Page",
             trigger: `.o_list_renderer ${homePage} td.o_list_record_selector input[type="checkbox"]`,
-            run: "click",
+            async run({ check, waitFor }) {
+                // view_rendering_delay
+                await check();
+                const trigger = `.o_list_renderer ${homePage} td.o_list_record_selector input[type="checkbox"]`;
+                for (let i = 0; i < 10; i++) {
+                    try {
+                        await waitFor(`${trigger}:checked`, { timeout: 500 });
+                        break;
+                    } catch {
+                        await check(trigger);
+                    }
+                }
+            },
         },
         ...deleteSelectedPage,
         {
@@ -259,7 +271,7 @@ registerWebsitePreviewTour(
         {
             content: "Click on All Pages",
             trigger: '.o_list_renderer thead input[type="checkbox"]',
-            run: "click",
+            run: "check",
         },
         ...deleteSelectedPage,
         {
@@ -269,35 +281,28 @@ registerWebsitePreviewTour(
     ]
 );
 
-registerWebsitePreviewTour(
-    "website_page_manager_session_forced",
+registerWebsitePreviewTour("website_page_manager_session_forced", {}, () => [
+    ...testSwitchWebsite("Test Website"),
     {
-        undeterministicTour_doNotCopy: true, // Remove this key to make the tour failed. ( It removes delay between steps )
+        content: "Click on Site",
+        trigger: 'button.dropdown-toggle[data-menu-xmlid="website.menu_site"]',
+        run: " click",
     },
-    () => [
-        ...testSwitchWebsite("Test Website"),
-        {
-            content: "Click on Site",
-            trigger: 'button.dropdown-toggle[data-menu-xmlid="website.menu_site"]',
-            run: " click",
-        },
-        {
-            content: "Click on Pages",
-            trigger: 'a.dropdown-item[data-menu-xmlid="website.menu_website_pages_list"]',
-            run: " click",
-        },
-        {
-            content: "Check that the homepage is the one of Test Website",
-            trigger:
-                ".o_list_table .o_data_row .o_data_cell[name=name]:contains('Home') " +
-                "~ .o_data_cell[name=website_id]:contains('Test Website')",
-        },
-        ...verifySelectedWebsiteFilter("Test Website"),
-    ]
-);
+    {
+        content: "Click on Pages",
+        trigger: 'a.dropdown-item[data-menu-xmlid="website.menu_website_pages_list"]',
+        run: " click",
+    },
+    {
+        content: "Check that the homepage is the one of Test Website",
+        trigger:
+            ".o_list_table .o_data_row .o_data_cell[name=name]:contains('Home') " +
+            "~ .o_data_cell[name=website_id]:contains('Test Website')",
+    },
+    ...verifySelectedWebsiteFilter("Test Website"),
+]);
 
 registry.category("web_tour.tours").add("website_page_manager_direct_access", {
-    undeterministicTour_doNotCopy: true, // Remove this key to make the tour failed. ( It removes delay between steps )
     steps: () => [
         {
             content: "Check that the homepage is the one of Test Website",
