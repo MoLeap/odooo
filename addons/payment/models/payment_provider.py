@@ -707,7 +707,7 @@ class PaymentProvider(models.Model):
 
         return providers
 
-    def _get_pending_msg(self):
+    def _get_pending_msg(self, **_kwargs):
         """Return the message to be displayed when the transaction is in pending state.
 
         :return: The pending message.

@@ -16,6 +16,17 @@ REPORT_REASONS_MAPPING = {
 class PaymentProvider(models.Model):
     _inherit = 'payment.provider'
 
+    bank_account_id = fields.Many2one(
+        string="Bank Account",
+        comodel_name='res.partner.bank',
+        domain='[("partner_id", "=", company_partner_id)]',
+        compute='_compute_bank_account_id',
+        store=True,
+        readonly=False,
+        copy=False,
+        check_company=True,
+    )
+    company_partner_id = fields.Many2one(comodel_name='res.partner', related='company_id.partner_id')
     journal_id = fields.Many2one(
         string="Payment Journal",
         help="The journal in which the successful transactions are posted.",
@@ -31,37 +42,13 @@ class PaymentProvider(models.Model):
         help="Only allow this payment provider when the partner's pricelist matches one of these.",
         comodel_name='product.pricelist',
     )
-    bank_account_id = fields.Many2one(
-        string="Bank Account",
-        comodel_name='res.partner.bank',
-        domain='[("partner_id", "=", company_partner_id)]',
-        compute='_compute_bank_account_id',
-        store=True,
-        readonly=False,
-        copy=False,
-        check_company=True,
-    )
-    company_partner_id = fields.Many2one(comodel_name='res.partner', related='company_id.partner_id')
 
     #=== COMPUTE METHODS ===#
 
-    @api.depends('company_id', 'state')
+    @api.depends('company_id')
     def _compute_bank_account_id(self):
         for provider in self:
-            if provider.state == 'disabled' or provider.bank_account_id:
-                continue
-            journal = self.env['account.journal'].search(
-                [
-                    ('bank_account_id', '!=', False),
-                    ('company_id', '=', provider.company_id.id),
-                    ('type', '=', 'bank'),
-                ],
-                limit=1,
-            )
-            provider.bank_account_id = (
-                journal.bank_account_id
-                or provider.company_id.partner_id.bank_ids[:1]
-            )
+            provider.bank_account_id = provider.company_id.partner_id.bank_ids[:1]
 
     def _ensure_payment_method_line(self, allow_create=True):
         self.ensure_one()

@@ -40,7 +40,7 @@ class PaymentProvider(models.Model):
             if (
                 provider.code == "custom"
                 and provider.custom_mode == "wire_transfer"
-                and provider.state in ["enabled", "test"]
+                and provider.state != "disabled"
                 and not provider.bank_account_id
             ):
                 raise ValidationError(
@@ -70,15 +70,20 @@ class PaymentProvider(models.Model):
         bank_account = self.bank_account_id
         return {"beneficiary": bank_account.holder_name, "bank_account": bank_account.display_name}
 
-    def _get_pending_msg(self):
-        """Override of `payment` to return specifc pending message for wire transfer."""
-        if self.code == "custom" and self.custom_mode == "wire_transfer":
-            return self._get_custom_pending_msg()
+    def _get_pending_msg(self, **kwargs):
+        """Override to return a specific pending message for website orders."""
+        if (
+            kwargs.get("from_website")
+            and self.code == "custom"
+            and self.custom_mode in self._get_custom_bank_related_modes()
+        ):
+            return self.env._("Your order will be confirmed after payment is received.")
 
-        return super()._get_pending_msg()
+        return super()._get_pending_msg(**kwargs)
 
-    def _get_custom_pending_msg(self):
-        return self.env._("Your order will be confirmed after payment is received.")
+    def _get_custom_bank_related_modes(self):
+        """Return custom modes that rely on bank details for pending payment instructions."""
+        return ["wire_transfer"]
 
     # === SETUP METHODS === #
 

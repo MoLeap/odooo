@@ -10,6 +10,10 @@ class TestUi(HttpCase):
         if self.env["ir.module.module"]._get("payment_custom").state != "installed":
             self.skipTest("Transfer provider is not installed")
 
+        self.env["res.partner.bank"].create({
+            "account_number": "BANK123456789",
+            "partner_id": self.env.company.partner_id.id,
+        })
         transfer_provider = self.env.ref("payment.payment_provider_transfer")
         transfer_provider.write({"state": "enabled", "is_published": True})
 
