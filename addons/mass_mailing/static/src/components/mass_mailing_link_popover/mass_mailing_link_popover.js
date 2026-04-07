@@ -19,7 +19,9 @@ export class MassMailingLinkPopover extends LinkPopover {
         this.state.noTracking = {
             label: "Disable Link Tracking",
             description: _t("Send the original url instead of wrapping it into a tracking url."),
-            isChecked: Boolean(this.linkElement.dataset.noTracking) || false,
+            isChecked: this.linkElement.dataset.noTracking
+                ? this.linkElement.dataset.noTracking === "1"
+                : false,
         };
     }
 
