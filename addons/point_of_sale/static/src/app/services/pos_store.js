@@ -8,7 +8,6 @@ import {
     Counter,
     orderUsageUTCtoLocalUtil,
     getTimeUtil,
-    getDeviceUuid,
 } from "@point_of_sale/utils";
 import { ConnectionLostError } from "@web/core/network/rpc";
 import { _t } from "@web/core/l10n/translation";
@@ -44,6 +43,7 @@ import { initLNA } from "../utils/init_lna";
 import { accountTaxHelpers } from "@account/helpers/account_tax";
 import { SnoozedProductTracker } from "@point_of_sale/app/models/utils/snooze_tracker";
 import { Domain } from "@web/core/domain";
+import { GeneratePrinterData } from "../utils/printer/generate_printer_data";
 
 const { DateTime } = luxon;
 export const CONSOLE_COLOR = "#F5B427";
@@ -79,7 +79,7 @@ export class PosStore extends WithLazyGetterTrap {
         "alert",
         "pos_router",
         "mail.sound_effects",
-        "pos_webrtc",
+        "customer_display_service",
     ];
 
     constructor() {
@@ -101,7 +101,7 @@ export class PosStore extends WithLazyGetterTrap {
             action,
             pos_router,
             alert,
-            pos_webrtc,
+            customer_display_service,
         }
     ) {
         this.env = env;
@@ -117,7 +117,7 @@ export class PosStore extends WithLazyGetterTrap {
         this.router = pos_router;
         this.sound = env.services["mail.sound_effects"];
         this.notification = notification;
-        this.posWebrtc = pos_webrtc;
+        this.customerDisplay = customer_display_service;
         this.pushOrderMutex = new Mutex();
         this.router.popStateCallback = this.handleUrlParams.bind(this);
         this.searchProductDBState = null;
@@ -260,6 +260,7 @@ export class PosStore extends WithLazyGetterTrap {
         }
 
         this.router.navigate(routeName, routeParams);
+        this.sendOrderToCustomerDisplay();
         return true;
     }
 
@@ -317,6 +318,10 @@ export class PosStore extends WithLazyGetterTrap {
                     this.router.state.current === "LoginScreen" && this.navigate("SaverScreen"),
             },
         ];
+    }
+
+    get customerDisplayPath() {
+        return `/pos_customer_display/${this.config.id}/${this.device.identifier}`;
     }
 
     async reloadData(fullReload = false) {
@@ -393,6 +398,7 @@ export class PosStore extends WithLazyGetterTrap {
                       params: this.router.state.params,
                   };
         this.navigate(page.page, page.params);
+        await this.initCustomerDisplay();
         return process;
     }
 
@@ -450,7 +456,6 @@ export class PosStore extends WithLazyGetterTrap {
     async processServerData() {
         // Used to identify the device when several devices are connected to the same POS
         this.device = this.data.device;
-        await this.posWebrtc.init(getDeviceUuid());
 
         // These fields should be unique for the pos_config
         // and should not change during the session, so we can
@@ -3195,6 +3200,41 @@ export class PosStore extends WithLazyGetterTrap {
 
     isProductSnoozed(product) {
         return this.snoozedProductTracker.isProductSnoozed(product);
+    }
+
+    /**
+     * Initialize customer display communication and bind model listeners.
+     */
+    async initCustomerDisplay() {
+        await this.customerDisplay.initSender(
+            this.device.identifier,
+            this.data.models,
+            GeneratePrinterData
+        );
+
+        const updateCustomerDisplay = debounce(() => this.sendOrderToCustomerDisplay(), 100);
+
+        // List of model-event pairs that should trigger a customer display update.
+        const customerDisplayEventListeners = [
+            { model: "pos.order", event: "create" },
+            { model: "pos.order", event: "update" },
+            { model: "pos.order", event: "delete" },
+            { model: "pos.order.line", event: "update" },
+            { model: "pos.payment", event: "update" },
+        ];
+        for (const { model, event } of customerDisplayEventListeners) {
+            this.models[model].addEventListener(event, updateCustomerDisplay);
+        }
+    }
+
+    sendOrderToCustomerDisplay() {
+        if (["SaverScreen", "LoginScreen"].includes(this.router.state.current)) {
+            this.customerDisplay.send({
+                displayScreenSaver: true,
+            });
+        } else {
+            this.customerDisplay.sendOrder(this.selectedOrder);
+        }
     }
 }
 

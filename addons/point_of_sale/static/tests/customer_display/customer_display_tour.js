@@ -6,6 +6,7 @@ import { isVisible } from "@web/core/utils/ui";
 registry.category("web_tour.tours").add("CustomerDisplayTour", {
     steps: () =>
         [
+            CustomerDisplay.startCustomerDisplay(),
             CustomerDisplay.addProduct(CustomerDisplay.ADD_PRODUCT, "add product"),
             Order.hasLine({ productName: "Letter Tray", price: "2,972.75" }),
             {
@@ -25,7 +26,6 @@ registry.category("web_tour.tours").add("CustomerDisplayTour", {
                 trigger: " div:contains('Welcome.')",
             },
             Order.doesNotHaveLine({}),
-            CustomerDisplay.amountIs("Total", "0.00"),
             {
                 trigger: "body",
                 run: () =>
@@ -49,6 +49,7 @@ registry.category("web_tour.tours").add("CustomerDisplayTour", {
 registry.category("web_tour.tours").add("CustomerDisplayTourScroll", {
     steps: () =>
         [
+            CustomerDisplay.startCustomerDisplay(),
             CustomerDisplay.addProduct(CustomerDisplay.ADD_MULTI_PRODUCTS, "add 20 products"),
             {
                 content: "An order line with `isSelected: true` should have 'selected' class",
@@ -99,13 +100,14 @@ registry.category("web_tour.tours").add("CustomerDisplayTourScroll", {
 registry.category("web_tour.tours").add("CustomerDisplayTourWithQr", {
     steps: () =>
         [
+            CustomerDisplay.startCustomerDisplay(),
             CustomerDisplay.addProduct(CustomerDisplay.ADD_PRODUCT, "add product"),
             Order.hasLine({ productName: "Letter Tray", price: "2,972.75" }),
             CustomerDisplay.amountIs("Total", "2,972.75"),
-            CustomerDisplay.postMessage(CustomerDisplay.PAY_WITH_CARD, "pay with card"),
+            CustomerDisplay.postMessage(CustomerDisplay.PAY_WITH_CASH, "pay with card"),
             CustomerDisplay.postMessage(CustomerDisplay.SEND_QR, "send qr code"),
             { trigger: "img[alt='QR Code']" },
-            CustomerDisplay.postMessage(CustomerDisplay.PAY_WITH_CARD, "confirm payment"),
+            CustomerDisplay.postMessage(CustomerDisplay.PAY_WITH_CASH, "confirm payment"),
             CustomerDisplay.postMessage(CustomerDisplay.ORDER_IS_FINALIZED, "order is finalized"),
             {
                 content: "Check that we are now on the 'Thank you' screen",

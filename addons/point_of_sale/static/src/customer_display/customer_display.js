@@ -17,11 +17,15 @@ export class CustomerDisplay extends Component {
 
     setup() {
         this.session = session;
-        this.dialog = useService("dialog");
-        this.order = useService("customer_display_data");
+
+        this.customerDisplayService = useService("customer_display_service");
+        this.customerDisplayService.initReceiver(this.session.identifier);
+        this.order = useState(this.customerDisplayService.data);
+
+        window.posmodel = this.customerDisplayService;
+
         this.time = useTime();
         const singleDialog = useSingleDialog();
-        this.state = useState({ prevQrCode: null });
 
         this.scrollableRef = useRef("scrollable");
         useLayoutEffect(() => {
@@ -32,21 +36,28 @@ export class CustomerDisplay extends Component {
 
         useLayoutEffect(
             (qrPaymentData) => {
-                if (!qrPaymentData || qrPaymentData.qrCode !== this.state.prevQrCode) {
+                if (!qrPaymentData || qrPaymentData.qrCode !== this.order.prevQrCode) {
                     singleDialog.close();
                 }
-                if (qrPaymentData) {
+                if (qrPaymentData?.qrCode) {
                     singleDialog.open(QRPopup, qrPaymentData);
                 }
 
-                this.state.prevQrCode = qrPaymentData?.qrCode || null;
+                this.order.prevQrCode = qrPaymentData?.qrCode || null;
             },
             () => [this.order.qrPaymentData]
         );
     }
 
-    getInternalNotes(line) {
-        return JSON.parse(line.internalNote || "[]");
+    parseInternalNotes(noteStr) {
+        if (!noteStr || typeof noteStr !== "string") {
+            return [];
+        }
+        return JSON.parse(noteStr);
+    }
+
+    get configLogoSrc() {
+        return `/web/image/pos.config/${this.session.config_id}/logo`;
     }
 }
 
