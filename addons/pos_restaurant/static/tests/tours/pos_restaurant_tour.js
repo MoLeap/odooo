@@ -899,3 +899,19 @@ registry.category("web_tour.tours").add("test_quantity_correctly_displayed_after
             ProductScreen.OrderButtonNotContain("Drinks"),
         ].flat(),
 });
+
+registry.category("web_tour.tours").add("test_general_note_removal_from_send_button", {
+    steps: () =>
+        [
+            Chrome.startPoS(),
+            FloorScreen.clickTable("5"),
+            ProductScreen.clickDisplayedProduct("Coca-Cola"),
+            ProductScreen.clickControlButton("General Note"),
+            TextInputPopup.inputText("Test message"),
+            Dialog.confirm(),
+            negateStep(...ProductScreen.OrderButtonNotContain("Message")),
+            ProductScreen.clickControlButton("General Note"),
+            Dialog.cancel(),
+            ProductScreen.OrderButtonNotContain("Message"),
+        ].flat(),
+});
