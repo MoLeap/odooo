@@ -7,18 +7,24 @@ from odoo.fields import Command, Domain
 
 class SaleOrderTemplate(models.Model):
     _name = "sale.order.template"
-    _description = "Quotation Template"
+    _description = "Order Templates"
     _order = "sequence, id"
 
     active = fields.Boolean(
         default=True,
-        help="If unchecked, it will allow you to hide the quotation template without removing it.",
+        help="If unchecked, it will allow you to hide the Order template without removing it.",
     )
     company_id = fields.Many2one(comodel_name="res.company", default=lambda self: self.env.company)
 
-    name = fields.Char(string="Quotation Template", required=True)
+    name = fields.Char(string="Template", required=True)
     note = fields.Html(string="Terms and conditions", translate=True)
     sequence = fields.Integer(default=10)
+    type = fields.Selection(
+        string="Type",
+        selection=[("quotation", "Quotation"), ("section", "Section")],
+        default="quotation",
+        required=True,
+    )
 
     mail_template_id = fields.Many2one(
         comodel_name="mail.template",
@@ -68,9 +74,6 @@ class SaleOrderTemplate(models.Model):
         help="If set, SO with this template will invoice in this journal; "
         "otherwise the sales journal with the lowest sequence is used.",
     )
-
-    # Section template related fields
-    is_section_template = fields.Boolean(string="Is section template")
 
     # Access control and visibility fields
     share_template = fields.Boolean(string="Share", default=True)
@@ -309,13 +312,11 @@ class SaleOrderTemplate(models.Model):
         """
         company = self.env["res.company"].browse(company_id)
         domain = (
-            Domain("is_section_template", "=", True)
+            Domain("type", "=", "section")
             & Domain("company_id", "in", tuple(company._accessible_branches().ids))
             & Domain("user_has_access", "=", True)
         )
-        return self.with_context(active_test=False).search_read(
-            domain, fields=["id", "name", "create_uid"]
-        )
+        return self.search_read(domain, fields=["id", "name", "create_uid"])
 
     def prepare_section_template_order_lines(self, order_changes, fields_spec):
         """Prepare `sale.order.line` value dicts from a section template.

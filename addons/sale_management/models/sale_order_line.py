@@ -48,7 +48,7 @@ class SaleOrderLine(models.Model):
 
         Given a section line of a sale order, this method collects the section
         itself and all its related lines, and stores them as an inactive
-        ``sale.order.template`` with is_section_template True. If a template with
+        ``sale.order.template`` with type ``section``. If a template with
         the same name and user already exists, its lines are replaced;
         otherwise, a new template is created.
 
@@ -66,13 +66,11 @@ class SaleOrderLine(models.Model):
         domain = (
             Domain("name", "=", self.name)
             & Domain("company_id", "=", self.order_id.company_id.id)
-            & Domain("is_section_template", "=", True)
+            & Domain("type", "=", "section")
             & Domain("create_uid", "=", self.env.user.id)
         )
 
-        existing_template = (
-            self.env["sale.order.template"].with_context(active_test=False).search(domain, limit=1)
-        )
+        existing_template = self.env["sale.order.template"].search(domain, limit=1)
 
         template_lines = [
             Command.create(section_line._prepare_template_line_values())
@@ -86,8 +84,7 @@ class SaleOrderLine(models.Model):
 
         new_template = self.env["sale.order.template"].create({
             "name": self.name,
-            "is_section_template": True,
-            "active": False,
+            "type": "section",
             "sale_order_template_line_ids": template_lines,
             "company_id": self.order_id.company_id.id,
             "share_template": False,

@@ -11,7 +11,7 @@ class ResCompany(models.Model):
         string="Default Sale Template",
         comodel_name="sale.order.template",
         domain="""[
-            ('is_section_template', '=', False),
+            ('type', '=', 'quotation'),
             '|',
             ('company_id', '=', False),
             ('company_id', '=', id),

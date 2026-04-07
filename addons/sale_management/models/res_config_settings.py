@@ -14,7 +14,7 @@ class ResConfigSettings(models.TransientModel):
         related="company_id.sale_order_template_id",
         readonly=False,
         domain="""[
-            ('is_section_template', '=', False),
+            ('type', '=', 'quotation'),
             '|',
             ('company_id', '=', False),
             ('company_id', '=', company_id),
