@@ -745,7 +745,7 @@ export class LinkPlugin extends Plugin {
                         { normalize: false }
                     );
                     link.remove();
-                } else if (cursors) {
+                } else if (cursors?.restore) {
                     cursors.restore();
                 } else {
                     this.dependencies.selection.setCursorEnd(link);
