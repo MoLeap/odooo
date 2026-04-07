@@ -1,5 +1,4 @@
-import { contains } from "@web/../tests/web_test_helpers";
-import { ResourceCalendarAttendance } from "../mock_server/mock_models/resource_calendar_attendance";
+import { contains, onRpc } from "@web/../tests/web_test_helpers";
 import {
     animationFrame,
     beforeEach,

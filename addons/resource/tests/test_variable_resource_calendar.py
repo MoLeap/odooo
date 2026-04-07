@@ -159,7 +159,6 @@ class TestVariableResourceCalendar(TransactionCase):
                 'hour_from': 6,
                 'hour_to': 8,
                 'recurrency': True,
-                'duration_based': False,
                 'date': "2025-01-02",
                 'recurrency_interval': 1,
                 'recurrency_type': "days",
@@ -169,7 +168,6 @@ class TestVariableResourceCalendar(TransactionCase):
                 'hour_from': 8,
                 'hour_to': 16,
                 'recurrency': True,
-                'duration_based': False,
                 'date': "2025-01-01",
                 'recurrency_interval': 1,
                 'recurrency_type': "weeks",
@@ -179,7 +177,6 @@ class TestVariableResourceCalendar(TransactionCase):
                 'hour_from': 16,
                 'hour_to': 17,
                 'recurrency': True,
-                'duration_based': False,
                 'date': "2025-01-03",
                 'recurrency_interval': 2,
                 'recurrency_type': "days",
@@ -187,7 +184,6 @@ class TestVariableResourceCalendar(TransactionCase):
             (0, 0, {
                 'duration_hours': 2,
                 'recurrency': True,
-                'duration_based': True,
                 'date': "2025-01-26",
                 'recurrency_interval': 2,
                 'recurrency_type': "days",
@@ -202,7 +198,6 @@ class TestVariableResourceCalendar(TransactionCase):
                     'calendar_id': self.variable_calendar.id,
                     'hour_from': 7,
                     'hour_to': 9,
-                    'duration_based': False,
                     'date': '2025-01-08',
                 },
             ])
@@ -218,7 +213,6 @@ class TestVariableResourceCalendar(TransactionCase):
                     'recurrency': True,
                     'recurrency_interval': 1,
                     'recurrency_type': "weeks",
-                    'duration_based': False,
                     'date': '2025-01-08',
                 },
             ])
@@ -229,7 +223,6 @@ class TestVariableResourceCalendar(TransactionCase):
                 'calendar_id': self.variable_calendar.id,
                 'hour_from': 7,
                 'hour_to': 9,
-                'duration_based': False,
                 'date': '2024-12-31',
             },
         ])
@@ -239,7 +232,6 @@ class TestVariableResourceCalendar(TransactionCase):
                     'calendar_id': self.variable_calendar.id,
                     'hour_from': 8,
                     'hour_to': 10,
-                    'duration_based': False,
                     'date': '2024-12-31',
                 },
             ])
@@ -253,7 +245,6 @@ class TestVariableResourceCalendar(TransactionCase):
                 'recurrency': True,
                 'recurrency_interval': 1,
                 'recurrency_type': "days",
-                'duration_based': False,
                 'date': '2024-12-01',
             },
         ])
@@ -263,7 +254,6 @@ class TestVariableResourceCalendar(TransactionCase):
                     'calendar_id': self.variable_calendar.id,
                     'hour_from': 8,
                     'hour_to': 10,
-                    'duration_based': False,
                     'date': '2024-12-31',
                 },
             ])
