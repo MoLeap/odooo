@@ -17,6 +17,10 @@ class TestPaymentTransaction(PaymentCustomCommon):
             msg = "requires product"
             raise unittest.SkipTest(msg)
 
+        cls.env["res.partner.bank"].create({
+            "account_number": "BANK123456789",
+            "partner_id": cls.company.partner_id.id,
+        })
         cls.provider = cls._prepare_provider(code="custom", custom_mode="wire_transfer")
         cls.product = cls.env["product.product"].create({
             "name": "test product",
