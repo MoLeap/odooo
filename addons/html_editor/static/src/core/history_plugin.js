@@ -567,7 +567,8 @@ export class HistoryPlugin extends Plugin {
             /** @type { EditorCommit } */
             const origin = savePoint.origin;
             const isLastCommit = origin === this.commits.at(-1);
-            const commitsToRestore = this.getCommitsUntil(origin.id);
+            const index = this.commits.findLastIndex((commit) => commit?.id === origin.id);
+            const commitsToRestore = this.commits.slice(index === -1 ? 1 : index + 1).reverse();
             const irreversibleCommits = [];
             let lastRevertedChanges;
             for (const commitToRestore of commitsToRestore) {
@@ -714,20 +715,6 @@ export class HistoryPlugin extends Plugin {
 
     getIsPreviewing() {
         return !!this.isPreviewing;
-    }
-
-    /**
-     * Get the commits saved in commits between the commit of given id (not
-     * included) and the most recent one. If no commit id is given, return all
-     * commits but the first.
-     *
-     * @param { EditorCommitId } [commitId]
-     * // TODO AGE: review this.
-     * @returns { EditorCommit[] }
-     */
-    getCommitsUntil(commitId) {
-        const commitIndex = this.commits.findLastIndex((commit) => commit?.id === commitId);
-        return this.commits.slice(commitIndex === -1 ? 1 : commitIndex + 1).reverse();
     }
 
     // =============
