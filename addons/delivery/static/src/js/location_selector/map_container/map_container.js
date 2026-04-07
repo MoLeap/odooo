@@ -55,7 +55,7 @@ export class MapContainer extends Component {
              * We load the script for the map before rendering the owl component to avoid a
              * UserError if the script can't be loaded (e.g. if the customer loses the connection
              * between the rendering of the page and when he opens the location selector, or if the
-             * CDN’s doesn't host the library anymore).
+             * CDN's doesn't host the library anymore).
              */
             try {
                 await Promise.all([
