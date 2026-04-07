@@ -861,6 +861,8 @@ class CalendarEvent(models.Model):
             recurring_events = alarm_events.filtered('recurrence_id')
             recurring_events.recurrence_id._setup_alarms()
             (alarm_events - recurring_events)._setup_alarms()
+
+        print("pass inside the write before here")
         return events.with_context(is_calendar_event_new=False)
 
     def _compute_field_value(self, field):
