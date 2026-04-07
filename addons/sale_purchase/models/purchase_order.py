@@ -42,6 +42,19 @@ class PurchaseOrder(models.Model):
         self.sudo()._activity_cancel_on_sale()
         return result
 
+    def action_merge(self):
+        tagged = self.filtered(lambda r: r.state in ('draft', 'sent')).order_line.filtered('sale_line_id')
+        originals = {line.id: line.analytic_distribution for line in tagged}
+        try:
+            for line in tagged:
+                dist = dict(line.analytic_distribution or {})
+                dist['_sale_line_id'] = line.sale_line_id.id
+                line.analytic_distribution = dist
+            return super().action_merge()
+        finally:
+            for line in tagged.exists():
+                line.analytic_distribution = originals[line.id] or False
+
     def _get_sale_orders(self):
         return self.order_line.sale_order_id
 
