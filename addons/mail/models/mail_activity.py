@@ -177,10 +177,14 @@ class MailActivity(models.Model):
     @api.depends('activity_type_id')
     def _compute_date_deadline(self):
         for activity in self:
+            print("will pass here to compute the deadline")
+            print("it is long")
             if activity.activity_type_id.delay_count:
                 activity.date_deadline = activity.activity_type_id._get_date_deadline()
             elif not activity.date_deadline:
+                print("pass here as it has no deadline")
                 activity.date_deadline = fields.Date.context_today(activity)
+            print(activity.date_deadline)
 
     @api.depends('activity_type_id')
     def _compute_note(self):
@@ -290,6 +294,7 @@ class MailActivity(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        print("pass inside the create activity")
         activities = super(MailActivity, self).create(vals_list)
 
         # find partners related to responsible users, separate readable from unreadable
@@ -321,12 +326,18 @@ class MailActivity(models.Model):
 
         # send notifications about activity creation
         todo_activities = activities.filtered(lambda act: act.active and act.date_deadline <= fields.Date.today() and act.user_id)
+        for act in todo_activities:
+            print("this is the new created activity")
+            print(act.date_deadline)
+            print(act.summary)
         if todo_activities:
             for user, user_activities in todo_activities.grouped('user_id').items():
                 user._bus_send("mail.activity/updated", {"activity_created": True, "count_diff": len(user_activities)})
         return activities
 
     def write(self, vals):
+        print("pass inside the write")
+        print(vals)
         today = fields.Date.today()
 
         def get_user_todo_activity_count(activities):

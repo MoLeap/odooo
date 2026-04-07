@@ -744,10 +744,8 @@ class CalendarEvent(models.Model):
         if meeting_activity_types:
             print("yes it has")
             for values in vals_list:
-                print("has a vals_list")
                 # created from calendar: try to create an activity on the related record
                 if values['meeting_activity_ids'] and not existing_event:
-                    print("will not pass no existing event")
                     continue
                 res_model = all_models.filtered(lambda m: m.id == values['res_model_id'])
                 res_id = values['res_id']
@@ -1351,6 +1349,7 @@ class CalendarEvent(models.Model):
         return self.event_tz or self.env.user.tz
 
     def _sync_activities(self, fields):
+        print("pass inside the sync")
         # update activities
         for event in self:
             if event.meeting_activity_ids:
