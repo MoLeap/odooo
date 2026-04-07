@@ -355,7 +355,7 @@ export class HistoryPlugin extends Plugin {
      */
     createSnapshotCommit() {
         const data = this.processThrough("snapshot_commit_data_processors", {
-            authorTimestamp: this.authorTimestamp || Date.now(), // TODO AGE: I don't think the || is needed.
+            authorTimestamp: this.authorTimestamp,
         });
         return new EditorCommit({ id: this.commits.at(-1)?.id, data });
     }
