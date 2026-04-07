@@ -266,6 +266,10 @@ class PosConfig(models.Model):
                 'records': records
             })
 
+    def notify_webrtc_signaling(self, payload):
+        self.ensure_one()
+        self._notify('WEBRTC_SIGNALING', payload)
+
     def read_config_open_orders(self, domain, record_ids=[]):
         delete_record_ids = {}
         dynamic_records = {}
@@ -1042,10 +1046,6 @@ class PosConfig(models.Model):
 
     def _get_special_products(self):
         return self.env.ref('point_of_sale.product_product_tip', raise_if_not_found=False) or self.env['product.product']
-
-    def update_customer_display(self, order, device_uuid):
-        self.ensure_one()
-        self._notify(f"UPDATE_CUSTOMER_DISPLAY-{device_uuid}", order)
 
     def _get_customer_display_data(self):
         self.ensure_one()
