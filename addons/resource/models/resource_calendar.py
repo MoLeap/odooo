@@ -10,12 +10,13 @@ from dateutil.relativedelta import relativedelta
 from dateutil.rrule import DAILY, rrule
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError
 from odoo.fields import Command, Domain
 from odoo.tools import float_compare
 from odoo.tools.date_utils import float_to_time, localized, to_timezone
 from odoo.tools.float_utils import float_round
 from odoo.tools.intervals import Intervals
+
 
 class ResourceCalendar(models.Model):
     """ Calendar model for a resource. It has

@@ -111,6 +111,16 @@ class ResourceCalendarAttendance(models.Model):
         "A recurrency should finish after the first occurence",
     )
 
+    _check_duration = models.Constraint(
+        "CHECK(duration_hours != 0)",
+        "An attendance should have a duration",
+    )
+
+    _check_hour_from_to = models.Constraint(
+        "CHECK((hour_from != hour_to) OR (duration_based IS TRUE))",
+        "An attendance should have an hour_from and hour_to or be duration based",
+    )
+
     def _format_attendance(self):
         self.ensure_one
         return {
