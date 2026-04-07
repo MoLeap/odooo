@@ -55,7 +55,7 @@
                             <i t-if="this.state.isInEditMode"
                                 class="oi oi-draggable ms-1 d-none d-sm-block mt-1"/>
                         </label>
-                        <div class="o_property_field_value">
+                        <div class="o_property_field_value d-flex w-100">
                             <PropertyValue
                                 id="domId"
                                 canChangeDefinition="this.state.canChangeDefinition"
@@ -73,7 +73,7 @@
                                 onTagsChange.bind="(newTags, newValue) => this.onTagsChange(propertyConfiguration.name, newTags, newValue)"
                                 record="this.props.record"
                             />
-                            <span class="o_input_box_overlay_end o_input_box_overlay_inline" t-if="propertyConfiguration.suffix" t-out="propertyConfiguration.suffix"/>
+                            <span t-if="propertyConfiguration.suffix" t-out="propertyConfiguration.suffix"/>
                         </div>
                     </div>
                     <div
