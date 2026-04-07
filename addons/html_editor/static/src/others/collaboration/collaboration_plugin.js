@@ -10,6 +10,7 @@ const HISTORY_SNAPSHOT_BUFFER_TIME = 1000 * 10;
  * @property { string } peerId
  *
  * @typedef { import("../../utils/commit").EditorCommit } EditorCommit
+ * @typedef { import("../../utils/commit").EditorCommitType } EditorCommitType
  */
 
 /**
@@ -125,7 +126,7 @@ export class CollaborationPlugin extends Plugin {
     /**
      * Apply external commits coming from the collaboration.
      *
-     * @param {Object} newCommits External commits to be applied
+     * @param { EditorCommit[] } newCommits External commits to be applied
      */
     onExternalHistoryCommits(newCommits) {
         let commitIndex = 0;
@@ -163,8 +164,8 @@ export class CollaborationPlugin extends Plugin {
     }
 
     /**
-     * @param {EditorCommit[]} commits
-     * @param {EditorCommit} newCommit
+     * @param { EditorCommit[] } commits
+     * @param { EditorCommit } newCommit
      */
     getInsertCommitIndex(commits, newCommit) {
         let index = commits.length - 1;
@@ -300,7 +301,7 @@ export class CollaborationPlugin extends Plugin {
     }
 
     /**
-     * @param {EditorCommit} commit
+     * @param { EditorCommit } commit
      */
     onHistoryCommitted(commit) {
         commit.updateData("peerId", this.peerId);

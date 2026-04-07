@@ -7,16 +7,9 @@ import { EditorCommit } from "../utils/commit";
 /**
  * @typedef { import("../utils/commit").EditorCommit } EditorCommit
  * @typedef { import("../utils/commit").EditorCommitType } EditorCommitType
+ * @typedef { import("../utils/commit").WritableEditorCommitType } WritableEditorCommitType
  * @typedef { import("../utils/commit").EditorCommitData } EditorCommitData
- * @typedef { import("../utils/commit").EditorCommitMetadata } EditorCommitMetadata
  * @typedef { import("../utils/commit").EditorCommitId } EditorCommitId
- * @typedef { import("./selection_plugin").SerializedSelection } SerializedSelection
- *
- * @typedef { Object } HistoryCommitData
- * @property { number } authorTimestamp
- * @property { number } [commitTimestamp]
- * @property { EditorCommitId } [previousCommitId]
- * @property { boolean } [batchable]
  */
 /**
  * @typedef { Object } HistoryShared
@@ -41,28 +34,28 @@ import { EditorCommit } from "../utils/commit";
 /**
  * @typedef {(() => void)[]} on_external_commit_added_handlers
  * @typedef {(() => void)[]} on_history_cleaned_handlers
- * @typedef {(() => void)[]} on_history_reset_handlers
+ * @typedef {((content: string) => void)[]} on_history_reset_handlers
  * @typedef {(() => void)[]} on_history_reset_from_commits_handlers
  * @typedef {((commit: EditorCommit) => void)[]} on_history_committed_handlers
  * @typedef {((commit: EditorCommit, options?: { ensureNewMutations?: boolean, restoreSelection?: boolean }) => void)[]} on_apply_commit_handlers
  * @typedef {((commit: EditorCommit, options?: { ensureNewMutations?: boolean, restoreFocus?: boolean }) => void)[]} on_revert_commit_handlers
- * @typedef {((revertedCommit: EditorCommit) => void)[]} on_undone_handlers
- * @typedef {((revertedCommit: EditorCommit) => void)[]} on_redone_handlers
+ * @typedef {((revertedCommit: EditorCommit<"standard" | "redo"> | undefined) => void)[]} on_undone_handlers
+ * @typedef {((revertedCommit: EditorCommit<"undo"> | undefined) => void)[]} on_redone_handlers
  * @typedef {(() => void)[]} on_preview_handlers
  * @typedef { (() => void)[] } on_restore_save_point_handlers
  * @typedef { (() => void)[] } on_commit_restored_handlers
  * @typedef { (() => void)[] } on_irreversible_commit_applied_handlers
  * @typedef { (() => void)[] } on_history_discard_handlers
- * @typedef { (({ stashedData: EditorCommitData }) => void)[] } on_history_unstashed_handlers
+ * @typedef { ((stashedData: EditorCommitData<"standard">) => void)[] } on_history_unstashed_handlers
  * @typedef { ((savePoint: EditorCommit<"savePoint">) => void)[] } on_savepoint_restored_handlers
  * @typedef { (() => void)[] } on_current_history_data_reset_handlers
  *
  * @typedef {((commit: EditorCommit) => boolean | undefined)[]} is_commit_reversible_predicates
  * @typedef {((commit: EditorCommit) => boolean | undefined)[]} has_commit_changes_predicates
  *
- * @typedef { ((data: EditorCommitData, origin?: EditorCommitData) => EditorCommitData | undefined)[] } pending_commit_data_processors
- * @typedef {((data: EditorCommitData) => EditorCommitData | undefined)[]} snapshot_commit_data_processors
- * @typedef { ((savePoint: Object) => Object | void)[] } save_point_data_processors
+ * @typedef { ((data: EditorCommitData, origin?: EditorCommit) => EditorCommitData | undefined)[] } pending_commit_data_processors
+ * @typedef {((data: EditorCommitData<"standard">) => EditorCommitData<"standard"> | undefined)[]} snapshot_commit_data_processors
+ * @typedef { ((data: EditorCommitData<"savePoint">) => EditorCommitData<"savePoint"> | void)[] } save_point_data_processors
  */
 
 export const COMMIT_DEBOUNCE_DELAY = 250;
@@ -144,13 +137,13 @@ export class HistoryPlugin extends Plugin {
     };
 
     setup() {
-        /** @type { HistoryCommitData } */
+        /** @type { number } */
         this.authorTimestamp = Date.now();
         this._onKeyupResetContenteditableNodes = [];
         this.addDomListener(this.document, "beforeinput", this.onDocumentBeforeInput.bind(this));
         this.addDomListener(this.document, "input", this.onDocumentInput.bind(this));
         this.clean();
-        /** @type { HistoryCommitData[] } */
+        /** @type { EditorCommitData<"standard">[] } */
         this.currentStash = [];
     }
 
@@ -177,10 +170,9 @@ export class HistoryPlugin extends Plugin {
     /**
      * Create a commit from data and write it to history.
      *
-     * @template { EditorCommitData } T
      * @param { object } params
      * @param { boolean } [params.batchable = false]
-     * @returns { EditorCommit<T> }
+     * @returns { EditorCommit<"standard"> | false }
      */
     commit({ batchable = false } = {}) {
         // Set the type of the commit here. That way, the state of undo and redo
@@ -210,6 +202,9 @@ export class HistoryPlugin extends Plugin {
         }
     }
 
+    /**
+     * @returns { EditorCommitData<"standard"> }
+     */
     discard() {
         const data = this.processCommitData();
         this.trigger("on_history_discard_handlers");
@@ -224,10 +219,12 @@ export class HistoryPlugin extends Plugin {
             return;
         }
         this.discard();
+        /** @type { EditorCommit<"standard" | "redo"> | undefined } */
         let revertedCommit;
         for (revertedCommit of this.getNextRevisionCommits("undo")) {
             this.revertCommit(revertedCommit, { ensureNewMutations: true });
             this.revertedCommits.add(revertedCommit.id);
+            /** @type { EditorCommitData<"undo"> } */
             const commitData = this.processCommitData({
                 data: {
                     batchable: revertedCommit.data.batchable,
@@ -250,10 +247,12 @@ export class HistoryPlugin extends Plugin {
      */
     redo() {
         this.discard();
+        /** @type { EditorCommit<"undo"> | undefined } */
         let revertedCommit;
         for (revertedCommit of this.getNextRevisionCommits("redo")) {
             this.revertCommit(revertedCommit, { ensureNewMutations: true });
             this.revertedCommits.add(revertedCommit.id);
+            /** @type { EditorCommitData<"redo"> } */
             const commitData = this.processCommitData({
                 data: {
                     batchable: revertedCommit.data.batchable,
@@ -316,9 +315,10 @@ export class HistoryPlugin extends Plugin {
     // =======================
 
     /**
-     * @param { EditorCommit } commit
+     * @template { WritableEditorCommitType } T
+     * @param { EditorCommit<T> } commit
      * @param { boolean } [silent = false] if true, skips any outside notification.
-     * @returns { EditorCommit }
+     * @returns { EditorCommit<T> | false }
      */
     writeCommit(commit, silent = false) {
         // Set the timestamp of the commit or keep the timestamp of the commit
@@ -351,9 +351,10 @@ export class HistoryPlugin extends Plugin {
     }
 
     /**
-     * @returns { EditorCommit }
+     * @returns { EditorCommit<"standard"> }
      */
     createSnapshotCommit() {
+        /** @type { EditorCommitData<"standard"> } */
         const data = this.processThrough("snapshot_commit_data_processors", {
             authorTimestamp: this.authorTimestamp,
         });
@@ -433,8 +434,9 @@ export class HistoryPlugin extends Plugin {
     /**
      * Returns the commits to be reverted/redone by a single undo or redo.
      *
-     * @param {"undo" | "redo"} type
-     * @returns { EditorCommit[] }
+     * @template { "undo" | "redo" } T
+     * @param { T } type
+     * @returns { (T extends "undo" ? EditorCommit<"standard" | "redo"> : EditorCommit<"undo">)[] }
      */
     getNextRevisionCommits(type) {
         let referenceCommitIndex = this.getNextRevisionIndex(type);
@@ -554,6 +556,7 @@ export class HistoryPlugin extends Plugin {
      * @returns { Function }
      */
     makeSavePoint() {
+        /** @type { EditorCommit<"savePoint"> } */
         const savePoint = new EditorCommit({
             type: "savePoint",
             data: this.processThrough("save_point_data_processors", {
@@ -571,6 +574,7 @@ export class HistoryPlugin extends Plugin {
             const isLastCommit = origin === this.commits.at(-1);
             const index = this.commits.findLastIndex((commit) => commit?.id === origin.id);
             const commitsToRestore = this.commits.slice(index === -1 ? 1 : index + 1).reverse();
+            /** @type { EditorCommit[] } */
             const irreversibleCommits = [];
             for (const commitToRestore of commitsToRestore) {
                 const isReversible = this.isReversibleCommit(commitToRestore);
@@ -600,6 +604,7 @@ export class HistoryPlugin extends Plugin {
             if (!isLastCommit) {
                 // Register resulting mutations as a new "restore" commit (prevent
                 // undo).
+                /** @type { EditorCommit<"restore"> } */
                 const restoreCommit = new EditorCommit({
                     type: "restore",
                     data: this.processCommitData({ origin }),
@@ -611,6 +616,13 @@ export class HistoryPlugin extends Plugin {
         };
     }
 
+    /**
+     * @template { import("../utils/commit").WritableEditorCommitType } [T="standard"]
+     * @param { Object } [param0 = {}]
+     * @param { EditorCommitData<T> } [param0.data = {}]
+     * @param { EditorCommit } [param0.origin]
+     * @returns { EditorCommitData<T> }
+     */
     processCommitData({ data = {}, origin } = {}) {
         return this.processThrough("pending_commit_data_processors", data, origin);
     }

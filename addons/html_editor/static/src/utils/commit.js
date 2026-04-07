@@ -1,30 +1,53 @@
 /**
  * @typedef { string } EditorCommitId
  * @typedef { "standard" | "undo" | "redo" | "restore" | "savePoint" } EditorCommitType
- * @typedef { { [key: string]: any } } EditorCommitData
+ * @typedef { Exclude<EditorCommitType, "savePoint"> } WritableEditorCommitType
+ */
+/**
+ * @template { EditorCommitType } [T=WritableEditorCommitType]
+ * @typedef { Record<string, any> & (
+ *   T extends "savePoint"
+ *     ? {
+ *           origin: EditorCommit<Exclude<EditorCommitType, "savePoint">>,
+ *           hasBeenRestored: boolean,
+ *           lastRevertedChanges?: EditorCommitData<Exclude<EditorCommitType, "savePoint">>,
+ *       }
+ *     : T extends ("standard" | "undo" | "redo")
+ *       ? {
+ *           authorTimestamp?: number,
+ *           commitTimestamp?: number,
+ *           previousCommitId?: EditorCommitId,
+ *           batchable?: boolean,
+ *       }
+ *       : {
+ *           authorTimestamp?: number,
+ *           commitTimestamp?: number,
+ *           previousCommitId?: EditorCommitId,
+ *         }
+ * ) } EditorCommitData<T>
  */
 
 /**
- * @template { Object } [T=EditorCommitData]
+ * @template { EditorCommitType } [T=WritableEditorCommitType]
  */
 export class EditorCommit {
     /**
      * @param { Object } [param0 = {}]
      * @param { EditorCommitId } [param0.id = this.generateId()]
-     * @param { EditorCommitType } [param0.type = "standard"]
-     * @param { T } [param0.data = {}]
+     * @param { T } [param0.type = "standard"]
+     * @param { EditorCommitData<T> } [param0.data = {}]
      */
     constructor({ id = this.generateId(), type = "standard", data = {} } = {}) {
         /** @type { EditorCommitId } */
         this.id = id;
-        /** @type { EditorCommitType } */
+        /** @type { T } */
         this.type = type;
-        /** @type { EditorCommitData & T } */
+        /** @type { EditorCommitData<T> } */
         this.data = data;
     }
 
     /**
-     * @param {keyof (EditorCommitData & T)} key
+     * @param { keyof EditorCommitData<T> } key
      * @param {any} value
      */
     updateData(key, value) {
