@@ -281,6 +281,16 @@ export class MoveNodePlugin extends Plugin {
         this.moveWidget.style.top = `${anchorY - containerRect.y - moveWidgetOffsetTop}px`;
         this.moveWidget.style.left = `${anchorX - containerRect.x - WIDGET_CONTAINER_WIDTH}px`;
 
+        const formSheet = this.moveWidget.closest(".o_form_sheet");
+        if (formSheet) {
+            const formSheetRect = formSheet.getBoundingClientRect();
+            const moveWidgetRect = this.moveWidget.getBoundingClientRect();
+            const BORDER_OVERLAP_THRESHOLD = 2;
+            this.moveWidget.classList.toggle(
+                "oe_movewidget_border",
+                formSheetRect.left - moveWidgetRect.left > BORDER_OVERLAP_THRESHOLD
+            );
+        }
         this.services.tooltip.add(this.moveWidget, {
             template: xml`
                 <div class="o-tooltip tooltip-inner text-start px-3">
