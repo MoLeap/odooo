@@ -248,6 +248,7 @@ class TestFrontend(TestFrontendCommon):
     def test_02_others_bis(self):
         self.pos_config.with_user(self.pos_admin).open_ui()
         self.start_pos_tour('ControlButtonsTour', login="pos_admin")
+        self.start_pos_tour('test_general_note_removal_from_send_button')
 
     def test_04_ticket_screen(self):
         self.pos_config.with_user(self.pos_user).open_ui()
