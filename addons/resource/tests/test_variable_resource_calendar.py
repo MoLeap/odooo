@@ -140,7 +140,7 @@ class TestVariableResourceCalendar(TransactionCase):
         """
         DB = Duration Based; TB = Time Based
 
-        R1 : 1d + 2025-01-02  -  duration: 2h; hour_from: 7h; hour_to: 8h; until: 2025-01-25;
+        R1 : 1d + 2025-01-02  -  duration: 2h; hour_from: 6h; hour_to: 8h; until: 2025-01-25;
         R2 : 1w + 2025-01-01  -  duration: 8h; hour_from: 8h; hour_to: 16h; until: 2025-01-31;
         R4 : 2d + 2025-01-03  -  duration: 1h; hour_from: 16h; hour_to: 17h;
         R8 : 0  + 2025-01-26  -  duration: 2h;
@@ -156,7 +156,7 @@ class TestVariableResourceCalendar(TransactionCase):
 
         self.variable_calendar.attendance_ids = [(5, 0, 0),
             (0, 0, {
-                'hour_from': 7,
+                'hour_from': 6,
                 'hour_to': 8,
                 'recurrency': True,
                 'duration_based': False,
@@ -267,3 +267,75 @@ class TestVariableResourceCalendar(TransactionCase):
                     'date': '2024-12-31',
                 },
             ])
+
+    def test_collision_duration_adhoc_on_3recurrences(self):
+        """
+        Adhoc that can make a day with multiple recurrence collision the total duration exceed 24h
+        R1: 2h
+        R2: 8h
+        R3: 1h
+        On 2025-01-15: R123 = 11h => +13h not possible
+        """
+        self.setup_collision()
+        self.variable_calendar.attendance_ids.duration_based = True
+        with self.assertRaises(UserError):
+            self.env["resource.calendar.attendance"].create([
+                {
+                    'calendar_id': self.variable_calendar.id,
+                    'duration_hours': 13.1,
+                    'date': '2025-01-15',
+                },
+            ])
+        self.env["resource.calendar.attendance"].create([
+            {
+                'calendar_id': self.variable_calendar.id,
+                'duration_hours': 13,
+                'date': '2025-01-15',
+            },
+        ])
+
+    def test_collision_duration_recurrency_on_3recurrences(self):
+        """
+        Adhoc that can make a day with multiple recurrence collision the total duration exceed 24h
+        R1: 2h
+        R2: 8h
+        R3: 1h
+        On 2025-01-15: R123 = 11h => +13h not possible
+        """
+        self.setup_collision()
+        self.variable_calendar.attendance_ids.duration_based = True
+        with self.assertRaises(UserError):
+            self.env["resource.calendar.attendance"].create([
+                {
+                    'calendar_id': self.variable_calendar.id,
+                    'duration_hours': 13.1,
+                    'recurrency': True,
+                    'recurrency_interval': 1,
+                    'recurrency_type': 'days',
+                    'date': '2025-01-12',
+                },
+            ])
+        self.env["resource.calendar.attendance"].create([
+            {
+                'calendar_id': self.variable_calendar.id,
+                'duration_hours': 13,
+                'recurrency': True,
+                'recurrency_interval': 1,
+                'recurrency_type': 'days',
+                'date': '2025-01-12',
+            },
+        ])
+
+    def test_exclusion_first_occurence(self):
+        date_to_exclude = date(2025, 1, 1)
+        recurrency = self.env["resource.calendar.attendance"].create([{
+            'calendar_id': self.variable_calendar.id,
+            'duration_hours': 12,
+            'recurrency': True,
+            'recurrency_interval': 1,
+            'recurrency_type': 'days',
+            'date': date_to_exclude,
+        }])
+        recurrency.exclude_occurence('2025-01-01')
+        result = self.variable_calendar._get_attendances_by_date(date_to_exclude, date_to_exclude)
+        self.assertEqual(result[date_to_exclude], self.env['resource.calendar.attendance'])

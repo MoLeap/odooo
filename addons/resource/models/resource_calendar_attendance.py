@@ -199,16 +199,15 @@ class ResourceCalendarAttendance(models.Model):
                     # To not compare permuations of the same collisions
                     if node_reccurency['max_id'] >= leaf_reccurency['max_id']:
                         continue
-                    new_ids = node_reccurency['ids'] | leaf_reccurency['ids']
-                    # To compare only with new ids to check
-                    if ids_to_check.isdisjoint(new_ids):
-                        continue
                     collision = _check_collision(node_reccurency, leaf_reccurency)
                     if not collision:
                         continue
                     new_period, new_date, new_excluded, new_until = collision
-                    attendances = self.browse(new_ids)
-                    attendances._check_attendance(format_date(self.env, new_date))
+                    new_ids = node_reccurency['ids'] | leaf_reccurency['ids']
+                    # If new added reccurency is in the ids of this new recurrency, we check contraints
+                    if not ids_to_check.isdisjoint(new_ids):
+                        attendances = self.browse(new_ids)
+                        attendances._check_attendance(format_date(self.env, new_date))
                     next_level_recurrent_attendance_nodes.append({
                         'ids': new_ids,
                         'period': new_period,
@@ -384,6 +383,8 @@ class ResourceCalendarAttendance(models.Model):
 
     def exclude_occurence(self, date):
         self.ensure_one()
+        if (parsed_date := parse_iso_date(date)) == self.date:
+            self.date = parsed_date + relativedelta(days=self.recurrency_interval if self.recurrency_type == 'days' else self.recurrency_interval * 7)
         excluded_ocurrences = self.recurrency_excluded_occurences['dates']
         if date not in excluded_ocurrences:
             excluded_ocurrences.append(date)
