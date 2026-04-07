@@ -183,14 +183,14 @@ export class BuilderOptionsPlugin extends Plugin {
             return buttons;
         },
         pending_commit_data_processors: this.processCommitData.bind(this),
-        save_point_data_processors: (savePoint) => ({
-            ...savePoint,
+        save_point_data_processors: (data) => ({
+            ...data,
             targetState: { ...this.targetState },
         }),
         on_savepoint_restored_handlers: (savePoint) => {
             // Note AGE: this is the `extraStepInfos` stuff.
-            if ("targetState" in savePoint) {
-                this.targetState = { ...savePoint.targetState };
+            if ("targetState" in savePoint.data) {
+                this.targetState = { ...savePoint.data.targetState };
             }
         },
     };

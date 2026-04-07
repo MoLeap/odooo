@@ -1,6 +1,6 @@
 /**
  * @typedef { string } EditorCommitId
- * @typedef { "standard" | "undo" | "redo" | "restore" } EditorCommitType
+ * @typedef { "standard" | "undo" | "redo" | "restore" | "savePoint" } EditorCommitType
  * @typedef { { [key: string]: any } } EditorCommitData
  */
 

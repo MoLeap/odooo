@@ -227,13 +227,13 @@ export class DomMutationPlugin extends Plugin {
         on_current_history_data_reset_handlers: () => {
             this.mutations = [];
         },
-        save_point_data_processors: (savePoint) => {
+        save_point_data_processors: (data) => {
             this.processAndStageMutations();
-            return { ...savePoint, mutations: [...this.mutations] };
+            return { ...data, mutations: [...this.mutations] };
         },
         on_savepoint_restored_handlers: withSequence(0, (savePoint) => {
             // Apply draft mutations to recover the same mutations state as before.
-            this.applyMutations(savePoint.mutations, { ensureNewMutations: true });
+            this.applyMutations(savePoint.data.mutations, { ensureNewMutations: true });
             this.processAndStageMutations();
             this.dispatchContentUpdated();
         }),

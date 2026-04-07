@@ -54,7 +54,7 @@ import { EditorCommit } from "../utils/commit";
  * @typedef { (() => void)[] } on_irreversible_commit_applied_handlers
  * @typedef { (() => void)[] } on_history_discard_handlers
  * @typedef { (({ stashedData: EditorCommitData }) => void)[] } on_history_unstashed_handlers
- * @typedef { ((savePoint: Object, lastRevertedChanges: EditorCommitData) => void)[] } on_savepoint_restored_handlers
+ * @typedef { ((savePoint: EditorCommit<"savePoint">) => void)[] } on_savepoint_restored_handlers
  * @typedef { (() => void)[] } on_current_history_data_reset_handlers
  *
  * @typedef {((commit: EditorCommit) => boolean | undefined)[]} is_commit_reversible_predicates
@@ -554,23 +554,24 @@ export class HistoryPlugin extends Plugin {
      * @returns { Function }
      */
     makeSavePoint() {
-        // TODO AGE: see if I could make this into a special kind of commit.
-        const savePoint = this.processThrough("save_point_data_processors", {
-            origin: this.commits.at(-1),
-            hasBeenRestored: false,
+        const savePoint = new EditorCommit({
+            type: "savePoint",
+            data: this.processThrough("save_point_data_processors", {
+                origin: this.commits.at(-1),
+                hasBeenRestored: false,
+            }),
         });
         return () => {
-            if (savePoint.hasBeenRestored) {
+            if (savePoint.data.hasBeenRestored) {
                 return;
             }
             this.discard();
             /** @type { EditorCommit } */
-            const origin = savePoint.origin;
+            const origin = savePoint.data.origin;
             const isLastCommit = origin === this.commits.at(-1);
             const index = this.commits.findLastIndex((commit) => commit?.id === origin.id);
             const commitsToRestore = this.commits.slice(index === -1 ? 1 : index + 1).reverse();
             const irreversibleCommits = [];
-            let lastRevertedChanges;
             for (const commitToRestore of commitsToRestore) {
                 const isReversible = this.isReversibleCommit(commitToRestore);
                 // Savepoint restoration is used for previews, so keep focus on the
@@ -583,7 +584,7 @@ export class HistoryPlugin extends Plugin {
                 this.trigger("on_commit_restored_handlers");
                 if (isReversible) {
                     this.discardedCommits.add(commitToRestore.id);
-                    lastRevertedChanges = commitToRestore.data;
+                    savePoint.data.lastRevertedChanges = commitToRestore.data;
                 } else {
                     irreversibleCommits.unshift(commitToRestore);
                 }
@@ -605,8 +606,8 @@ export class HistoryPlugin extends Plugin {
                 });
                 this.writeCommit(restoreCommit);
             }
-            savePoint.hasBeenRestored = true;
-            this.trigger("on_savepoint_restored_handlers", savePoint, lastRevertedChanges);
+            savePoint.data.hasBeenRestored = true;
+            this.trigger("on_savepoint_restored_handlers", savePoint);
         };
     }
 

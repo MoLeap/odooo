@@ -268,30 +268,31 @@ export class SelectionPlugin extends Plugin {
                 this.setSerializedSelection(commit.data.selection);
             }
         },
-        on_savepoint_restored_handlers: (savePoint, lastRevertedChanges) => {
-            if (lastRevertedChanges?.selection && !savePoint.mutations.length) {
-                savePoint.selection.setCursor((cursor) => {
+        on_savepoint_restored_handlers: (savePoint) => {
+            if (savePoint.data.lastRevertedChanges?.selection && !savePoint.data.mutations.length) {
+                savePoint.data.selection.setCursor((cursor) => {
                     const anchorNode = this.dependencies.domReference.getNodeById(
-                        lastRevertedChanges.selection.anchorNodeId
+                        savePoint.data.lastRevertedChanges.selection.anchorNodeId
                     );
                     const focusNode = this.dependencies.domReference.getNodeById(
-                        lastRevertedChanges.selection.focusNodeId
+                        savePoint.data.lastRevertedChanges.selection.focusNodeId
                     );
                     cursor.anchor.node = anchorNode;
-                    cursor.anchor.offset = lastRevertedChanges.selection.anchorOffset;
+                    cursor.anchor.offset =
+                        savePoint.data.lastRevertedChanges.selection.anchorOffset;
 
                     cursor.focus.node = focusNode;
-                    cursor.focus.offset = lastRevertedChanges.selection.focusOffset;
+                    cursor.focus.offset = savePoint.data.lastRevertedChanges.selection.focusOffset;
                 });
             }
 
             // TODO ABD TODO @phoenix: evaluate if the selection is not restorable at the desired position
-            savePoint.selection.restore();
+            savePoint.data.selection.restore();
             this.stageSelection();
         },
-        save_point_data_processors: (savePoint) =>
+        save_point_data_processors: (data) =>
             // TODO ABD TODO @phoenix: selection may become obsolete, it should evolve with mutations.
-            ({ ...savePoint, selection: this.preserveSelection() }),
+            ({ ...data, selection: this.preserveSelection() }),
         snapshot_commit_data_processors: (data) => ({
             ...data,
             activeElementId: null,
